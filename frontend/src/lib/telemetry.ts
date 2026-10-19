@@ -1,0 +1,147 @@
+// AETHER PITCH v2.0 — mutable 60fps telemetry store.
+// The 10Hz WebSocket stream lands here; R3F components sample it inside
+// useFrame with velocity extrapolation, so the 3D scene never re-renders
+// React at tick rate.
+
+import type { Insight, MatchTick, Metrics } from "./types";
+
+export interface PlayerSample {
+  id: string;
+  team: "NLA" | "MCS";
+  shirt_number: number;
+  name: string;
+  role: string;
+  // previous / current tick snapshots for interpolation
+  px: number; py: number; ph: number;
+  x: number; y: number; h: number;
+  vx: number; vy: number;
+  speed_kmh: number;
+  stamina: number;
+  pose_state: string;
+  playstyle_badge: string | null;
+  prevTickAt: number;
+  currTickAt: number;
+  kickT0: number;
+}
+
+export interface BallSample {
+  px: number; py: number; pz: number;
+  x: number; y: number; z: number;
+  vx: number; vy: number; vz: number;
+  speed_kmh: number;
+  pass_start: [number, number] | null;
+  pass_end: [number, number] | null;
+  is_lofted: boolean;
+  prevTickAt: number;
+  currTickAt: number;
+}
+
+export interface GhostSample {
+  x: number;
+  y: number;
+  delta_xt: number;
+  at: number;
+}
+
+class TelemetryStore {
+  players = new Map<string, PlayerSample>();
+  ball: BallSample = {
+    px: 0, py: 0, pz: 0,
+    x: 0, y: 0, z: 0,
+    vx: 0, vy: 0, vz: 0,
+    speed_kmh: 0,
+    pass_start: null, pass_end: null, is_lofted: false,
+    prevTickAt: 0, currTickAt: 0,
+  };
+  match = {
+    t_match: 0,
+    clock: "--:--",
+    score: { NLA: 0, MCS: 0 },
+    possession: "NLA" as "NLA" | "MCS",
+    carrier: null as string | null,
+    scenario: null as string | null,
+    scenario_left: null as number | null,
+  };
+  metrics: Metrics | null = null;
+  insight: Insight | null = null;
+  ghost: GhostSample | null = null;
+  pdrByPlayer = new Map<string, number>();
+
+  setPdr(pid: string, pdr: number) {
+    this.pdrByPlayer.set(pid, pdr);
+  }
+
+  applyTick(tick: MatchTick) {
+    const now = performance.now();
+    for (const p of tick.players) {
+      const cur = this.players.get(p.id);
+      if (!cur) {
+        this.players.set(p.id, {
+          id: p.id, team: p.team, shirt_number: p.shirt_number,
+          name: p.name, role: p.role,
+          px: p.x, py: p.y, ph: p.heading_rad,
+          x: p.x, y: p.y, h: p.heading_rad,
+          vx: p.vx, vy: p.vy,
+          speed_kmh: p.speed_kmh, stamina: p.stamina,
+          pose_state: p.pose_state, playstyle_badge: p.playstyle_badge,
+          prevTickAt: now, currTickAt: now, kickT0: 0,
+        });
+        continue;
+      }
+      cur.px = cur.x; cur.py = cur.y; cur.ph = cur.h;
+      cur.x = p.x; cur.y = p.y; cur.h = p.heading_rad;
+      cur.vx = p.vx; cur.vy = p.vy;
+      cur.speed_kmh = p.speed_kmh;
+      cur.stamina = p.stamina;
+      if (p.pose_state === "KICK" && cur.pose_state !== "KICK") cur.kickT0 = now;
+      cur.pose_state = p.pose_state;
+      cur.playstyle_badge = p.playstyle_badge;
+      cur.prevTickAt = cur.currTickAt;
+      cur.currTickAt = now;
+    }
+    const b = tick.ball;
+    const bl = this.ball;
+    bl.px = bl.x; bl.py = bl.y; bl.pz = bl.z;
+    bl.x = b.x; bl.y = b.y; bl.z = b.z;
+    bl.vx = b.vx; bl.vy = b.vy; bl.vz = b.vz;
+    bl.speed_kmh = b.speed_kmh;
+    if (b.pass_start) bl.pass_start = b.pass_start;
+    if (b.pass_end) bl.pass_end = b.pass_end;
+    bl.is_lofted = b.is_lofted;
+    bl.prevTickAt = bl.currTickAt;
+    bl.currTickAt = now;
+    if (b.ghost_end) {
+      this.ghost = {
+        x: b.ghost_end[0], y: b.ghost_end[1],
+        delta_xt: b.ghost_delta_xt ?? 0.08,
+        at: now,
+      };
+    }
+    this.match = {
+      t_match: tick.t_match,
+      clock: tick.clock,
+      score: tick.score,
+      possession: tick.possession,
+      carrier: tick.carrier,
+      scenario: tick.scenario,
+      scenario_left: tick.scenario_left,
+    };
+  }
+
+  applyMetrics(m: Metrics) {
+    this.metrics = m;
+  }
+
+  applyInsight(i: Insight) {
+    this.insight = i;
+  }
+
+  /** Interpolation factor for a sample: 1.0 = current tick reached, >1 extrapolates. */
+  static alpha(s: { prevTickAt: number; currTickAt: number }, now: number): number {
+    const span = s.currTickAt - s.prevTickAt || 100;
+    return Math.min(1.35, (now - s.currTickAt) / span);
+  }
+}
+
+export const telemetry = new TelemetryStore();
+export const tickAlpha = TelemetryStore.alpha;

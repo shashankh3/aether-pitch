@@ -5,50 +5,29 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        obsidian: "#05070C",
+        obsidian: "#04060A",
         "panel-ink": "#0B1119",
         tactical: "#00F0FF",
         pitch: "#00FF85",
-        crimson: "#FF2A54",
-        violetdeep: "#38003C",
+        crimson: "#FF1E56",
         gold: "#FFC24D",
+        navy: "#0A1A2F",
+        violetdeep: "#38003C",
       },
       fontFamily: {
-        display: [
-          '"Barlow Condensed"',
-          '"Arial Narrow"',
-          "Impact",
-          "ui-sans-serif",
-          "sans-serif",
-        ],
-        tech: ['"Rajdhani"', "ui-monospace", "monospace"],
-        mono: [
-          "ui-monospace",
-          "SFMono-Regular",
-          "Menlo",
-          "Consolas",
-          "monospace",
-        ],
+        display: ["var(--font-teko)", '"Arial Narrow"', "Impact", "sans-serif"],
+        tech: ["var(--font-rajdhani)", "ui-monospace", "monospace"],
+        sans: ["var(--font-inter)", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ["var(--font-jetbrains)", "ui-monospace", "monospace"],
       },
       keyframes: {
-        "wipe-diag": {
-          "0%": { transform: "translateX(-130%) skewX(-18deg)" },
-          "100%": { transform: "translateX(260%) skewX(-18deg)" },
-        },
         sheen: {
           "0%": { transform: "translateX(-120%)" },
           "100%": { transform: "translateX(320%)" },
         },
-        scanline: {
-          "0%": { top: "-10%", opacity: "0" },
-          "12%": { opacity: "0.5" },
-          "100%": { top: "110%", opacity: "0" },
-        },
       },
       animation: {
-        "wipe-diag": "wipe-diag 1s ease-out both",
         sheen: "sheen 2.4s ease-in-out infinite",
-        scanline: "scanline 5s linear infinite",
       },
     },
   },

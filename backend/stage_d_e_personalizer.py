@@ -100,6 +100,42 @@ RECAP_INTROS = {
 }
 
 
+CAMERA_ZONES = {
+    "counter_overload": "FINAL_THIRD_OVERLOAD",
+    "pressing_trap": "MIDFIELD_PRESS_TRAP",
+    "inversion": "INVERTED_FULLBACK_FLANK",
+    "difficult_progression": "PROGRESSION_LANE",
+    "threat_surge": "XT_SURGE_ZONE",
+    "rhythm_shift": "BUILDUP_ZONE",
+}
+
+
+def build_camera_directive(ev: dict, metrics: dict, archetype: str) -> dict:
+    """Autonomous 3D camera director: recommends a broadcast camera mode for the
+    WebGL engine whenever a threshold event or God-Mode scenario fires."""
+    ev = ev or {}
+    sc = ev.get("scenario")
+    chaos = (metrics or {}).get("chaos_index", 0.5)
+    if sc == "chaos_counter" or archetype == "counter_overload":
+        mode = "ACTION_ZOOM"
+    elif archetype == "pressing_trap" or sc == "high_press_turnover":
+        mode = "TACTICAL_DRONE"
+    elif archetype == "inversion" or sc == "tactical_inversion":
+        mode = "TACTICAL_DRONE"
+    elif archetype == "difficult_progression" and (ev.get("pdr") or 0) > 88:
+        mode = "PLAYER_LOCK_3RD_PERSON"
+    elif chaos > 0.8:
+        mode = "ACTION_ZOOM"
+    else:
+        mode = "TELE_BROADCAST"
+    return {
+        "recommended_mode": mode,
+        "focus_target_id": ev.get("player_id"),
+        "cinematic_slow_mo": bool(ev.get("type") == "GOAL" or (ev.get("pdr") or 0) > 92),
+        "ar_highlight_zone": CAMERA_ZONES.get(archetype, "BUILDUP_ZONE"),
+    }
+
+
 class Personalizer:
     def __init__(self, cfg=settings):
         self.s = cfg
@@ -182,6 +218,7 @@ class Personalizer:
             "stage_c_explainability": stage_c.get("stage_c_explainability", {}),
             "stage_d_broadcast_overlay": overlay,
             "stage_e_personalization": personalization,
+            "camera_directive": build_camera_directive(ev, metrics, arch),
         }
 
     def build_recap_packet(self, recap: dict, score: dict, clock: str) -> dict:

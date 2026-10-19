@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   Insight, MatchEvent, MatchTick, Metrics, Pipeline, Recap,
 } from "@/lib/types";
+import { telemetry } from "@/lib/telemetry";
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -66,16 +67,22 @@ export function useStudio(): StudioState {
             break;
           }
           case "tick":
+            telemetry.applyTick(msg.data);
             tickRef.current = msg.data;
             setTick(msg.data);
             break;
           case "metrics":
+            telemetry.applyMetrics(msg.data);
             setMetrics(msg.data);
             break;
           case "event":
+            if (msg.data?.type === "PASS" && msg.data.player_id && msg.data.pdr != null) {
+              telemetry.setPdr(msg.data.player_id, msg.data.pdr);
+            }
             setEvents((prev) => [msg.data, ...prev].slice(0, 14));
             break;
           case "insight":
+            telemetry.applyInsight(msg.data);
             setInsights((prev) => [msg.data, ...prev].slice(0, 12));
             break;
           case "pipeline":

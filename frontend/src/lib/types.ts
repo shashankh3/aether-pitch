@@ -1,19 +1,43 @@
-// AETHER PITCH — shared WebSocket payload types (mirrors backend schemas)
+// AETHER PITCH v2.0 — shared WebSocket payload types (mirrors backend schemas)
 
 export type Team = "NLA" | "MCS";
+export type Role = "GK" | "DEF" | "MID" | "FWD";
+export type PoseState = "SPRINT" | "KICK" | "PRESS" | "JOG" | "IDLE";
+export type PlayStyleBadge = "RAPID+" | "INCISIVE_PASS+" | "INTERCEPT+";
+export type CameraMode =
+  | "TELE_BROADCAST"
+  | "PLAYER_LOCK_3RD_PERSON"
+  | "TACTICAL_DRONE_ORBIT"
+  | "AUTO_DIRECTOR";
+
+/** Mode vocabulary emitted by the Stage (c)/(d) AI camera director. */
+export type DirectorMode =
+  | "ACTION_ZOOM"
+  | "TACTICAL_DRONE"
+  | "PLAYER_LOCK_3RD_PERSON"
+  | "TELE_BROADCAST";
 
 export interface PlayerTick {
   id: string;
   team: Team;
   number: number;
+  shirt_number: number;
   name: string;
-  role: "GK" | "DF" | "MF" | "FW";
+  role: Role;
   x: number;
   y: number;
   vx: number;
   vy: number;
   speed_kmh: number;
   stamina: number;
+  heading_rad: number;
+  pose_state: PoseState;
+  playstyle_badge: PlayStyleBadge | null;
+}
+
+export interface Vec2 {
+  x: number;
+  y: number;
 }
 
 export interface MatchTick {
@@ -22,7 +46,20 @@ export interface MatchTick {
   score: { NLA: number; MCS: number };
   possession: Team;
   players: PlayerTick[];
-  ball: { x: number; y: number; z: number; speed_kmh: number };
+  ball: {
+    x: number;
+    y: number;
+    z: number;
+    vx: number;
+    vy: number;
+    vz: number;
+    speed_kmh: number;
+    pass_start: [number, number] | null;
+    pass_end: [number, number] | null;
+    is_lofted: boolean;
+    ghost_end?: [number, number] | null;
+    ghost_delta_xt?: number | null;
+  };
   carrier: string | null;
   scenario: string | null;
   scenario_left: number | null;
@@ -48,6 +85,13 @@ export interface GhostPass {
   delta_xt: number;
   target_id: string;
   openness_m?: number;
+}
+
+export interface CameraDirective {
+  recommended_mode: DirectorMode;
+  focus_target_id: string | null;
+  cinematic_slow_mo: boolean;
+  ar_highlight_zone: string;
 }
 
 export interface MatchEvent {
@@ -89,6 +133,7 @@ export interface Insight {
   created_at: string;
   model: string;
   archetype: string;
+  camera_directive?: CameraDirective;
   stage_c_explainability: {
     moment_headline: string;
     why_it_matters_causal: string;
@@ -132,8 +177,13 @@ export type PersonaMode = "analyst" | "casual" | "split";
 export type LangCode = "en" | "es" | "ar" | "hi";
 
 export const TEAM_COLORS: Record<Team, string> = {
-  NLA: "#FF2A54", // North London Athletic — crimson red
-  MCS: "#38BDF8", // Manchester Cityscape — sky blue
+  NLA: "#FF1E56", // North London Athletic — crimson / gold
+  MCS: "#00F0FF", // Manchester Cityscape — electric cyan / navy
+};
+
+export const TEAM_KIT: Record<Team, { primary: string; shorts: string; gk: string }> = {
+  NLA: { primary: "#E11D48", shorts: "#7F0F26", gk: "#D9F99D" },
+  MCS: { primary: "#00E5FF", shorts: "#0A1A2F", gk: "#FDE047" },
 };
 
 export const LANG_LABELS: Record<LangCode, string> = {
@@ -144,8 +194,15 @@ export const LANG_LABELS: Record<LangCode, string> = {
 };
 
 export const SPEECH_LOCALES: Record<LangCode, string> = {
-  en: "en-US",
+  en: "en-GB",
   es: "es-ES",
   ar: "ar-SA",
   hi: "hi-IN",
 };
+
+export const CAMERA_MODES: { id: CameraMode; label: string }[] = [
+  { id: "TELE_BROADCAST", label: "Tele Cam" },
+  { id: "PLAYER_LOCK_3RD_PERSON", label: "Pro Cam" },
+  { id: "TACTICAL_DRONE_ORBIT", label: "Drone Orbit" },
+  { id: "AUTO_DIRECTOR", label: "Auto-Director" },
+];

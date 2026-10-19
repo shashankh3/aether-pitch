@@ -49,12 +49,19 @@ export default function PipelineInspector({ pipeline, connected }: Props) {
               <span key={s.id} className="flex items-center gap-1.5">
                 {i > 0 && <span className="text-[9px] text-slate-600">→</span>}
                 <span
-                  className={`flex items-baseline gap-1 rounded border border-white/10 bg-black/40 px-2 py-1 font-mono text-[10px] ${
+                  className={`flex items-center gap-1.5 border border-white/10 bg-black/40 px-2 py-1 font-tech text-[10px] ${
                     pipeline ? s.color : "text-slate-600"
                   }`}
                   title={s.sub}
                 >
-                  <span className="font-sans font-bold tracking-wider">{s.id.toUpperCase()}</span>
+                  <span
+                    className={`relative h-1.5 w-1.5 rounded-full ${pipeline ? "bg-pitch" : "bg-slate-700"}`}
+                  >
+                    {pipeline && (
+                      <span className="absolute inset-0 animate-ping rounded-full bg-pitch/70" />
+                    )}
+                  </span>
+                  <span className="font-display font-bold tracking-wider">{s.id.toUpperCase()}</span>
                   <span className="text-slate-500">{ms != null ? `${ms.toFixed(1)}ms` : "—"}</span>
                 </span>
               </span>

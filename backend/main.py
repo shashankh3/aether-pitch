@@ -83,6 +83,7 @@ class Hub:
 hub = Hub()
 last_state: dict = {}
 last_metrics: dict = {}
+last_ghost: Optional[tuple] = None    # (expire_t_match, [gx, gy], delta_xt)
 insights: deque = deque(maxlen=40)
 top_inflections: List[dict] = []
 pipeline: Dict[str, Any] = {
@@ -105,7 +106,7 @@ def _stamp_pipeline(stage: str, latency_ms: float, payload: Any) -> None:
 
 async def make_insight(ev: dict, metrics: dict, state: dict) -> None:
     """Stage (c) -> (d) -> (e) for one gated event, then broadcast the packet."""
-    global insight_counter, last_insight_real_ts
+    global insight_counter, last_insight_real_ts, last_ghost
     ctx = {
         "event": ev,
         "metrics": metrics,
@@ -128,8 +129,10 @@ async def make_insight(ev: dict, metrics: dict, state: dict) -> None:
     }
     insights.append(data)
     last_insight_real_ts = time.perf_counter()
-    _stamp_pipeline("c", stage_c.get("latency_ms", 0.0), stage_c.get("stage_c_explainability"))
-    _stamp_pipeline("d", 0.4, data["stage_d_broadcast_overlay"])
+    ghost = data["stage_d_broadcast_overlay"].get("draw_ghost_pass") and ev.get("ghost_pass")
+    if ghost:
+        last_ghost = (state["t_match"] + 4.0, [ghost["x"], ghost["y"]], ghost.get("delta_xt", 0.0))
+    _stamp_pipeline("c", stage_c.get("latency_ms", 0.0), stage_c.get("stage_c_explainability"))    _stamp_pipeline("d", 0.4, data["stage_d_broadcast_overlay"])
     _stamp_pipeline("e", 0.6, data["stage_e_personalization"])
     await hub.broadcast({"type": "insight", "data": data})
 
@@ -162,7 +165,7 @@ def _record_inflection(ev: dict) -> None:
 
 async def match_loop() -> None:
     """The heartbeat: 10Hz Stage (a) ticks; 2Hz metrics/pipeline packets."""
-    global last_state, last_metrics, last_insight_real_ts
+    global last_state, last_metrics, last_insight_real_ts, last_ghost
     next_real_metrics = time.perf_counter()
     math.scenario_active = None
     event_seq = 0
@@ -188,6 +191,24 @@ async def match_loop() -> None:
             ev = math.enrich(ev, state)
             ev["id"] = f"evt_{event_seq:06d}"
             enriched.append(ev)
+
+        # PlayStyle+ badge registry: INCISIVE_PASS+ / INTERCEPT+ from Stage (b/c)
+        for ev in enriched:
+            if ev.get("type") == "PASS":
+                if (ev.get("pdr") or 0) > 80 and ev.get("player_id"):
+                    engine.set_badge([ev["player_id"]], "INCISIVE_PASS+", 4.0)
+                ghost = ev.get("ghost_pass")
+                if ghost:
+                    last_ghost = (state["t_match"] + 4.0, [ghost["x"], ghost["y"]],
+                                  ghost.get("delta_xt", 0.0))
+            elif ev.get("type") == "PRESSURE_TRAP" and ev.get("players"):
+                engine.set_badge(list(ev["players"])[:3], "INTERCEPT+", 4.0)
+        if last_ghost and state["t_match"] < last_ghost[0]:
+            state["ball"]["ghost_end"] = last_ghost[1]
+            state["ball"]["ghost_delta_xt"] = round(last_ghost[2], 3)
+        elif state.get("ball"):
+            state["ball"]["ghost_end"] = None
+            state["ball"]["ghost_delta_xt"] = None
         _stamp_pipeline("b", (time.perf_counter() - t0) * 1000.0,
                         {"chaos_index": metrics["chaos_index"],
                          "chaos_state": metrics["chaos_state"],

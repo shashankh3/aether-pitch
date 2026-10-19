@@ -165,11 +165,11 @@ class TacticalMathEngine:
         self.chaos = _clip(0.90 * self.chaos + 0.10 * _clip(raw))
 
     def _line_stretch(self, state: dict) -> float:
-        """Vertical stretch of the in-possession structure: deepest DF -> highest MF, /35 m."""
+        """Vertical stretch of the in-possession structure: deepest DEF -> highest MID, /35 m."""
         team = state["possession"]
         players = [p for p in state["players"] if p["team"] == team and p["role"] != "GK"]
-        dfs = [p for p in players if p["role"] == "DF"] or players
-        mfs = [p for p in players if p["role"] == "MF"] or players
+        dfs = [p for p in players if p["role"] == "DEF"] or players
+        mfs = [p for p in players if p["role"] == "MID"] or players
         if team == "NLA":
             deepest = min(p["x"] for p in dfs)
             highest = max(p["x"] for p in mfs)
@@ -223,7 +223,7 @@ class TacticalMathEngine:
         """Defensive line height in meters from each team's own goal line."""
         out = {}
         for team in ("NLA", "MCS"):
-            dfs = [p for p in state["players"] if p["team"] == team and p["role"] == "DF"]
+            dfs = [p for p in state["players"] if p["team"] == team and p["role"] == "DEF"]
             if not dfs:
                 out[team] = 0.0
             elif team == "NLA":
