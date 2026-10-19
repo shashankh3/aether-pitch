@@ -67,9 +67,9 @@ export function useStudio(): StudioState {
             break;
           }
           case "tick":
-            telemetry.applyTick(msg.data);
+            telemetry.recordLive(msg.data);
             tickRef.current = msg.data;
-            setTick(msg.data);
+            if (!telemetry.playbackPaused) setTick(msg.data);
             break;
           case "metrics":
             telemetry.applyMetrics(msg.data);
@@ -78,6 +78,9 @@ export function useStudio(): StudioState {
           case "event":
             if (msg.data?.type === "PASS" && msg.data.player_id && msg.data.pdr != null) {
               telemetry.setPdr(msg.data.player_id, msg.data.pdr);
+            }
+            if (msg.data?.type === "PASS" && msg.data.target_id) {
+              telemetry.setPassReceiver(msg.data.target_id);
             }
             setEvents((prev) => [msg.data, ...prev].slice(0, 14));
             break;

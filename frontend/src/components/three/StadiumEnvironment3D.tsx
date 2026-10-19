@@ -12,7 +12,7 @@ const PL = 105;
 const PW = 68;
 
 /* ------------------------------------------------------- mowed turf bands */
-function Turf() {
+function Turf({ alphaMode }: { alphaMode: boolean }) {
   const bands = useMemo(() => {
     const arr: { x: number; w: number; odd: boolean }[] = [];
     const n = 24;
@@ -21,6 +21,11 @@ function Turf() {
     }
     return arr;
   }, []);
+  if (alphaMode) {
+    // broadcast alpha: hide the opaque grass plane entirely (regulation lines
+    // stay visible as the AR anchor grid)
+    return null;
+  }
   return (
     <group>
       {bands.map((b, i) => (
@@ -262,55 +267,63 @@ function Crowd() {
 }
 
 /* ------------------------------------------------------------ environment */
-export default function StadiumEnvironment3D() {
+export default function StadiumEnvironment3D({ alphaMode = false }: { alphaMode?: boolean }) {
   return (
     <group>
       {/* dark surround track + outer ground */}
-      <mesh position={[0, -0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[132, 94]} />
-        <meshStandardMaterial color="#0A0F16" roughness={1} />
-      </mesh>
-      <mesh position={[0, -0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[420, 420]} />
-        <meshStandardMaterial color="#05070C" roughness={1} />
-      </mesh>
+      {!alphaMode && (
+        <>
+          <mesh position={[0, -0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+            <planeGeometry args={[132, 94]} />
+            <meshStandardMaterial color="#0A0F16" roughness={1} />
+          </mesh>
+          <mesh position={[0, -0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[420, 420]} />
+            <meshStandardMaterial color="#05070C" roughness={1} />
+          </mesh>
+        </>
+      )}
 
-      <Turf />
+      <Turf alphaMode={alphaMode} />
       <Lines />
-      <Goal side={1} />
-      <Goal side={-1} />
+      {!alphaMode && (
+        <>
+          <Goal side={1} />
+          <Goal side={-1} />
 
-      {/* LED perimeter boards */}
-      <AdBoard pos={[0, 0, -36.5]} rot={0} w={112} />
-      <AdBoard pos={[0, 0, 36.5]} rot={Math.PI} w={112} />
-      <AdBoard pos={[-56.5, 0, 0]} rot={Math.PI / 2} w={76} />
-      <AdBoard pos={[56.5, 0, 0]} rot={-Math.PI / 2} w={76} />
+          {/* LED perimeter boards */}
+          <AdBoard pos={[0, 0, -36.5]} rot={0} w={112} />
+          <AdBoard pos={[0, 0, 36.5]} rot={Math.PI} w={112} />
+          <AdBoard pos={[-56.5, 0, 0]} rot={Math.PI / 2} w={76} />
+          <AdBoard pos={[56.5, 0, 0]} rot={-Math.PI / 2} w={76} />
 
-      {/* stands skirt */}
-      {[0, Math.PI].map((r) => (
-        <mesh key={r} position={[0, 4, -46]} rotation={[0, r, 0]}>
-          <boxGeometry args={[140, 12, 14]} />
-          <meshStandardMaterial color="#0D1420" roughness={1} />
-        </mesh>
-      ))}
-      {[0, Math.PI].map((r) => (
-        <mesh key={`s${r}`} position={[0, 4, 46]} rotation={[0, r, 0]}>
-          <boxGeometry args={[140, 12, 14]} />
-          <meshStandardMaterial color="#0D1420" roughness={1} />
-        </mesh>
-      ))}
-      {[Math.PI / 2, -Math.PI / 2].map((r) => (
-        <mesh key={`e${r}`} position={[r === Math.PI / 2 ? 58 : -58, 4, 0]} rotation={[0, r, 0]}>
-          <boxGeometry args={[92, 12, 14]} />
-          <meshStandardMaterial color="#0D1420" roughness={1} />
-        </mesh>
-      ))}
+          {/* stands skirt */}
+          {[0, Math.PI].map((r) => (
+            <mesh key={r} position={[0, 4, -46]} rotation={[0, r, 0]}>
+              <boxGeometry args={[140, 12, 14]} />
+              <meshStandardMaterial color="#0D1420" roughness={1} />
+            </mesh>
+          ))}
+          {[0, Math.PI].map((r) => (
+            <mesh key={`s${r}`} position={[0, 4, 46]} rotation={[0, r, 0]}>
+              <boxGeometry args={[140, 12, 14]} />
+              <meshStandardMaterial color="#0D1420" roughness={1} />
+            </mesh>
+          ))}
+          {[Math.PI / 2, -Math.PI / 2].map((r) => (
+            <mesh key={`e${r}`} position={[r === Math.PI / 2 ? 58 : -58, 4, 0]} rotation={[0, r, 0]}>
+              <boxGeometry args={[92, 12, 14]} />
+              <meshStandardMaterial color="#0D1420" roughness={1} />
+            </mesh>
+          ))}
 
-      <Crowd />
-      <Floodlight pos={[-62, 0, -44]} />
-      <Floodlight pos={[62, 0, -44]} />
-      <Floodlight pos={[-62, 0, 44]} />
-      <Floodlight pos={[62, 0, 44]} />
+          <Crowd />
+          <Floodlight pos={[-62, 0, -44]} />
+          <Floodlight pos={[62, 0, -44]} />
+          <Floodlight pos={[-62, 0, 44]} />
+          <Floodlight pos={[62, 0, 44]} />
+        </>
+      )}
     </group>
   );
 }

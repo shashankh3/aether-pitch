@@ -9,6 +9,7 @@ import { Crosshair, Lock, Unlock, Volume2, Flame } from "lucide-react";
 import type { LangCode, MatchEvent, MatchTick, PlayerTick, Team } from "@/lib/types";
 import { SPEECH_LOCALES } from "@/lib/types";
 import { CRESTS } from "@/components/Crests";
+import { useSpeechController } from "@/hooks/useSpeechController";
 import { clamp } from "@/lib/utils";
 
 const SPRINT_KMH = 30;
@@ -112,30 +113,17 @@ export default function PlayerLock360({ tick, lockedId, onLock, events, lang, in
   const lastPass = events.find((e) => e.type === "PASS" && e.player_id === lockedId && e.pdr != null);
   const sprinting = (player?.speed_kmh ?? 0) > SPRINT_KMH;
   const Crest = player ? CRESTS[player.team as Team] : null;
+  const { speakInsight } = useSpeechController();
 
   const roster = useMemo(() => tick?.players ?? [], [tick?.players]);
 
   const speak = () => {
-    if (!player || typeof window === "undefined" || !window.speechSynthesis) return;
-    try {
-      const synth = window.speechSynthesis;
-      synth.cancel();
-      const locale = SPEECH_LOCALES[lang];
-      const voice =
-        synth.getVoices().find((v) => v.lang === locale) ||
-        synth.getVoices().find((v) => v.lang.startsWith(locale.split("-")[0]));
-      const text =
-        insightLine && insightLine.length > 0
-          ? insightLine
-          : `${player.name}, ${player.team} ${player.role}, currently at ${player.speed_kmh.toFixed(1)} kilometres per hour, stamina ${Math.round(player.stamina)} percent.`;
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = locale;
-      if (voice) u.voice = voice;
-      u.rate = 1.05;
-      synth.speak(u);
-    } catch {
-      /* speech unsupported */
-    }
+    if (!player) return;
+    const text =
+      insightLine && insightLine.length > 0
+        ? insightLine
+        : `${player.name}, ${player.team} ${player.role}, currently at ${player.speed_kmh.toFixed(1)} kilometres per hour, stamina ${Math.round(player.stamina)} percent.`;
+    speakInsight(text, lang);
   };
 
   return (

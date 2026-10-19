@@ -1,0 +1,30 @@
+# Azure Developer CLI (azd) manifest for AETHER PITCH
+# Deploy:  azd up
+name: aether-pitch
+metadata:
+  template: aether-pitch@3.0.0
+
+services:
+  engine:
+    project: ./backend
+    language: python
+    host: containerapp
+    docker:
+      path: ./Dockerfile
+    env:
+      - name: MATCH_TIME_SCALE
+        value: "6.0"
+      - name: MATCH_START_MINUTE
+        value: "62.0"
+
+  studio:
+    project: ./frontend
+    language: js
+    host: containerapp
+    docker:
+      path: ./Dockerfile
+    env:
+      - name: NEXT_PUBLIC_WS_URL
+        value: ws://engine:8000/ws
+      - name: NEXT_PUBLIC_API_URL
+        value: http://engine:8000

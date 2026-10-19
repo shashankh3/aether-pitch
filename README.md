@@ -1,15 +1,33 @@
-# AETHER PITCH v2.0 — EA SPORTS FC 27 3D WebGL Broadcast & Autonomous Studio Engine
+# AETHER PITCH v4.0 — EA SPORTS FC 27 3D WebGL Broadcast, Championship Telestrator & Autonomous Studio Engine
 
 **Premier League & Microsoft Azure "Inside the Game" Hackathon submission.**
 An EA Sports FC 27 (HyperMotion V) + Lenovo Football AI Pro grade broadcast studio:
-a **60 FPS Three.js / React Three Fiber 3D stadium** with articulated player avatars,
-4 autonomous camera modes, volumetric AR overlays — all fed by a **5-stage real-time
-Azure AI pipeline over 100% synthetic 10Hz football telemetry**.
+a **60 FPS Three.js / React Three Fiber 3D stadium** with **14-part biomechanical
+player avatars**, 4 autonomous camera modes, volumetric AR overlays, a **15-second
+DVR time-machine + 3D telestrator**, a **computer-vision auto-eventing viewport**,
+a **bi-directional "Ask The 12th Man" co-pilot**, **SMPTE broadcast alpha mode**
+and a **1-click judge rubric verifier** — all fed by a **5-stage real-time Azure AI
+pipeline over 100% synthetic 10Hz football telemetry**.
 
 ```
 NLA (North London Athletic, crimson/gold)  vs  MCS (Manchester Cityscape, cyan/navy)
 Zero real clubs, players, logos, or proprietary tracking data.
 ```
+
+---
+
+## v3.0 / v4.0 Championship Modules
+
+| Module | What it does |
+|--------|--------------|
+| **14-part biomechanical rig** | Shared singleton geometry pool (zero GPU re-allocation), velocity-locked stride phase (zero foot sliding), asymmetric knee flexion, counter-swinging 2-segment arms, sprint torso lean + bob, 350ms KICK strike, goalkeeper ready/dive stance, breathing idle, ball-tracking neck, troika `<Text>` jersey numbers back+chest, smart-culled `<Html>` pills (max ~4 live) |
+| **Stage A/II CV Auto-Eventer** | Picture-in-picture optical tracking feed: 8 ball-nearest players projected through a 2D→3D homography, YOLOv8+ByteTrack boxes with `ID | conf | km/h` labels, skeletal keypoints, ball tracker + velocity arrow, H-matrix calibration grid, live machine-detected event log (zero manual tagging) |
+| **DVR Time-Machine + Telestrator** | 150-tick (15s) circular buffer; freeze + scrub with spike/sprint timeline markers; 3D volumetric spotlight pillars, offside laser wall (second-deepest defender + attacker distance), compactness convex-hull mesh (m² + stretch), holographic ghost-ball replay, custom tactical arrows |
+| **Broadcast Alpha Mode** | `?overlay=alpha` or one click: strips every opaque surface leaving only the AR layer over a transparent checkerboard / chroma-green `#00B140` canvas (OBS / Vizrt / Singular.live ready), live **SMPTE 50fps timecode**, and the machine-readable `AETHER_RENDER_PARTNER_V2` packet inspector with 1-click copy |
+| **Ask The 12th Man** | `POST /api/studio-query`: typed or spoken tactical questions → 3-step agent reasoning chain + localized answer + 15s commentator cue + a `scene_directive` that physically flies the camera, drops spotlight beams, raises the offside wall, and highlights the defensive seam on the 3D pitch |
+| **Voice + Two-Phase UX** | Zero-overlap speech controller (cancel-before-queue, en-GB/es-ES/ar-SA/hi-IN voice mapping, broadcast cadence) with live equalizer pill; scenario injections resolve Phase 1 instantly (<30ms physics) then Phase 2 AI reasoning shimmer |
+| **Tactical Radar Mini-Map** | EA FC 27-style 230×148 translucent radar: 22 dots, locked-player gold pulse, ball flare, pass + ghost vectors, spotlight rings, click-to-lock that flies the 3D camera |
+| **Judge Rubric Verifier** | `GET /api/health/pipeline-audit` runs an isolated 5-stage self-test (per-stage ms + sample outputs + synthetic compliance) rendered as a one-click VERIFIED checklist; `test_pipeline.py`, `backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml`, `azure.yaml` included |
 
 ---
 

@@ -3,10 +3,11 @@
 // Casual Fan vs Split TwinCast) with the persona + language switchers living
 // right in the dock, EN/ES/AR/HI localization and live voice synthesis.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Volume2, VolumeX, Gauge, BrainCircuit, Sparkles, Users, Heart, Layers } from "lucide-react";
 import type { Insight, LangCode, Metrics, PersonaMode } from "@/lib/types";
 import { LANG_LABELS, SPEECH_LOCALES } from "@/lib/types";
+import { useSpeechController } from "@/hooks/useSpeechController";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -86,44 +87,22 @@ const PERSONAS: { id: PersonaMode; label: string; icon: React.ReactNode }[] = [
 ];
 
 export default function TwinCastHUD({ insights, persona, onPersona, lang, onLang, metrics }: Props) {
-  const [voiceOn, setVoiceOn] = useState(false);
-  const voiceOnRef = useRef(false);
+  const { isSpeaking, isVoiceMuted, speakInsight, toggleMute } = useSpeechController();
   const spokenRef = useRef<string>("");
   const latest = insights[0];
-
-  const speak = (insight: Insight, l: LangCode) => {
-    try {
-      const synth = window.speechSynthesis;
-      synth.cancel();
-      const e = insight.stage_e_personalization;
-      const text = l === "en" ? e.casual_fan_mode.story_card : e.translations[l] || e.casual_fan_mode.story_card;
-      const locale = SPEECH_LOCALES[l];
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = locale;
-      const voice = synth.getVoices().find((v) => v.lang === locale) ||
-        synth.getVoices().find((v) => v.lang.startsWith(locale.split("-")[0]));
-      if (voice) u.voice = voice;
-      u.rate = 1.05;
-      synth.speak(u);
-    } catch {
-      /* speech synthesis unsupported */
-    }
-  };
 
   useEffect(() => {
     if (!latest || spokenRef.current === latest.id) return;
     spokenRef.current = latest.id;
-    if (voiceOnRef.current) speak(latest, lang);
+    if (!isVoiceMuted) {
+      const e = latest.stage_e_personalization;
+      speakInsight(
+        lang === "en" ? e.casual_fan_mode.story_card : e.translations[lang] || e.casual_fan_mode.story_card,
+        lang
+      );
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latest?.id]);
-
-  const toggleVoice = () => {
-    const next = !voiceOn;
-    setVoiceOn(next);
-    voiceOnRef.current = next;
-    if (!next) window.speechSynthesis?.cancel();
-    else if (latest) speak(latest, lang);
-  };
 
   return (
     <section className="clip-ea flex h-full min-h-0 flex-col border border-white/15 bg-slate-950/78 backdrop-blur-xl">
@@ -133,14 +112,15 @@ export default function TwinCastHUD({ insights, persona, onPersona, lang, onLang
             <Sparkles size={13} className="text-pitch" /> TwinCast
           </h2>
           <button
-            onClick={toggleVoice}
+            onClick={toggleMute}
             className={cn(
               "flex items-center gap-1 px-1.5 py-0.5 font-tech text-[10px] font-bold uppercase tracking-wider transition",
-              voiceOn ? "bg-pitch/20 text-pitch" : "text-slate-500 hover:text-slate-300"
+              isVoiceMuted ? "text-slate-500 hover:text-slate-300" : "bg-pitch/20 text-pitch"
             )}
-            title="Localized AI voice commentary (Web Speech API + Azure AI Speech-ready)"
+            title="Localized AI voice commentary (Web Speech API + Azure AI Speech-ready) — click to mute/unmute"
           >
-            {voiceOn ? <Volume2 size={13} /> : <VolumeX size={13} />}
+            {isVoiceMuted ? <VolumeX size={13} /> : <Volume2 size={13} />}
+            {isSpeaking && !isVoiceMuted && <span className="animate-breathe">LIVE</span>}
           </button>
         </div>
         <div className="mt-1.5 flex gap-1">

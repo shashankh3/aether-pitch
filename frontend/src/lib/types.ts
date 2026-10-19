@@ -206,3 +206,59 @@ export const CAMERA_MODES: { id: CameraMode; label: string }[] = [
   { id: "TACTICAL_DRONE_ORBIT", label: "Drone Orbit" },
   { id: "AUTO_DIRECTOR", label: "Auto-Director" },
 ];
+
+/* ------------------------------------------------ v3.0 telestrator / DVR */
+export interface CustomTacticalArrow {
+  from: [number, number];
+  to: [number, number];
+}
+
+export interface TelestratorState {
+  spotlightPlayerIds: string[];
+  showOffsideLaserWall: boolean;
+  showCompactnessPolygon: boolean;
+  animateGhostReplay: boolean;
+  customTacticalArrows: CustomTacticalArrow[];
+}
+
+export interface HighlightZone {
+  x_min: number;
+  x_max: number;
+  y_min: number;
+  y_max: number;
+  label: string;
+}
+
+/* ------------------------------------------------ v4.0 studio co-pilot */
+export interface StudioSceneDirective {
+  camera_mode: DirectorMode | "ACTION_ZOOM";
+  spotlight_player_ids: string[];
+  enable_offside_wall: boolean;
+  enable_compactness_polygon: boolean;
+  draw_ghost_pass: boolean;
+  highlight_pitch_zone: HighlightZone | null;
+}
+
+export interface StudioQueryResponse {
+  query: string;
+  agent_reasoning_chain: string[];
+  studio_answer_localized: string;
+  commentator_cue_15s: string;
+  scene_directive: StudioSceneDirective;
+  model?: string;
+}
+
+/* ------------------------------------------------ v4.0 rubric audit */
+export interface PipelineAudit {
+  status: string;
+  synthetic_data_compliance: boolean;
+  audit: {
+    stage_a_ingest_ms: number;
+    stage_b_interpret_ms: number;
+    stage_c_explain_ms: number;
+    stage_d_render_ms: number;
+    stage_e_personalize_ms: number;
+  };
+  live_pipeline: Record<string, number | null>;
+  event_gate: { rule: string; gate_fired_in_audit: { should_explain: boolean; reasons: string[] } };
+}

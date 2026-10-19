@@ -51,7 +51,12 @@ export function XTGrid({ visible, possession }: { visible: boolean; possession: 
         const xs = dir === 1 ? x + PL / 2 : PL / 2 - x;
         const v = xtAt(xs, z + 34) / 0.35;
         const vv = Math.max(0, Math.min(1, v));
-        mat4.makeTranslation(x, 0.02, z);
+        // near-zero tiles collapse away so the floor only glows where it matters
+        if (vv < 0.12) {
+          mat4.makeScale(0, 0, 0);
+        } else {
+          mat4.makeTranslation(x, 0.02, z);
+        }
         m.setMatrixAt(i, mat4);
         color.lerpColors(CYAN, MAGENTA, vv);
         m.setColorAt(i, color);

@@ -1,8 +1,10 @@
 "use client";
-// AETHER PITCH v2.0 — HoloPitch3D
-// The full WebGL scene root: night-stadium lighting, 22 articulated avatars,
-// the 3D ball, volumetric AR overlays, the 4-mode broadcast camera rig and
-// Bloom post-processing. Memoized so 10Hz HUD state never re-renders the scene.
+// AETHER PITCH v3.0/v4.0 — HoloPitch3D
+// The full WebGL scene root: night-stadium lighting, 22 articulated 14-part
+// avatars, the 3D ball, volumetric AR overlays, the telestrator layer, the
+// 4-mode broadcast camera rig and Bloom post-processing.
+// Broadcast Alpha mode: strips every opaque surface and keeps only the AR
+// layer over a transparent / chroma-green canvas for live TV compositing.
 
 import { memo, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
@@ -12,9 +14,12 @@ import StadiumEnvironment3D from "./StadiumEnvironment3D";
 import PlayerAvatar3D from "./PlayerAvatar3D";
 import PassVectors3D from "./PassVectors3D";
 import BroadcastCameraRig from "./BroadcastCameraRig";
+import Telestrator3DOverlays from "./Telestrator3DOverlays";
 import { DefensiveLasers, XTGrid } from "./TacticalOverlays3D";
 import { telemetry, tickAlpha } from "@/lib/telemetry";
-import type { CameraDirective, CameraMode, Metrics } from "@/lib/types";
+import type {
+  CameraDirective, CameraMode, HighlightZone, Metrics, TelestratorState,
+} from "@/lib/types";
 
 export interface OverlayToggles {
   xtGrid: boolean;
@@ -29,6 +34,9 @@ interface Props {
   lockedId: string | null;
   keyIds: string[];
   metrics: Metrics | null;
+  telestrator: TelestratorState;
+  highlightZone: HighlightZone | null;
+  alphaMode: boolean;
   onLock: (id: string | null) => void;
 }
 
@@ -67,16 +75,16 @@ function Ball3D() {
 }
 
 /* ------------------------------------------------------------ avatar layer */
-function AvatarLayer({ lockedId, keyIds, onLock }: {
+function AvatarLayer({ lockedId, keyIds, alphaOnly, onLock }: {
   lockedId: string | null;
   keyIds: string[];
+  alphaOnly: boolean;
   onLock: (id: string | null) => void;
 }) {
   const keySet = useMemo(() => new Set(keyIds), [keyIds]);
   const [ids, setIds] = useState<string[]>([]);
   const sizeRef = useRef(-1);
   useFrame(() => {
-    // players are a fixed roster of 22 — track store population changes only
     if (telemetry.players.size !== 0 && telemetry.players.size !== sizeRef.current) {
       sizeRef.current = telemetry.players.size;
       setIds(Array.from(telemetry.players.keys()));
@@ -90,6 +98,7 @@ function AvatarLayer({ lockedId, keyIds, onLock }: {
           id={id}
           locked={lockedId === id}
           showPill={keySet.has(id)}
+          alphaOnly={alphaOnly}
           onLock={onLock}
         />
       ))}
@@ -98,11 +107,14 @@ function AvatarLayer({ lockedId, keyIds, onLock }: {
 }
 
 /* ------------------------------------------------------------------ scene */
-function Scene({ camMode, override, toggles, lockedId, keyIds, metrics, onLock }: Props) {
+function Scene({
+  camMode, override, toggles, lockedId, keyIds, metrics,
+  telestrator, highlightZone, alphaMode, onLock,
+}: Props) {
   return (
     <>
-      <color attach="background" args={["#04060A"]} />
-      <fog attach="fog" args={["#04060A", 130, 420]} />
+      {!alphaMode && <color attach="background" args={["#04060A"]} />}
+      {!alphaMode && <fog attach="fog" args={["#04060A", 130, 420]} />}
 
       {/* lighting: one shadow-casting floodlight + atmospheric fills */}
       <hemisphereLight args={["#33415C", "#0A0F14", 0.42]} />
@@ -123,14 +135,15 @@ function Scene({ camMode, override, toggles, lockedId, keyIds, metrics, onLock }
       <directionalLight position={[-60, 50, -40]} intensity={0.4} color="#7FA8FF" />
       <directionalLight position={[55, 40, -55]} intensity={0.3} color="#FFD9A8" />
 
-      <StadiumEnvironment3D />
-      <Ball3D />
-      <AvatarLayer lockedId={lockedId} keyIds={keyIds} onLock={onLock} />
+      <StadiumEnvironment3D alphaMode={alphaMode} />
+      {!alphaMode && <Ball3D />}
+      <AvatarLayer lockedId={lockedId} keyIds={keyIds} alphaOnly={alphaMode} onLock={onLock} />
 
       {/* volumetric AR layers */}
       <XTGrid visible={toggles.xtGrid} possession={metrics?.possession ?? "NLA"} />
       <DefensiveLasers visible={toggles.lasers} metrics={metrics} />
       <PassVectors3D showGhost={toggles.ghost} />
+      <Telestrator3DOverlays telestrator={telestrator} highlightZone={highlightZone} />
 
       <BroadcastCameraRig mode={camMode} lockedId={lockedId} override={override} />
 
@@ -150,7 +163,7 @@ export default function HoloPitch3D(props: Props) {
       <Canvas
         shadows
         dpr={[1, 1.75]}
-        gl={{ antialias: true, powerPreference: "high-performance" }}
+        gl={{ antialias: true, powerPreference: "high-performance", alpha: true }}
         camera={{ fov: 42, position: [0, 38, 55], near: 0.5, far: 700 }}
       >
         <MemoScene {...props} />

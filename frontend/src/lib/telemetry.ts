@@ -43,6 +43,19 @@ export interface GhostSample {
   at: number;
 }
 
+/** One 10Hz snapshot in the 15-second DVR circular buffer. */
+export interface MatchSnapshot {
+  seq: number;
+  t_match: number;
+  clock: string;
+  tick: MatchTick;
+  metrics: Metrics | null;
+  insightId: string | null;
+  isMarker: boolean;          // high-chaos spike / high-PDR pass on the timeline
+}
+
+const HISTORY_CAP = 150; // 15.0 s at 10Hz
+
 class TelemetryStore {
   players = new Map<string, PlayerSample>();
   ball: BallSample = {
@@ -67,11 +80,54 @@ class TelemetryStore {
   ghost: GhostSample | null = null;
   pdrByPlayer = new Map<string, number>();
 
+  // ---- v3.0 DVR circular buffer + playback ----
+  history: MatchSnapshot[] = [];
+  historyVersion = 0;
+  playbackPaused = false;
+  passReceiver: { id: string; at: number } | null = null;
+  telestratorSpotlightIds: string[] = [];
+
   setPdr(pid: string, pdr: number) {
     this.pdrByPlayer.set(pid, pdr);
   }
 
-  applyTick(tick: MatchTick) {
+  setPassReceiver(id: string | null) {
+    this.passReceiver = id ? { id, at: performance.now() } : null;
+  }
+
+  private recordHistory(tick: MatchTick, metrics: Metrics | null) {
+    const last = this.history[this.history.length - 1];
+    const isMarker =
+      (this.metrics ? Math.abs(this.metrics.delta_chaos) > 0.15 : false) ||
+      (tick.players.some((p) => p.speed_kmh >= 30));
+    if (last && tick.t_match - last.t_match < 0.05) return; // dedupe restarts
+    this.history.push({
+      seq: this.history.length ? last.seq + 1 : 0,
+      t_match: tick.t_match,
+      clock: tick.clock,
+      tick,
+      metrics,
+      insightId: this.insight?.id ?? null,
+      isMarker,
+    });
+    if (this.history.length > HISTORY_CAP) this.history.shift();
+    this.historyVersion++;
+  }
+
+  /** Snapshot at `offsetTicks` back from the newest (0 = newest, -150 = -15s). */
+  snapshotAt(offsetTicks: number): MatchSnapshot | null {
+    if (!this.history.length) return null;
+    const idx = this.history.length - 1 + offsetTicks;
+    return this.history[Math.max(0, Math.min(this.history.length - 1, Math.round(idx)))] ?? null;
+  }
+
+  /** Apply a historical snapshot to the live scene (DVR scrub / freeze). */
+  replay(offsetTicks: number) {
+    const snap = this.snapshotAt(offsetTicks);
+    if (snap) this.applyTick(snap.tick, false);
+  }
+
+  applyTick(tick: MatchTick, record = true) {
     const now = performance.now();
     for (const p of tick.players) {
       const cur = this.players.get(p.id);
@@ -126,6 +182,13 @@ class TelemetryStore {
       scenario: tick.scenario,
       scenario_left: tick.scenario_left,
     };
+    if (record) this.recordHistory(tick, this.metrics);
+  }
+
+  /** Live stream entry: always record DVR history; apply only when not scrubbing. */
+  recordLive(tick: MatchTick) {
+    this.recordHistory(tick, this.metrics);
+    if (!this.playbackPaused) this.applyTick(tick, false);
   }
 
   applyMetrics(m: Metrics) {
