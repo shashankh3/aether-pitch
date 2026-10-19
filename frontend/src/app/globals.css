@@ -1,0 +1,125 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,600;0,700;1,600;1,700;1,800&family=Rajdhani:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background: #05070c;
+  color: #e2e8f0;
+  overflow: hidden;
+  font-family: 'Rajdhani', ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ------------------------------------------------ broadcast shapes */
+/* EA-style parallelogram slab */
+.clip-skew {
+  clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+}
+.clip-skew-l {
+  clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+}
+.clip-skew-r {
+  clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%);
+}
+/* chamfered panel: cut TL + BR corners */
+.clip-chamfer {
+  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+}
+/* notched tab: cut BR + BL */
+.clip-tab {
+  clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 100%, 8px 100%);
+}
+.clip-notch-r {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 14px 100%);
+}
+
+/* ------------------------------------------------ surfaces */
+.glass {
+  backdrop-filter: blur(10px);
+  background: rgba(6, 10, 18, 0.82);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+.glass-soft {
+  backdrop-filter: blur(8px);
+  background: rgba(6, 10, 18, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+.lower-third {
+  background: linear-gradient(100deg, rgba(5, 8, 14, 0.96) 0%, rgba(10, 16, 28, 0.88) 100%);
+}
+
+/* diagonal hazard / accent stripes */
+.stripes-crimson {
+  background-image: repeating-linear-gradient(
+    -55deg, rgba(255, 42, 84, 0.9) 0 6px, rgba(255, 42, 84, 0.25) 6px 12px);
+}
+.stripes-dark {
+  background-image: repeating-linear-gradient(
+    -55deg, rgba(255, 255, 255, 0.05) 0 5px, transparent 5px 10px);
+}
+
+.text-glow-cyan { text-shadow: 0 0 14px rgba(0, 240, 255, 0.7); }
+.text-glow-crimson { text-shadow: 0 0 14px rgba(255, 42, 84, 0.7); }
+.text-outline {
+  -webkit-text-stroke: 1.5px rgba(0, 0, 0, 0.55);
+  paint-order: stroke fill;
+}
+
+.scroll-slim::-webkit-scrollbar { width: 6px; height: 6px; }
+.scroll-slim::-webkit-scrollbar-track { background: transparent; }
+.scroll-slim::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 9999px;
+}
+
+/* ------------------------------------------------ keyframes */
+@keyframes slam-in {
+  0%   { transform: scale(2.1) skewX(-10deg); opacity: 0; letter-spacing: 0.3em; }
+  55%  { transform: scale(0.94) skewX(-10deg); opacity: 1; letter-spacing: 0.02em; }
+  75%  { transform: scale(1.04) skewX(-10deg); }
+  100% { transform: scale(1) skewX(-10deg); opacity: 1; }
+}
+@keyframes lower-in {
+  0%   { transform: translateX(-56px) skewX(-10deg); opacity: 0; }
+  100% { transform: translateX(0) skewX(0deg); opacity: 1; }
+}
+@keyframes wipe-diag {
+  0%   { transform: translateX(-130%) skewX(-18deg); }
+  100% { transform: translateX(260%) skewX(-18deg); }
+}
+@keyframes sheen {
+  0%   { transform: translateX(-120%); }
+  100% { transform: translateX(320%); }
+}
+@keyframes scanline {
+  0%   { top: -10%; opacity: 0; }
+  12%  { opacity: 0.5; }
+  100% { top: 110%; opacity: 0; }
+}
+@keyframes pulse-crimson {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 42, 84, 0.55); }
+  50%      { box-shadow: 0 0 18px 4px rgba(255, 42, 84, 0.55); }
+}
+@keyframes slide-up {
+  0%   { transform: translateY(24px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+@keyframes breathe {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+@keyframes bar-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-slam-in { animation: slam-in 0.7s cubic-bezier(0.2, 1.4, 0.3, 1) both; }
+.animate-lower-in { animation: lower-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-breathe { animation: breathe 2s ease-in-out infinite; }
+.animate-pulse-crimson { animation: pulse-crimson 1.2s ease-in-out infinite; }
+.animate-slide-up { animation: slide-up 0.35s ease-out both; }
