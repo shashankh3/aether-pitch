@@ -21,8 +21,9 @@ export default function ScoreBug({ tick, metrics }: Props) {
   const wpPct = Math.round(wpNla * 100);
 
   return (
-    <div className="clip-ea pointer-events-auto w-[286px] select-none">
-      <div className="flex items-stretch border border-white/15 bg-slate-950/85 backdrop-blur-xl">
+    <div className="clip-ea panel-lux hud-enter pointer-events-auto w-[286px] select-none overflow-hidden">
+      <div className="hairline absolute inset-x-0 top-0 h-px opacity-70" />
+      <div className="flex items-stretch border border-white/15 bg-slate-950/70 backdrop-blur-xl">
         <div className="w-[5px] stripes-crimson" />
         <div className="flex flex-1 items-center justify-between px-2 py-1.5">
           <div className="flex items-center gap-1.5">
@@ -32,6 +33,10 @@ export default function ScoreBug({ tick, metrics }: Props) {
           <span className="font-tech text-[24px] font-bold leading-none text-white">{nla}</span>
         </div>
         <div className="flex flex-col items-center justify-center border-x border-white/10 bg-black/50 px-2">
+          <span className="mb-0.5 flex items-center gap-1 font-display text-[7px] font-semibold uppercase tracking-[0.2em] text-crimson">
+            <span className="h-1 w-1 rounded-full bg-crimson hud-live-dot" />
+            Live
+          </span>
           <span className="font-tech text-[15px] font-bold leading-none text-pitch">{tick?.clock ?? "--:--"}</span>
           <span className="font-display text-[8.5px] font-semibold uppercase tracking-[0.2em] text-slate-500">2nd Half</span>
         </div>
@@ -45,7 +50,7 @@ export default function ScoreBug({ tick, metrics }: Props) {
         <div className="w-[5px] bg-gradient-to-b from-tactical to-sky-700" />
       </div>
       {/* win probability / momentum bar */}
-      <div className="border-x border-b border-white/15 bg-slate-950/85 px-2 py-1.5 backdrop-blur-xl">
+      <div className="border-x border-b border-white/15 bg-slate-950/70 px-2 py-1.5 backdrop-blur-xl">
         <div className="mb-1 flex items-center justify-between font-tech text-[9px] font-bold uppercase tracking-[0.18em]">
           <span className="text-crimson">NLA {wpPct}%</span>
           <span className="text-slate-500">Win Probability</span>

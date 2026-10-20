@@ -47,10 +47,11 @@ export default function TacticalPulseBar({ metrics }: Props) {
 
   return (
     <div
-      className={`clip-ea pointer-events-auto w-full max-w-[520px] border border-white/15 bg-slate-950/80 px-3 py-2 backdrop-blur-xl ${
-        critical ? "animate-pulse-crimson border-crimson/60" : ""
+      className={`clip-ea panel-lux hud-enter pointer-events-auto relative w-full max-w-[520px] overflow-hidden border px-3 py-2 backdrop-blur-xl ${
+        critical ? "animate-pulse-crimson border-crimson/60" : "border-white/15"
       }`}
     >
+      <div className="hairline absolute inset-x-0 top-0 h-px opacity-60" />
       <div className="mb-1 flex items-center justify-between">
         <span className="font-display text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">
           Tactical Pulse · Control vs Chaos

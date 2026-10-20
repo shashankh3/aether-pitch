@@ -35,7 +35,7 @@ import type {
   MetricFocus, PersonaMode, PersonaModeV5, PersonalizationState, RecapAct, RecapPassArc,
   StudioQueryResponse, TelestratorState,
 } from "@/lib/types";
-import { Radio, Clapperboard, LayoutGrid, ShieldCheck } from "lucide-react";
+import { Radio, Clapperboard, LayoutGrid, ShieldCheck, Eye, EyeOff, Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const SCENARIO_KEYS: Record<string, string> = {
@@ -44,6 +44,19 @@ const SCENARIO_KEYS: Record<string, string> = {
   "3": "tactical_inversion",
   "4": "halftime_recap",
 };
+
+const MOBILE_CAMS: { id: CameraMode; label: string }[] = [
+  { id: "TELE_BROADCAST", label: "Tele" },
+  { id: "PLAYER_LOCK_3RD_PERSON", label: "Pro" },
+  { id: "TACTICAL_DRONE_ORBIT", label: "Drone" },
+  { id: "AUTO_DIRECTOR", label: "Auto" },
+];
+
+const MOBILE_TOGGLES: { id: keyof OverlayToggles; label: string }[] = [
+  { id: "xtGrid", label: "xT" },
+  { id: "ghost", label: "Ghost" },
+  { id: "lasers", label: "Laser" },
+];
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const CAMERA_OVERRIDE_MS = 6500;
@@ -108,6 +121,10 @@ export default function StudioPage() {
   const [showAlphaModal, setShowAlphaModal] = useState(false);
   const [showRubric, setShowRubric] = useState(false);
 
+  // ---- presentation / clean-feed controls ----
+  const [cinemaMode, setCinemaMode] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
   // ---- v5.0 judge domination ----
   const [showRecap, setShowRecap] = useState(false);
   const [recapPass, setRecapPass] = useState<RecapPassArc | null>(null);
@@ -127,6 +144,26 @@ export default function StudioPage() {
     if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("overlay") === "alpha") {
       setAlphaMode(true);
     }
+  }, []);
+
+  useEffect(() => {
+    const sync = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (typeof document === "undefined") return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.().catch(() => {});
+    } else {
+      document.documentElement.requestFullscreen?.().catch(() => {});
+    }
+  }, []);
+
+  const toggleAlpha = useCallback(() => {
+    setAlphaMode((a) => !a);
+    setCinemaMode(false);
   }, []);
 
   // lower-third: show for 8s whenever a new insight lands
@@ -199,12 +236,26 @@ export default function StudioPage() {
         || target.tagName === "SELECT" || target.isContentEditable
       )) return;
       if (document.querySelector('[aria-modal="true"]')) return;
+      const key = e.key.toLowerCase();
+      if (key === "f") {
+        e.preventDefault();
+        toggleFullscreen();
+        return;
+      }
+      if (key === "h") {
+        if (!alphaMode) setCinemaMode((v) => !v);
+        return;
+      }
+      if (e.key === "Escape" && cinemaMode) {
+        setCinemaMode(false);
+        return;
+      }
       const name = SCENARIO_KEYS[e.key];
       if (name && !busy) inject(name);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [inject, busy]);
+  }, [alphaMode, cinemaMode, inject, busy, toggleFullscreen]);
 
   // ---- pill targets: locked / carrier / receiver / spotlighted / sprinters ----
   const keySig = tick
@@ -481,6 +532,7 @@ export default function StudioPage() {
           setRecapPass(null);
           setTelestrator((t) => ({ ...t, animateGhostReplay: false, customTacticalArrows: [] }));
           if (snap) telemetry.applyTick(snap, false);
+          setCinemaMode(false);
           setAlphaMode(true);
           tourFxTimers.current.push(setTimeout(() => setAlphaMode(false), 6500));
           break;
@@ -559,8 +611,13 @@ export default function StudioPage() {
           backgroundPosition: "0 0, 0 12px, 12px -12px, -12px 0",
         };
 
+  const goalPalette =
+    goalBanner?.team === "MCS"
+      ? ["#00F0FF", "#7DF9FF", "#FFFFFF", "#FFC24D", "#1D4ED8"]
+      : ["#FF1E56", "#FF5C86", "#FFFFFF", "#FFC24D", "#7F0F26"];
+
   return (
-    <main className="relative h-screen w-screen overflow-hidden bg-obsidian">
+    <main className="relative h-[100dvh] w-screen overflow-hidden bg-obsidian">
       {/* chroma / checkerboard backdrop behind the transparent WebGL canvas */}
       {alphaMode && <div className="fixed inset-0 z-0" style={alphaBackdropStyle} />}
 
@@ -579,14 +636,36 @@ export default function StudioPage() {
         onLock={handleLock}
       />
 
+      {!alphaMode && (
+        <>
+          <div className="scene-aurora" aria-hidden />
+          <div className="scene-grade" aria-hidden />
+          <div className="scene-scanlines" aria-hidden />
+          <div className="scene-grain" aria-hidden />
+          <div className="broadcast-frame" aria-hidden>
+            <span className="frame-corner frame-corner-tl" />
+            <span className="frame-corner frame-corner-tr" />
+            <span className="frame-corner frame-corner-bl" />
+            <span className="frame-corner frame-corner-br" />
+          </div>
+        </>
+      )}
+
       {/* ------------------------------------------------------------------ */}
       {/* HUD overlay grid: left rail · centre stage · right rail · dashboard */}
       {/* ------------------------------------------------------------------ */}
-      <div className={cn("pointer-events-none absolute inset-0", alphaMode ? "z-20" : "z-10")}>
+      <div
+        aria-hidden={cinemaMode || undefined}
+        className={cn(
+          "pointer-events-none absolute inset-0",
+          alphaMode ? "z-20" : "z-10",
+          cinemaMode ? "cinema-hide" : "cinema-show"
+        )}
+      >
         <div className="grid h-full w-full grid-cols-1 grid-rows-[auto_1fr_auto] gap-2 overflow-y-auto p-2 scroll-slim lg:gap-3 lg:p-3 xl:grid-cols-[352px_minmax(0,1fr)_368px] xl:grid-rows-[minmax(0,1fr)_auto] xl:overflow-hidden">
 
           {/* ---------- LEFT RAIL · top: brand + scorebug + CV auto-eventer ---------- */}
-          <div className="pointer-events-auto flex min-h-0 flex-col items-start gap-2 xl:col-start-1 xl:row-start-1">
+          <div className="hud-enter pointer-events-auto flex min-h-0 flex-col items-start gap-2 xl:col-start-1 xl:row-start-1">
             <div className="flex items-center gap-2">
               <div
                 className="clip-skew flex h-9 w-9 items-center justify-center bg-gradient-to-br from-violetdeep via-[#6d1250] to-crimson"
@@ -605,6 +684,26 @@ export default function StudioPage() {
                   </span>
                 </div>
               </div>
+              <div className="ml-1 flex items-center gap-1">
+                <button
+                  onClick={() => setCinemaMode(true)}
+                  disabled={alphaMode}
+                  aria-pressed={cinemaMode}
+                  className="clip-skew border border-white/10 bg-slate-950/75 p-1.5 text-slate-400 backdrop-blur-xl hover:border-tactical/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                  title="Clean broadcast feed (H)"
+                  aria-label="Enter clean broadcast feed"
+                >
+                  <Eye size={13} />
+                </button>
+                <button
+                  onClick={toggleFullscreen}
+                  className="clip-skew border border-white/10 bg-slate-950/75 p-1.5 text-slate-400 backdrop-blur-xl hover:border-tactical/40 hover:text-white"
+                  title={isFullscreen ? "Exit fullscreen (F)" : "Enter fullscreen (F)"}
+                  aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                >
+                  {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+                </button>
+              </div>
             </div>
             <ScoreBug tick={tick} metrics={metrics} />
             <div className="hidden min-h-0 xl:block [@media(max-height:800px)]:hidden">
@@ -613,7 +712,7 @@ export default function StudioPage() {
           </div>
 
           {/* ---------- CENTRE STAGE · top: pulse + voice pill + status badges ---------- */}
-          <div className="pointer-events-auto flex flex-col items-center gap-2 xl:col-start-2 xl:row-start-1">
+          <div className="hud-enter pointer-events-auto flex flex-col items-center gap-2 xl:col-start-2 xl:row-start-1">
             <TacticalPulseBar metrics={metrics} />
             <JudgeAutopilotTour
               onStep={handleAutopilotStep}
@@ -670,13 +769,68 @@ export default function StudioPage() {
                 </span>
               </div>
             )}
+
+            {/* compact mobile production dock */}
+            <div className="flex w-full max-w-[520px] items-center gap-1 overflow-x-auto border border-white/10 bg-slate-950/70 p-1 backdrop-blur-xl scroll-slim xl:hidden">
+              {MOBILE_CAMS.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => pickCamera(c.id)}
+                  aria-pressed={camMode === c.id}
+                  className={cn(
+                    "clip-skew shrink-0 px-2 py-1 font-tech text-[10px] font-bold uppercase tracking-wider",
+                    camMode === c.id ? "bg-tactical/20 text-tactical" : "text-slate-400 hover:text-white"
+                  )}
+                  title={c.label}
+                >
+                  {c.label}
+                </button>
+              ))}
+              <span className="mx-0.5 h-4 w-px shrink-0 bg-white/15" />
+              {MOBILE_TOGGLES.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => toggleKey(t.id)}
+                  aria-pressed={toggles[t.id]}
+                  className={cn(
+                    "clip-skew shrink-0 px-2 py-1 font-tech text-[10px] font-bold uppercase tracking-wider",
+                    toggles[t.id] ? "bg-pitch/20 text-pitch" : "text-slate-500 hover:text-slate-300"
+                  )}
+                  title={t.label}
+                >
+                  {t.label}
+                </button>
+              ))}
+              <span className="mx-0.5 h-4 w-px shrink-0 bg-white/15" />
+              <button
+                onClick={toggleAlpha}
+                aria-pressed={alphaMode}
+                className={cn(
+                  "clip-skew shrink-0 p-1.5",
+                  alphaMode ? "bg-gold/20 text-gold" : "text-slate-400 hover:text-white"
+                )}
+                title="Broadcast alpha mode"
+                aria-label="Toggle broadcast alpha mode"
+              >
+                <Clapperboard size={12} />
+              </button>
+              <button
+                onClick={() => setShowRubric(true)}
+                className="clip-skew shrink-0 p-1.5 text-pitch hover:text-white"
+                title="Verify pipeline"
+                aria-label="Verify pipeline"
+              >
+                <ShieldCheck size={12} />
+              </button>
+            </div>
           </div>
 
           {/* ---------- RIGHT RAIL · production cluster + camera + TwinCast + co-pilot + radar ---------- */}
-          <aside className="pointer-events-auto hidden min-h-0 flex-col gap-2 overflow-y-auto pr-0.5 scroll-slim xl:col-start-3 xl:row-span-2 xl:flex">
+          <aside className="hud-enter-late pointer-events-auto hidden min-h-0 flex-col gap-2 overflow-y-auto pr-0.5 scroll-slim xl:col-start-3 xl:row-span-2 xl:flex">
             <div className="flex shrink-0 gap-1.5">
               <button
-                onClick={() => setAlphaMode((a) => !a)}
+                onClick={toggleAlpha}
+                aria-pressed={alphaMode}
                 className={cn(
                   "clip-skew flex flex-1 items-center justify-center gap-1 py-1.5 font-tech text-[10px] font-bold uppercase tracking-wider transition",
                   alphaMode ? "bg-gold/25 text-gold" : "bg-slate-950/85 text-slate-300 hover:text-white"
@@ -766,10 +920,12 @@ export default function StudioPage() {
           </div>
 
           {/* ---------- DASHBOARD · bottom-centre: lower-third + DVR + pipeline + deck ---------- */}
-          <div className="pointer-events-none relative flex flex-col justify-end gap-1.5 xl:col-start-2 xl:row-start-2">
+          <div className="hud-enter-later pointer-events-none relative flex flex-col justify-end gap-1.5 xl:col-start-2 xl:row-start-2">
             {lt && lowerThird && (
               <div
                 key={lowerThird.id}
+                role="status"
+                aria-live="polite"
                 className="animate-lower-in pointer-events-none absolute bottom-full left-1/2 z-20 mb-3 flex w-full max-w-[640px] -translate-x-1/2 items-stretch"
               >
                 <div
@@ -828,14 +984,67 @@ export default function StudioPage() {
         </div>
       </div>
 
+      {cinemaMode && !alphaMode && (
+        <>
+          <div className="fixed right-4 top-4 z-40 flex items-center gap-2">
+            <span className="hidden items-center gap-2 border border-white/10 bg-slate-950/75 px-2.5 py-1.5 font-tech text-[9px] font-bold uppercase tracking-[0.24em] text-slate-400 backdrop-blur-xl sm:flex">
+              <span className="h-1.5 w-1.5 rounded-full bg-crimson hud-live-dot" />
+              Clean Feed
+            </span>
+            <button
+              autoFocus
+              onClick={() => setCinemaMode(false)}
+              className="pointer-events-auto flex items-center gap-2 border border-tactical/40 bg-slate-950/80 px-3 py-1.5 font-tech text-[10px] font-bold uppercase tracking-[0.18em] text-tactical backdrop-blur-xl hover:bg-tactical/15 hover:text-white"
+              title="Restore HUD (H)"
+              aria-label="Restore HUD"
+            >
+              <EyeOff size={13} /> HUD
+              <kbd className="ml-1 border border-white/15 px-1 py-px text-[8px] text-slate-400">H</kbd>
+            </button>
+          </div>
+          <div className="pointer-events-none fixed bottom-4 left-4 z-40 flex items-end gap-2 opacity-90">
+            <span className="h-6 w-1 bg-gradient-to-b from-crimson to-tactical" />
+            <div className="leading-none">
+              <div className="font-display text-[15px] font-bold uppercase tracking-[0.16em] text-white">
+                AETHER<span className="text-tactical">PITCH</span>
+              </div>
+              <div className="mt-1 font-tech text-[8px] font-semibold uppercase tracking-[0.32em] text-slate-400">
+                Live World Feed · 10 Hz
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* ---------- GOAL slam ---------- */}
       {goalBanner && (
         <div
           key={goalBanner.id}
+          role="status"
+          aria-live="assertive"
+          aria-atomic="true"
           className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center overflow-hidden"
         >
+          <div className="absolute inset-0 overflow-hidden" aria-hidden>
+            {Array.from({ length: 36 }).map((_, i) => (
+              <span
+                key={i}
+                className="absolute block"
+                style={{
+                  left: `${(i * 37 + 11) % 100}%`,
+                  top: "-8%",
+                  width: `${4 + (i % 3) * 2}px`,
+                  height: `${9 + (i % 4) * 3}px`,
+                  borderRadius: i % 4 === 0 ? "50%" : "1px",
+                  backgroundColor: goalPalette[i % goalPalette.length],
+                  opacity: 0.9,
+                  animation: `confetti-fall ${1.3 + (i % 5) * 0.16}s cubic-bezier(0.18, 0.7, 0.32, 1) ${(i % 9) * 0.045}s both`,
+                }}
+              />
+            ))}
+          </div>
           <div
-            className="animate-slam-in flex flex-col items-center px-14 py-4"
+            className="animate-slam-in relative z-10 flex flex-col items-center overflow-hidden px-14 py-4"
             style={{
               background:
                 goalBanner.team === "NLA"
@@ -845,6 +1054,11 @@ export default function StudioPage() {
               boxShadow: "0 0 60px rgba(0,0,0,0.7)",
             }}
           >
+            <span className="goal-sweep pointer-events-none absolute inset-y-0 left-0 w-1/3 opacity-70" />
+            <span
+              className="pointer-events-none absolute h-44 w-44 rounded-full border-2 border-white/40"
+              style={{ left: "calc(50% - 5.5rem)", top: "calc(50% - 5.5rem)", animation: "goal-burst 1.3s ease-out both" }}
+            />
             <span
               className="font-display text-[84px] font-bold uppercase italic leading-none text-white text-outline"
               style={{ textShadow: "0 6px 30px rgba(0,0,0,0.6)" }}

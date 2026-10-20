@@ -23,10 +23,11 @@ The project was built for the **Premier League × Microsoft Azure "Inside the Ga
 
 ## Highlights
 
-- **Live 3D broadcast** — 60 FPS React Three Fiber stadium, articulated player rigs, four camera modes, volumetric overlays, and broadcast alpha output.
+- **Cinematic 3D broadcast** — a procedural night stadium, 22 articulated player rigs, four camera modes, choreographed camera intros, dynamic FOV, score-impact camera shake, volumetric overlays, and broadcast alpha output.
 - **Five-stage pipeline** — synthetic ingest, deterministic tactical math, asynchronous AI explanation, render packets, and personalization.
 - **Explainable analytics** — Pass Difficulty Rating, Expected Threat, Ghost Pass, Chaos Index, pressing metrics, and defensive line analysis.
 - **Fan runtime** — persona modes, metric locking, club bias, locked players, and EN/ES/AR/HI commentary without restarting the stream.
+- **Studio-grade interactions** — focus-managed dialogs, Escape/outside-click dismissal, ARIA live regions, reduced-motion support, and a responsive mobile production dock.
 - **Resilient by design** — a 10 Hz browser edge engine takes over if the WebSocket or Azure pipeline drops, then hot-swaps back when it returns.
 
 ## Contents
@@ -48,13 +49,15 @@ The project was built for the **Premier League × Microsoft Azure "Inside the Ga
 
 ### Broadcast and visualization
 
-- **105 × 68 m stadium** with regulation markings, goalposts and nets, LED advertising boards, floodlights, and an instanced crowd.
+- **Cinematic night stadium** — procedural mowed turf, regulation markings, goalposts and nets, LED advertising boards, a tiered bowl with roof lighting, 1,600 instanced crowd figures, camera flashes, floodlight beams, twin jumbotrons, stars, moon, and a procedural ball trail.
+- **Camera choreography** — a cinematic intro move, broadcast-grade dynamic field of view, ball-following push, score-impact shake, and clamped Pro Cam / auto-director framing.
 - **22 articulated avatars** with procedural gait, sprint lean, kick animation, goalkeeper stance, jersey numbers, and PlayStyle badges.
 - **Four camera modes** — Tele Cam, Pro Cam, Drone Orbit, and Auto-Director. AI camera directives can take over temporarily; a manual camera choice cancels the takeover.
 - **15-second DVR and 3D telestrator** — freeze and scrub live play, inspect sprint/chaos markers, and draw spotlight pillars, an offside wall, a compactness hull, ghost-ball replays, and tactical arrows.
 - **Tactical layers** — xT threat grid, defensive laser links, parabolic pass tubes, Ghost Pass counterfactuals, pitch-control surface, and passing network.
 - **Broadcast alpha mode** — open `/?overlay=alpha` for a transparent/chroma-ready AR layer with SMPTE timecode and a machine-readable render-partner packet.
-- **Match chrome** — scorebug, momentum and win-probability bars, tactical pulse, lower thirds, GOAL slam, and player lock hologram.
+- **Match chrome** — scorebug, momentum and win-probability bars, tactical pulse, lower thirds, GOAL slam with confetti, and player lock hologram.
+- **Clean-feed presentation** — `H` hides the HUD for a framed cinematic feed, `F` toggles fullscreen, and a compact mobile production dock exposes camera modes and core AR toggles.
 
 ### AI and analytics
 
@@ -68,9 +71,11 @@ The project was built for the **Premier League × Microsoft Azure "Inside the Ga
 
 ### Fan experience and reliability
 
-- **Fan Personalization Tuner** with live persona, metric, club, player, and language controls.
+- **Fan Personalization Tuner** with live persona, metric, club, player, and language controls, pressed-state semantics, Escape dismissal, and outside-click close.
 - **60-second judge autopilot** that runs a six-step guided tour with synchronized voiceover.
 - **Five-stage pipeline inspector** and a one-click rubric audit at `GET /api/health/pipeline-audit`.
+- **Accessible production dialogs** for the overlay packet, rubric audit, three-act recap, and studio recap with focus trap, focus restoration, scroll lock, labelled titles, and live status regions.
+- **Responsive studio layout** — compact mobile dock, icon-first scenario controls, scroll-safe overlays, and reduced-motion support.
 - **Resilient match engine** that switches to a browser-native 10 Hz simulation during backend or Azure failures.
 
 ## Architecture
@@ -238,18 +243,22 @@ Frontend environment variables (set in `frontend/.env.local` or the container en
 2. Click **Run 60s Judge Autopilot** for a guided tour of the CV viewport, camera direction, DVR/telestrator, alpha mode, personalization, and the three-act recap.
 3. Use the Camera Director to switch modes and toggle xT, Ghost Pass, defensive lasers, pitch control, and the passing network.
 4. Freeze the DVR to scrub the last 15 seconds; selecting a historical frame pauses live recording until playback resumes.
-5. Open http://localhost:3000/?overlay=alpha for the transparent broadcast layer.
+5. Open **Overlay JSON** or **Verify** for the render-partner packet and live five-stage audit; every dialog traps focus, closes on `Esc` or backdrop click, and restores the trigger.
+6. Open http://localhost:3000/?overlay=alpha for the transparent broadcast layer.
 
-### Scenario shortcuts
+### Keyboard shortcuts
 
-| Key | Scenario | Effect |
-|---|---|---|
-| `1` | `chaos_counter` | Injects a chaotic counter-attack window |
-| `2` | `high_press_turnover` | Forces a high-press turnover and pressure trap |
-| `3` | `tactical_inversion` | Inverts the tactical shape and triggers AI analysis |
-| `4` | `halftime_recap` | Opens the three-act Studio Match Recap |
+| Key | Action |
+|---|---|
+| `1` | Inject `chaos_counter` |
+| `2` | Inject `high_press_turnover` |
+| `3` | Inject `tactical_inversion` |
+| `4` | Open the three-act Studio Match Recap |
+| `H` | Toggle the clean broadcast feed |
+| `F` | Toggle fullscreen |
+| `Esc` | Restore the HUD from clean feed |
 
-Keyboard shortcuts are ignored while typing in inputs, textareas, selects, or editable fields, and while a modal is open.
+Shortcuts are ignored while typing in inputs, textareas, selects, or editable fields, and while a modal is open.
 
 ### Camera modes
 
@@ -347,7 +356,7 @@ The frontend interpolates the 10 Hz stream to 60 FPS through a mutable telemetry
 │   ├── src/components/                # HUD, DVR, tuner, recap, autopilot, modals
 │   ├── src/components/three/          # Stadium, avatars, overlays, camera rig
 │   ├── src/hooks/                     # Resilient match engine, speech, studio state
-│   ├── src/lib/                       # Schema types, telemetry store, edge engine
+│   ├── src/lib/                       # Schema types, telemetry store, edge engine, modal a11y
 │   ├── package.json
 │   └── Dockerfile
 ├── docker-compose.yml
@@ -374,6 +383,8 @@ Build the frontend for a production check:
 cd frontend
 npm run build
 ```
+
+Browser smoke checks cover 1600 × 900 desktop and 390 × 844 mobile layouts: WebGL canvas initialization, camera/overlay controls, overlay-packet and rubric dialogs, three-act recap, fan tuner dismissal, and the `?overlay=alpha` clean-output path.
 
 Optional backend static check:
 

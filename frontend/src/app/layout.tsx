@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Rajdhani, Teko, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -28,9 +28,40 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AETHER PITCH — EA SPORTS FC 27 3D WebGL Broadcast & Studio Engine",
+  title: {
+    default: "AETHER PITCH — Cinematic 3D Football Broadcast & AI Studio",
+    template: "%s · AETHER PITCH",
+  },
   description:
-    "EA Sports FC HyperMotion V-grade 3D WebGL broadcast: articulated player avatars, 4 autonomous camera modes, volumetric AR overlays and a 5-stage Azure AI pipeline over 100% synthetic 10Hz telemetry.",
+    "A cinematic 3D WebGL football broadcast: articulated avatars, autonomous camera direction, volumetric AR tactics, DVR telestration and a 5-stage Azure AI pipeline over 100% synthetic 10 Hz telemetry.",
+  applicationName: "AETHER PITCH",
+  keywords: [
+    "3D football broadcast", "WebGL", "React Three Fiber", "Azure AI Foundry",
+    "sports analytics", "real-time telemetry", "broadcast graphics", "tactical analysis",
+  ],
+  authors: [{ name: "AETHER PITCH" }],
+  creator: "AETHER PITCH",
+  openGraph: {
+    type: "website",
+    siteName: "AETHER PITCH",
+    title: "AETHER PITCH — Cinematic 3D Football Broadcast & AI Studio",
+    description:
+      "A cinematic 3D WebGL football broadcast with autonomous cameras, volumetric AR and a 5-stage Azure AI pipeline.",
+  },
+  twitter: {
+    card: "summary",
+    title: "AETHER PITCH — Cinematic 3D Football Broadcast & AI Studio",
+    description:
+      "A cinematic 3D WebGL football broadcast with autonomous cameras, volumetric AR and a 5-stage Azure AI pipeline.",
+  },
+  robots: { index: true, follow: true },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#04060A",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({

@@ -33,7 +33,8 @@ interface Props {
 
 export default function CameraDirectorBar({ mode, onMode, toggles, onToggle, aiDirected }: Props) {
   return (
-    <div className="clip-ea pointer-events-auto w-full border border-white/15 bg-slate-950/80 p-2 backdrop-blur-xl">
+    <div className="clip-ea panel-lux hud-enter-late pointer-events-auto relative w-full overflow-hidden border border-white/15 p-2 backdrop-blur-xl">
+      <div className="hairline absolute inset-x-0 top-0 h-px opacity-60" />
       <div className="mb-1.5 flex items-center justify-between px-1">
         <span className="font-display text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">
           Camera Director
@@ -49,10 +50,11 @@ export default function CameraDirectorBar({ mode, onMode, toggles, onToggle, aiD
           <button
             key={c.id}
             onClick={() => onMode(c.id)}
+            aria-pressed={mode === c.id}
             className={cn(
               "clip-chamfer flex items-center gap-1.5 px-2 py-1.5 font-tech text-[11px] font-bold uppercase tracking-wider transition",
               mode === c.id
-                ? "bg-tactical/20 text-tactical shadow-[0_0_14px_rgba(0,240,255,0.25)]"
+                ? "bg-gradient-to-r from-tactical/25 to-pitch/10 text-tactical shadow-[0_0_14px_rgba(0,240,255,0.25)]"
                 : "bg-white/[0.03] text-slate-400 hover:bg-white/[0.07] hover:text-slate-200"
             )}
             title={c.label}
@@ -67,6 +69,7 @@ export default function CameraDirectorBar({ mode, onMode, toggles, onToggle, aiD
           <button
             key={t.id}
             onClick={() => onToggle(t.id)}
+            aria-pressed={toggles[t.id]}
             className={cn(
               "clip-skew flex items-center justify-center gap-1 px-1 py-1 font-tech text-[9.5px] font-bold uppercase tracking-wider transition",
               toggles[t.id] ? "bg-pitch/20 text-pitch" : "bg-white/[0.03] text-slate-500 hover:text-slate-300"

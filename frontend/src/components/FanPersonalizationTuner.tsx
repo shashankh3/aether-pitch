@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SlidersHorizontal, X, Target, Users, Languages, Heart } from "lucide-react";
 import type {
   ClubBias, LangCode, MetricFocus, PersonaModeV5, PersonalizationState,
@@ -35,15 +35,47 @@ const CLUBS: { id: ClubBias; label: string }[] = [
 
 export default function FanPersonalizationTuner({ state, onChange }: Props) {
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const activeMetric = METRICS.find((m) => m.id === state.metric_focus);
   const update = <K extends keyof PersonalizationState>(key: K, value: PersonalizationState[K]) => {
     onChange({ ...state, [key]: value });
   };
+  const close = () => {
+    setOpen(false);
+    triggerRef.current?.focus({ preventScroll: true });
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(false);
+      triggerRef.current?.focus({ preventScroll: true });
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (panelRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [open]);
 
   return (
     <>
       <button
+        ref={triggerRef}
         onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-controls="fan-tuner-panel"
+        aria-haspopup="dialog"
         className={cn(
           "clip-ea flex w-full items-center justify-between border px-2 py-1.5 backdrop-blur-xl transition",
           open
@@ -70,7 +102,13 @@ export default function FanPersonalizationTuner({ state, onChange }: Props) {
       </button>
 
       {open && (
-        <div className="fixed right-3 top-14 z-[60] w-[min(360px,calc(100vw-24px))] max-h-[calc(100vh-80px)] overflow-y-auto border border-tactical/30 bg-slate-950/95 p-3 shadow-[0_0_40px_rgba(0,240,255,0.12)] backdrop-blur-2xl scroll-slim">
+        <div
+          ref={panelRef}
+          id="fan-tuner-panel"
+          role="dialog"
+          aria-label="Fan personalization"
+          className="modal-lux fixed right-3 top-14 z-[60] w-[min(360px,calc(100vw-24px))] max-h-[calc(100vh-80px)] overflow-y-auto p-3 scroll-slim"
+        >
           <div className="mb-2 flex items-center justify-between border-b border-white/10 pb-2">
             <div>
               <div className="font-display text-[14px] font-bold uppercase tracking-[0.2em] text-white">
@@ -80,12 +118,12 @@ export default function FanPersonalizationTuner({ state, onChange }: Props) {
                 Stage E · live fan runtime
               </div>
             </div>
-            <button onClick={() => setOpen(false)} className="p-1 text-slate-400 hover:text-white">
+            <button onClick={close} className="modal-close clip-skew" aria-label="Close fan personalization">
               <X size={15} />
             </button>
           </div>
 
-          <div className="mb-2">
+          <div className="mb-2" role="group" aria-label="Persona mode">
             <div className="mb-1 flex items-center gap-1 font-display text-[9px] font-bold uppercase tracking-[0.22em] text-slate-500">
               <Users size={10} /> Persona Mode
             </div>
@@ -94,6 +132,7 @@ export default function FanPersonalizationTuner({ state, onChange }: Props) {
                 <button
                   key={p.id}
                   onClick={() => update("persona_mode", p.id)}
+                  aria-pressed={state.persona_mode === p.id}
                   className={cn(
                     "clip-skew py-1 font-tech text-[9.5px] font-bold uppercase tracking-wider transition",
                     state.persona_mode === p.id
@@ -107,7 +146,7 @@ export default function FanPersonalizationTuner({ state, onChange }: Props) {
             </div>
           </div>
 
-          <div className="mb-2">
+          <div className="mb-2" role="group" aria-label="Single metric focus">
             <div className="mb-1 flex items-center gap-1 font-display text-[9px] font-bold uppercase tracking-[0.22em] text-slate-500">
               <Target size={10} /> Single-Metric Focus · filters 3D tags
             </div>
@@ -116,6 +155,7 @@ export default function FanPersonalizationTuner({ state, onChange }: Props) {
                 <button
                   key={m.id}
                   onClick={() => update("metric_focus", m.id)}
+                  aria-pressed={state.metric_focus === m.id}
                   className={cn(
                     "flex w-full items-center justify-between border px-2 py-1 text-left transition",
                     state.metric_focus === m.id
@@ -132,16 +172,19 @@ export default function FanPersonalizationTuner({ state, onChange }: Props) {
                     </span>
                     <span className="block font-tech text-[8.5px] text-slate-500">{m.detail}</span>
                   </span>
-                  <span className={cn(
-                    "h-2 w-2 rounded-full",
-                    state.metric_focus === m.id ? "animate-breathe bg-pitch" : "bg-slate-700"
-                  )} />
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "h-2 w-2 rounded-full",
+                      state.metric_focus === m.id ? "animate-breathe bg-pitch" : "bg-slate-700"
+                    )}
+                  />
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="mb-2">
+          <div className="mb-2" role="group" aria-label="Favorite club bias">
             <div className="mb-1 flex items-center gap-1 font-display text-[9px] font-bold uppercase tracking-[0.22em] text-slate-500">
               <Heart size={10} /> Favorite Club Bias
             </div>
@@ -150,6 +193,7 @@ export default function FanPersonalizationTuner({ state, onChange }: Props) {
                 <button
                   key={c.id}
                   onClick={() => update("favorite_club_bias", c.id)}
+                  aria-pressed={state.favorite_club_bias === c.id}
                   className={cn(
                     "clip-skew py-1 font-tech text-[9px] font-bold uppercase tracking-wider transition",
                     state.favorite_club_bias === c.id
@@ -163,7 +207,7 @@ export default function FanPersonalizationTuner({ state, onChange }: Props) {
             </div>
           </div>
 
-          <div>
+          <div role="group" aria-label="Market language">
             <div className="mb-1 flex items-center gap-1 font-display text-[9px] font-bold uppercase tracking-[0.22em] text-slate-500">
               <Languages size={10} /> Market Language
             </div>
@@ -172,6 +216,7 @@ export default function FanPersonalizationTuner({ state, onChange }: Props) {
                 <button
                   key={lang}
                   onClick={() => update("market_language", lang)}
+                  aria-pressed={state.market_language === lang}
                   className={cn(
                     "py-1 font-tech text-[9px] font-bold uppercase tracking-wider transition",
                     state.market_language === lang

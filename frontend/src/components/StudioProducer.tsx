@@ -9,6 +9,7 @@ import { useRef, useState } from "react";
 import { Clapperboard, Film, Mic, X, Zap, Camera, Send, Sparkles, Loader2 } from "lucide-react";
 import type { Insight, LangCode, Recap, StudioQueryResponse } from "@/lib/types";
 import { useSpeechController } from "@/hooks/useSpeechController";
+import { useModalA11y } from "@/lib/useModalA11y";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -52,6 +53,8 @@ export default function StudioProducer({
   const [response, setResponse] = useState<StudioQueryResponse | null>(null);
   const [listening, setListening] = useState(false);
   const recRef = useRef<SpeechRecognitionLike | null>(null);
+  const recapPanelRef = useRef<HTMLDivElement>(null);
+  useModalA11y(Boolean(recap), onCloseRecap, recapPanelRef);
   const { isVoiceMuted, speakInsight } = useSpeechController();
   const dir = latest?.camera_directive;
 
@@ -259,19 +262,31 @@ export default function StudioProducer({
 
       {/* instant studio recap modal */}
       {recap && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-8 backdrop-blur-sm">
-          <div className="clip-ea scroll-slim max-h-full w-[560px] overflow-y-auto border border-tactical/30 bg-slate-950/95 p-5 shadow-2xl animate-slide-up">
+        <div
+          className="modal-backdrop z-40"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="studio-recap-title"
+          onClick={onCloseRecap}
+        >
+          <div
+            ref={recapPanelRef}
+            tabIndex={-1}
+            data-modal-panel
+            onClick={(e) => e.stopPropagation()}
+            className="modal-lux clip-ea scroll-slim max-h-full w-[560px] overflow-y-auto p-5"
+          >
             <div className="mb-3 flex items-start justify-between gap-4">
               <div>
-                <div className="mb-1 flex items-center gap-1.5 font-display text-[10px] font-bold uppercase tracking-[0.25em] text-pitch">
+                <div className="modal-kicker mb-1 flex items-center gap-1.5 text-pitch">
                   <Film size={11} /> Studio Match Recap · {recap.timecode}
                 </div>
-                <h3 className="font-display text-[24px] font-bold leading-snug text-slate-100">{recap.title}</h3>
+                <h3 id="studio-recap-title" className="font-display text-[24px] font-bold leading-snug text-slate-100">{recap.title}</h3>
                 <div className="mt-1 font-tech text-[12px] text-slate-400">
                   NLA {recap.score.NLA} — {recap.score.MCS} MCS
                 </div>
               </div>
-              <button onClick={onCloseRecap} className="p-1 text-slate-400 transition hover:bg-white/10 hover:text-white">
+              <button onClick={onCloseRecap} className="modal-close clip-skew" aria-label="Close studio match recap">
                 <X size={16} />
               </button>
             </div>

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Clapperboard, Download, Loader2, Play, RefreshCw, Sparkles, X,
 } from "lucide-react";
+import { useModalA11y } from "@/lib/useModalA11y";
 import type {
   LangCode, MatchEvent, MatchRecapStoryboard, MatchTick, RecapAct,
 } from "@/lib/types";
@@ -108,6 +109,8 @@ export default function MatchRecapStudioModal({
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const live = useRef({ tick, events });
+  const panelRef = useRef<HTMLDivElement>(null);
+  useModalA11y(open, onClose, panelRef);
 
   useEffect(() => {
     live.current = { tick, events };
@@ -116,9 +119,10 @@ export default function MatchRecapStudioModal({
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
-    fetch(`${API_URL}/api/match-recap`)
+    fetch(`${API_URL}/api/match-recap`, { signal: controller.signal })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json() as Promise<MatchRecapStoryboard>;
@@ -127,14 +131,17 @@ export default function MatchRecapStudioModal({
         if (!cancelled) setData(storyboard);
       })
       .catch(() => {
-        if (cancelled) return;
+        if (cancelled || controller.signal.aborted) return;
         setData(fallbackStoryboard(live.current.tick, live.current.events));
         setError("Azure storyboard unreachable — showing the edge-generated 3-act cut.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [open, attempt]);
 
   const teleprompter = useMemo(() => {
@@ -173,43 +180,56 @@ export default function MatchRecapStudioModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-3 backdrop-blur-md" onClick={onClose}>
+    <div
+      className="modal-backdrop z-[70]"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="recap-modal-title"
+      aria-busy={loading}
+    >
       <div
-        className="clip-ea relative flex max-h-[92vh] w-[min(1040px,calc(100vw-24px))] flex-col border border-gold/30 bg-[#060A12] shadow-[0_0_80px_rgba(255,194,77,0.12)]"
+        ref={panelRef}
+        tabIndex={-1}
+        data-modal-panel
+        className="modal-lux clip-ea relative flex max-h-[92vh] w-[min(1040px,calc(100vw-24px))] flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3">
-          <div>
-            <div className="flex items-center gap-2 font-display text-[18px] font-bold uppercase tracking-[0.18em] text-white">
+        <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
+          <div className="min-w-0">
+            <h3 id="recap-modal-title" className="flex items-center gap-2 font-display text-[18px] font-bold uppercase tracking-[0.18em] text-white">
               <Clapperboard size={18} className="text-gold" /> Studio Match Recap
-            </div>
-            <div className="font-tech text-[9px] uppercase tracking-[0.24em] text-slate-500">
+            </h3>
+            <div className="modal-kicker mt-0.5">
               Milestone engine · ghost-pass counterfactuals · time travel
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <button
               onClick={exportTeleprompter}
-              className="clip-skew flex items-center gap-1 bg-gold/15 px-2.5 py-1.5 font-tech text-[10px] font-bold uppercase tracking-wider text-gold hover:bg-gold/25"
+              disabled={!teleprompter || loading}
+              className="modal-action clip-skew"
+              data-tone="gold"
+              aria-label="Export recap teleprompter"
             >
-              <Download size={12} /> Export Teleprompter
+              <Download size={12} /> <span className="hidden sm:inline">Export</span> Teleprompter
             </button>
-            <button onClick={onClose} className="p-1 text-slate-400 hover:text-white">
+            <button onClick={onClose} className="modal-close clip-skew" aria-label="Close studio match recap">
               <X size={18} />
             </button>
           </div>
         </div>
 
-        <div className="scroll-slim min-h-0 flex-1 overflow-y-auto p-4">
+        <div className="scroll-slim min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
           {loading && (
-            <div className="flex h-[280px] items-center justify-center gap-2 font-tech text-[12px] text-tactical">
+            <div className="flex h-[280px] items-center justify-center gap-2 font-tech text-[12px] text-tactical" role="status" aria-live="polite">
               <Loader2 size={18} className="animate-spin" /> Compiling 22-player snapshots and ghost lanes…
             </div>
           )}
           {error && (
-            <div className="mb-3 flex items-center justify-between border border-gold/30 bg-gold/10 px-3 py-2 font-tech text-[10px] text-gold">
+            <div role="alert" className="mb-3 flex items-center justify-between gap-2 border border-gold/30 bg-gold/10 px-3 py-2 font-tech text-[10px] text-gold">
               <span>{error}</span>
-              <button onClick={() => setAttempt((a) => a + 1)} className="flex items-center gap-1 hover:text-white">
+              <button onClick={() => setAttempt((a) => a + 1)} className="flex shrink-0 items-center gap-1 hover:text-white">
                 <RefreshCw size={11} /> retry
               </button>
             </div>
@@ -218,14 +238,14 @@ export default function MatchRecapStudioModal({
             <>
               <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
                 <div>
-                  <div className="font-display text-[26px] font-bold uppercase leading-tight tracking-wide text-white">
+                  <div className="font-display text-[22px] font-bold uppercase leading-tight tracking-wide text-white sm:text-[26px]">
                     {data.title}
                   </div>
                   <div className="font-tech text-[10px] uppercase tracking-[0.2em] text-slate-500">
                     {data.subtitle}
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="text-left sm:text-right">
                   <div className="font-display text-[24px] font-bold text-white">
                     {data.score.NLA}–{data.score.MCS}
                   </div>
@@ -235,7 +255,7 @@ export default function MatchRecapStudioModal({
                 </div>
               </div>
 
-              <div className="mb-3 grid grid-cols-3 gap-2">
+              <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
                 {data.acts.map((act) => (
                   <div key={act.act} className="clip-chamfer flex flex-col border border-white/10 bg-white/[0.025] p-3">
                     <div className="flex items-center justify-between">

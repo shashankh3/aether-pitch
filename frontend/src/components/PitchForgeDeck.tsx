@@ -73,7 +73,9 @@ export default function PitchForgeDeck({ tick, busy, onInject }: Props) {
             key={s.id}
             onClick={() => onInject(s.id)}
             disabled={!!busy}
-            className={`clip-chamfer group relative flex min-w-0 flex-1 items-center gap-2 overflow-hidden px-3 py-2.5 text-left transition disabled:opacity-60 ${
+            aria-label={s.label}
+            title={s.detail}
+            className={`clip-chamfer group relative flex min-w-0 flex-1 items-center justify-center gap-2 overflow-hidden px-3 py-2.5 text-left transition disabled:opacity-60 md:justify-start ${
               isActive ? "bg-white/[0.06]" : "border border-white/10 bg-white/[0.02] hover:bg-white/[0.05]"
             }`}
             style={
@@ -81,7 +83,6 @@ export default function PitchForgeDeck({ tick, busy, onInject }: Props) {
                 ? { border: `1px solid ${s.accent}`, boxShadow: `0 0 22px ${s.accent}44, inset 0 0 18px ${s.accent}22` }
                 : undefined
             }
-            title={s.detail}
           >
             {/* left accent rail */}
             <span
@@ -106,7 +107,7 @@ export default function PitchForgeDeck({ tick, busy, onInject }: Props) {
             </span>
             <span className="relative z-10 min-w-0">
               <span
-                className="block truncate font-display text-[15px] font-bold uppercase leading-tight tracking-wide"
+                className="hidden truncate font-display text-[15px] font-bold uppercase leading-tight tracking-wide sm:block"
                 style={{ color: isActive ? s.accent : "#E2E8F0" }}
               >
                 {s.label}

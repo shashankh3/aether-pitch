@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Clapperboard, Copy, Check, X, Radio } from "lucide-react";
 import { telemetry } from "@/lib/telemetry";
+import { useModalA11y } from "@/lib/useModalA11y";
 import type { Insight } from "@/lib/types";
 
 /* ------------------------------------------- SMPTE 50fps timecode chip */
@@ -129,6 +130,8 @@ export default function BroadcastAlphaModal({ open, onClose, insight }: Props) {
   const [copied, setCopied] = useState(false);
   const [packet, setPacket] = useState<string>("");
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  useModalA11y(open, onClose, panelRef);
 
   useEffect(() => {
     if (!open) return;
@@ -152,39 +155,45 @@ export default function BroadcastAlphaModal({ open, onClose, insight }: Props) {
   };
   return (
     <div
-      className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm sm:p-8"
+      className="modal-backdrop pointer-events-auto z-50"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label="Production overlay JSON"
+      aria-labelledby="alpha-modal-title"
     >
       <div
-        className="clip-ea flex max-h-full w-[640px] flex-col border border-gold/40 bg-slate-950/95 shadow-2xl animate-slide-up"
+        ref={panelRef}
+        tabIndex={-1}
+        data-modal-panel
+        className="modal-lux clip-ea flex max-h-full w-[640px] flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-          <div>
-            <h3 className="flex items-center gap-2 font-display text-[19px] font-bold uppercase tracking-wide text-gold">
+        <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
+          <div className="min-w-0">
+            <h3 id="alpha-modal-title" className="flex items-center gap-2 font-display text-[19px] font-bold uppercase tracking-wide text-gold">
               <Clapperboard size={16} /> Production Overlay JSON
             </h3>
-            <p className="font-tech text-[10px] uppercase tracking-[0.2em] text-slate-500">
+            <p className="modal-kicker mt-0.5">
               AETHER_RENDER_PARTNER_V2 · Singular.live / Vizrt machine-readable
             </p>
           </div>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={copy}
-              className="clip-skew flex items-center gap-1.5 bg-pitch/20 px-2.5 py-1 font-tech text-[11px] font-bold uppercase tracking-wider text-pitch transition hover:bg-pitch/35"
-            >
+          <div className="flex shrink-0 items-center gap-2">
+            <button onClick={copy} className="modal-action clip-skew">
               {copied ? <Check size={12} /> : <Copy size={12} />}
               {copied ? "Copied" : "Copy"}
             </button>
-            <button onClick={onClose} className="p-1 text-slate-400 transition hover:bg-white/10 hover:text-white">
+            <button onClick={onClose} className="modal-close clip-skew" aria-label="Close production overlay JSON">
               <X size={16} />
             </button>
           </div>
         </div>
-        <pre className="scroll-slim min-h-0 flex-1 overflow-auto p-4 font-mono text-[10.5px] leading-relaxed text-slate-300">
+        <p className="sr-only" role="status" aria-live="polite">
+          {copied ? "Production packet copied to clipboard." : ""}
+        </p>
+        <pre
+          className="scroll-slim min-h-0 flex-1 overflow-auto p-4 font-mono text-[10.5px] leading-relaxed text-slate-300"
+          aria-label="Machine-readable production overlay packet"
+        >
           {packet}
         </pre>
       </div>

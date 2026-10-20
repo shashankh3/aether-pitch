@@ -3,10 +3,10 @@
 // Runs the live backend self-test (GET /api/health/pipeline-audit) and maps
 // the result onto every hackathon judging requirement.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ShieldCheck, X, Loader2, CheckCircle2 } from "lucide-react";
 import type { PipelineAudit } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { useModalA11y } from "@/lib/useModalA11y";
 
 interface Props {
   open: boolean;
@@ -25,57 +25,70 @@ export default function RubricVerifierModal({ open, onClose }: Props) {
   const [audit, setAudit] = useState<PipelineAudit | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  useModalA11y(open, onClose, panelRef);
 
   useEffect(() => {
     if (!open) return;
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
     setAudit(null);
     const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    fetch(`${API_URL}/api/health/pipeline-audit`)
+    fetch(`${API_URL}/api/health/pipeline-audit`, { signal: controller.signal })
       .then((r) => {
         if (!r.ok) throw new Error(`audit HTTP ${r.status}`);
         return r.json();
       })
       .then(setAudit)
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoading(false));
+      .catch((e) => {
+        if (controller.signal.aborted) return;
+        setError(String(e));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
   }, [open]);
 
   if (!open) return null;
   return (
     <div
-      className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm sm:p-8"
+      className="modal-backdrop pointer-events-auto z-50"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label="5-stage rubric diagnostic"
+      aria-labelledby="rubric-modal-title"
+      aria-busy={loading}
     >
       <div
-        className="clip-ea max-h-full w-[680px] overflow-y-auto border border-pitch/40 bg-slate-950/95 p-5 shadow-2xl animate-slide-up scroll-slim"
+        ref={panelRef}
+        tabIndex={-1}
+        data-modal-panel
+        className="modal-lux clip-ea scroll-slim max-h-full w-[680px] overflow-y-auto p-5"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-3 flex items-start justify-between">
+        <div className="mb-3 flex items-start justify-between gap-3">
           <div>
-            <h3 className="flex items-center gap-2 font-display text-[22px] font-bold uppercase tracking-wide text-pitch">
+            <h3 id="rubric-modal-title" className="flex items-center gap-2 font-display text-[22px] font-bold uppercase tracking-wide text-pitch">
               <ShieldCheck size={18} /> 5-Stage Rubric Diagnostic
             </h3>
-            <p className="font-tech text-[10.5px] uppercase tracking-[0.2em] text-slate-500">
+            <p className="modal-kicker mt-0.5">
               Live self-test over an isolated synthetic match tick
             </p>
           </div>
-          <button onClick={onClose} className="p-1 text-slate-400 transition hover:bg-white/10 hover:text-white">
+          <button onClick={onClose} className="modal-close clip-skew" aria-label="Close rubric diagnostic">
             <X size={16} />
           </button>
         </div>
 
         {loading && (
-          <div className="flex items-center gap-2 py-8 text-slate-400">
+          <div className="flex items-center gap-2 py-8 text-slate-400" role="status" aria-live="polite">
             <Loader2 size={18} className="animate-spin" /> Running pipeline audit…
           </div>
         )}
         {error && (
-          <div className="clip-chamfer border border-crimson/40 bg-crimson/10 p-3 text-[12px] text-crimson">
+          <div role="alert" className="clip-chamfer border border-crimson/40 bg-crimson/10 p-3 text-[12px] text-crimson">
             Audit failed: {error} — is the engine on :8000 running?
           </div>
         )}
