@@ -1,200 +1,424 @@
-# AETHER PITCH v5.0 — Championship Finale 3D Broadcast & Judge-Domination Engine
+<div align="center">
 
-**Premier League & Microsoft Azure "Inside the Game" Hackathon submission.**
-An EA Sports FC 27 (HyperMotion V) + Lenovo Football AI Pro grade broadcast studio:
-a **60 FPS Three.js / React Three Fiber 3D stadium** with **14-part biomechanical
-player avatars**, 4 autonomous camera modes, volumetric AR overlays, a **15-second
-DVR time-machine + 3D telestrator**, a **computer-vision auto-eventing viewport**,
-a **bi-directional "Ask The 12th Man" co-pilot**, **SMPTE broadcast alpha mode**
-and a **1-click judge rubric verifier** — all fed by a **5-stage real-time Azure AI
-pipeline over 100% synthetic 10Hz football telemetry**.
+# AETHER PITCH
 
-**v5.0 adds:** live fan personalization (persona / metric lock / club lens / i18n),
-a milestone engine + **three-act cinematic recap** with 3D time travel, a Gaussian
-**spatial control surface** and 3D passing network, a **60-second judge autopilot**,
-and a **10Hz edge fallback** that keeps the broadcast alive through Azure/WebSocket
-failures. Full architecture, math appendix and demo script: **[SUBMISSION_GUIDE.md](SUBMISSION_GUIDE.md)**.
+**A real-time 3D football broadcast studio driven by 100% synthetic telemetry and a deterministic five-stage Azure AI pipeline.**
 
-**Tagline:** *AETHER PITCH — the championship finale, rendered live in 3D and personalized for every fan.*
+[![Next.js](https://img.shields.io/badge/Next.js-14-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![React Three Fiber](https://img.shields.io/badge/React%20Three%20Fiber-8-61DAFB?logo=react&logoColor=black)](https://docs.pmnd.rs/react-three-fiber)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Azure](https://img.shields.io/badge/Azure-AI%20Foundry-0078D4?logo=microsoftazure&logoColor=white)](https://azure.microsoft.com/)
+[![Synthetic Data](https://img.shields.io/badge/data-100%25%20synthetic-6f42c1)](#synthetic-data)
 
-```
-NLA (North London Athletic, crimson/gold)  vs  MCS (Manchester Cityscape, cyan/navy)
-Zero real clubs, players, logos, or proprietary tracking data.
-```
+[Quick Start](#quick-start) · [Features](#features) · [Architecture](#architecture) · [API](#api-reference) · [Configuration](#configuration) · [Testing](#testing--verification)
+
+</div>
 
 ---
 
-## v3.0 / v4.0 Championship Modules
+AETHER PITCH turns a deterministic synthetic football match into a broadcast-grade, interactive 3D experience in the browser. A 10 Hz FastAPI engine drives 22 articulated players, tactical overlays, a 15-second DVR, AI commentary, and per-fan personalization. Every club, player, crest, and tracking sample is synthetic.
 
-| Module | What it does |
-|--------|--------------|
-| **14-part biomechanical rig** | Shared singleton geometry pool (zero GPU re-allocation), velocity-locked stride phase (zero foot sliding), asymmetric knee flexion, counter-swinging 2-segment arms, sprint torso lean + bob, 350ms KICK strike, goalkeeper ready/dive stance, breathing idle, ball-tracking neck, troika `<Text>` jersey numbers back+chest, smart-culled `<Html>` pills (max ~4 live) |
-| **Stage A/II CV Auto-Eventer** | Picture-in-picture optical tracking feed: 8 ball-nearest players projected through a 2D→3D homography, YOLOv8+ByteTrack boxes with `ID | conf | km/h` labels, skeletal keypoints, ball tracker + velocity arrow, H-matrix calibration grid, live machine-detected event log (zero manual tagging) |
-| **DVR Time-Machine + Telestrator** | 150-tick (15s) circular buffer; freeze + scrub with spike/sprint timeline markers; 3D volumetric spotlight pillars, offside laser wall (second-deepest defender + attacker distance), compactness convex-hull mesh (m² + stretch), holographic ghost-ball replay, custom tactical arrows |
-| **Broadcast Alpha Mode** | `?overlay=alpha` or one click: strips every opaque surface leaving only the AR layer over a transparent checkerboard / chroma-green `#00B140` canvas (OBS / Vizrt / Singular.live ready), live **SMPTE 50fps timecode**, and the machine-readable `AETHER_RENDER_PARTNER_V2` packet inspector with 1-click copy |
-| **Ask The 12th Man** | `POST /api/studio-query`: typed or spoken tactical questions → 3-step agent reasoning chain + localized answer + 15s commentator cue + a `scene_directive` that physically flies the camera, drops spotlight beams, raises the offside wall, and highlights the defensive seam on the 3D pitch |
-| **Voice + Two-Phase UX** | Zero-overlap speech controller (cancel-before-queue, en-GB/es-ES/ar-SA/hi-IN voice mapping, broadcast cadence) with live equalizer pill; scenario injections resolve Phase 1 instantly (<30ms physics) then Phase 2 AI reasoning shimmer |
-| **Tactical Radar Mini-Map** | EA FC 27-style 230×148 translucent radar: 22 dots, locked-player gold pulse, ball flare, pass + ghost vectors, spotlight rings, click-to-lock that flies the 3D camera |
-| **Judge Rubric Verifier** | `GET /api/health/pipeline-audit` runs an isolated 5-stage self-test (per-stage ms + sample outputs + synthetic compliance) rendered as a one-click VERIFIED checklist; `test_pipeline.py`, `backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml`, `azure.yaml` included |
+The project was built for the **Premier League × Microsoft Azure "Inside the Game" hackathon**. Azure services are optional: without credentials, every stage falls back to a deterministic local implementation, so the full studio runs offline. For the full architecture, mathematical appendix, and demo script, see [SUBMISSION_GUIDE.md](SUBMISSION_GUIDE.md).
 
-### v5.0 Championship Finale Modules
+## Highlights
 
-| Module | What it does |
-|--------|--------------|
-| **Fan Personalization Runtime** | `FanPersonalizationTuner` + `stage_d_e_personalizer.py`: persona fork, single-metric 3D tag lock, NLA/MCS club lens, locked-player context, EN/ES/AR/HI adaptation via `GET/POST /api/personalization` |
-| **Milestone Engine + 3-Act Recap** | Stage A detects sprint records (>31.5 km/h), five-pass PDR mastery, and 30s final-third press sieges; `GET/POST /api/match-recap` returns full 22-player snapshots, actual/ghost passes, localized commentary, teleprompter export, and `LOAD ACT` 3D time travel |
-| **Spatial Control Surface** | 21×14 Gaussian pitch-control `CanvasTexture` heat surface + elevated 3D passing network, independently toggled from the camera director |
-| **Judge Autopilot Tour** | One click runs a 60-second, six-step self-driving rubric demo (CV PiP → God Mode → DVR/telestrate → broadcast alpha → fan personalization → 3-act recap) with synchronized voiceover |
-| **Resilient Edge Engine** | `useResilientMatchEngine` + `edgeEngine.ts`: 10Hz browser synthetic fallback, seamless WebSocket hot-swap, and a live `🟢 AZURE PIPELINE LIVE` / `⚡ EDGE AUTONOMOUS ENGINE ACTIVE` status pill |
+- **Live 3D broadcast** — 60 FPS React Three Fiber stadium, articulated player rigs, four camera modes, volumetric overlays, and broadcast alpha output.
+- **Five-stage pipeline** — synthetic ingest, deterministic tactical math, asynchronous AI explanation, render packets, and personalization.
+- **Explainable analytics** — Pass Difficulty Rating, Expected Threat, Ghost Pass, Chaos Index, pressing metrics, and defensive line analysis.
+- **Fan runtime** — persona modes, metric locking, club bias, locked players, and EN/ES/AR/HI commentary without restarting the stream.
+- **Resilient by design** — a 10 Hz browser edge engine takes over if the WebSocket or Azure pipeline drops, then hot-swaps back when it returns.
 
----
+## Contents
 
-## Quick Start (single command)
+- [Features](#features)
+- [Architecture](#architecture)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+- [Using the Studio](#using-the-studio)
+- [API Reference](#api-reference)
+- [Project Structure](#project-structure)
+- [Testing & Verification](#testing--verification)
+- [Deployment](#deployment)
+- [Synthetic Data](#synthetic-data)
+- [Contributing](#contributing)
+- [License](#license)
 
-**Windows:** double-click `start_studio.bat`  ·  **macOS/Linux:** `bash start_studio.sh`
+## Features
 
-| Service   | URL                              |
-|-----------|----------------------------------|
-| Studio UI | http://localhost:3000            |
-| Backend   | http://localhost:8000            |
-| API docs  | http://localhost:8000/docs       |
+### Broadcast and visualization
 
-Manual launch:
+- **105 × 68 m stadium** with regulation markings, goalposts and nets, LED advertising boards, floodlights, and an instanced crowd.
+- **22 articulated avatars** with procedural gait, sprint lean, kick animation, goalkeeper stance, jersey numbers, and PlayStyle badges.
+- **Four camera modes** — Tele Cam, Pro Cam, Drone Orbit, and Auto-Director. AI camera directives can take over temporarily; a manual camera choice cancels the takeover.
+- **15-second DVR and 3D telestrator** — freeze and scrub live play, inspect sprint/chaos markers, and draw spotlight pillars, an offside wall, a compactness hull, ghost-ball replays, and tactical arrows.
+- **Tactical layers** — xT threat grid, defensive laser links, parabolic pass tubes, Ghost Pass counterfactuals, pitch-control surface, and passing network.
+- **Broadcast alpha mode** — open `/?overlay=alpha` for a transparent/chroma-ready AR layer with SMPTE timecode and a machine-readable render-partner packet.
+- **Match chrome** — scorebug, momentum and win-probability bars, tactical pulse, lower thirds, GOAL slam, and player lock hologram.
+
+### AI and analytics
+
+- **Stage A — ingest:** deterministic 10 Hz PitchForge simulation with 3D pose state, ball physics, event detection, and milestone tracking.
+- **Stage B — interpret:** NumPy tactical math for Chaos Index, PDR, 16 × 12 xT, Ghost Pass, AI gating, leverage, PPDA, and defensive lines.
+- **Stage C — explain:** asynchronous causal narratives and studio answers through Azure AI Foundry / Azure OpenAI, with a local fallback.
+- **Stage D — render:** time-coded overlay packets, highlight zones, and camera directives for the 3D scene.
+- **Stage E — personalize:** analyst/casual/split personas, metric lock, club lens, locked-player context, and localized commentary.
+- **Ask The 12th Man:** ask a tactical question and receive a reasoning chain, localized answer, commentator cue, and a scene directive that moves the camera and overlays.
+- **Three-act recap:** milestone-driven storyboard with full 22-player snapshots, ghost passes, localized narration, teleprompter export, and 3D time travel.
+
+### Fan experience and reliability
+
+- **Fan Personalization Tuner** with live persona, metric, club, player, and language controls.
+- **60-second judge autopilot** that runs a six-step guided tour with synchronized voiceover.
+- **Five-stage pipeline inspector** and a one-click rubric audit at `GET /api/health/pipeline-audit`.
+- **Resilient match engine** that switches to a browser-native 10 Hz simulation during backend or Azure failures.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Browser["Browser — Next.js 14"]
+        direction TB
+        HUD["Broadcast HUD\nscorebug · DVR · telestrator"]
+        Scene["React Three Fiber\nstadium · avatars · overlays"]
+        Store["Telemetry store\n10 Hz in → 60 fps render"]
+        Edge["Edge engine\n10 Hz local fallback"]
+        Store --> Scene
+        Store --> HUD
+        Edge -. failover .-> Store
+    end
+
+    subgraph Backend["FastAPI engine — 10 Hz loop"]
+        direction LR
+        A["Stage A\nSynthetic ingest"] --> B["Stage B\nTactical math"]
+        B --> D["Stage D\nRender packets"]
+        B -. gated event .-> C["Stage C\nAzure AI Foundry"]
+        C -. async insight .-> D
+        D --> E["Stage E\nPersonalization"]
+    end
+
+    E -->|WebSocket /ws| Store
+    HUD -->|REST + scenarios| A
+    HUD -->|studio query| C
+```
+
+The 10 Hz loop never waits on Stage C. Cloud reasoning is dispatched as an async task, so a slow model cannot stall the match. If Azure credentials are absent, Stage C and Stage E use deterministic local fallbacks and Stage D stays on the local WebSocket transport.
+
+### Pipeline contract
+
+| Stage | Responsibility | Key outputs | Blocking |
+|---|---|---|---|
+| **A — Ingest** | Synthetic physics, player/ball state, event and milestone detection | 22 players, ball, pose state, raw events, milestones | Yes, 10 Hz heartbeat |
+| **B — Interpret** | Deterministic NumPy tactical analysis | Chaos, PDR, xT, Ghost Pass, gate, leverage | Yes, sub-millisecond |
+| **C — Explain** | Azure AI Foundry agents and local fallback narratives | Commentary, studio answers, recap acts | No, asynchronous |
+| **D — Render** | Broadcast overlay and camera packets | Overlays, highlight zones, camera directives | Yes, cheap |
+| **E — Personalize** | Persona, metric, club, player, and language adaptation | Localized fan story and HUD payload | Yes, cheap |
+
+### Technology stack
+
+| Layer | Technologies |
+|---|---|
+| **Frontend** | Next.js 14 (App Router), React 18, TypeScript, React Three Fiber, Three.js, Drei, postprocessing, Tailwind CSS |
+| **Backend** | Python, FastAPI, Uvicorn, NumPy, Pydantic, python-dotenv |
+| **AI and cloud (optional)** | Azure AI Foundry / Azure OpenAI, Azure AI Translator, Azure Web PubSub configuration, Azure Container Apps |
+| **Delivery** | Docker, Docker Compose, Azure Developer CLI (`azd`), start scripts for Windows and macOS/Linux |
+
+## Quick Start
+
+### Prerequisites
+
+| Requirement | Version |
+|---|---|
+| Python | 3.11+ recommended |
+| Node.js | 20+ |
+| npm | 10+ |
+| Docker | Optional, for the container stack |
+
+### One-command launch
+
+**Windows**
+
+```bat
+start_studio.bat
+```
+
+**macOS / Linux**
+
 ```bash
-cd backend  && python -m pip install -r requirements.txt && python -m uvicorn main:app --reload --port 8000
-cd frontend && npm install && npm run dev
+bash start_studio.sh
 ```
 
-**Go cloud (optional):** copy `backend/.env.example` → `backend/.env` and add your
-`AZURE_OPENAI_*` / `AZURE_TRANSLATOR_*` credentials. Without credentials everything
-runs on deterministic local fallbacks — judge-ready out of the box.
+The launcher installs dependencies, starts both services, and opens the studio.
 
----
+| Service | URL |
+|---|---|
+| Studio UI | http://localhost:3000 |
+| Backend | http://localhost:8000 |
+| OpenAPI docs | http://localhost:8000/docs |
 
-## The 3D WebGL Broadcast Engine (`frontend/src/components/three/`)
+### Manual launch
 
-| Module | What it renders |
-|--------|-----------------|
-| `PlayerAvatar3D.tsx` | 22 articulated humanoid rigs (torso / head+hair / swinging arms / thigh-knee-sock-cleat legs) with procedural gait (`freq = max(2.5, kmh·0.65)`, `amp = min(0.85, kmh·0.032)`), speed-proportional torso lean, 350ms KICK strike, ball-tracking clamped neck, HyperMotion dual foot-rings (gold/cyan when locked or carrier, crimson at ≥30 km/h), grass vision cones, spinning **PlayStyle+ plumbob** and live glass pills (`#9 V. Sorensen • 32.4 km/h • PDR 89%`) |
-| `StadiumEnvironment3D.tsx` | 105m×68m mowed emerald turf, full regulation line set + penalty arcs, metallic goalposts with wireframe nets, 4 scrolling **LED ad boards**, floodlight towers, instanced 3D crowd (1,600 fans) |
-| `TacticalOverlays3D.tsx` | 16×12 **xT threat floor** (InstancedMesh, cyan→magenta, mirrored per possession), **defensive laser links** per back-4/mid-3 with floating line-height + stretch badges |
-| `PassVectors3D.tsx` | 3D **parabolic pass tube** (`QuadraticBezierCurve3`, 6.5 m lofted / 1.2 m ground) + dashed cyan **Lenovo Ghost Pass** counterfactual with `+xT` badge |
-| `BroadcastCameraRig.tsx` | 4 damped camera modes (below) + AI `camera_directive` takeover |
+Terminal 1 — backend:
 
-**Camera modes:** `Tele Cam` (classic TV) · `Pro Cam` (EA FC 3rd-person behind the
-locked avatar, looking 18 m ahead) · `Drone Orbit` (free Lenovo 3D Digital Twin orbit)
-· `Auto-Director` (tele during buildup, dramatic 14 m low-angle swoop when
-`chaos > 0.72` or a Stage (d) overlay fires). Any manual pick cancels the AI take.
+```bash
+cd backend
+python -m venv .venv
 
-60 fps is protected by module-level shared geometries/materials, `useMemo`, a mutable
-telemetry store with **velocity-extrapolated interpolation** (10Hz stream → 60fps
-render, React never re-renders at tick rate), one shadow-casting floodlight +
-InstancedMesh crowd, and `Bloom` + `Vignette` post-processing.
+# Windows
+.venv\Scripts\activate
 
----
+# macOS / Linux
+source .venv/bin/activate
 
-## The 5-Stage Azure Pipeline (unchanged contract, richer payload)
-
-```
-Stage (a) INGEST     stage_a_synthetic_engine.py — 10Hz PitchForge physics sim
-                     now emits 3D pose telemetry: heading_rad (smoothed),
-                     pose_state (KICK > SPRINT ≥28 > PRESS <5m > JOG > IDLE),
-                     playstyle_badge (RAPID+ ≥30 km/h, INCISIVE_PASS+ on
-                     PDR>80 passes, INTERCEPT+ in pressing traps), and the
-                     3D ball (x,y,z,vx,vy,vz, pass_start/end, is_lofted, ghost_end);
-                     MilestoneTracker emits sprint / pass-mastery / press-dominance records
-Stage (b) INTERPRET  stage_b_math_engine.py — deterministic NumPy (unchanged):
-                     Chaos Index (0.35·T̂r + 0.25·σ̂²v + 0.20·stretch + 0.20·press),
-                     PDR logistic, 16×12 xT, Ghost Pass scan, AI gate
-Stage (c) EXPLAIN    stage_c_foundry_agents.py — Azure AI Foundry triage +
-                     causal narrative (deterministic fallback offline)
-Stage (d) RENDER     stage_d_e_personalizer.py — overlay packets now include a
-                     camera_directive: { recommended_mode, focus_target_id,
-                     cinematic_slow_mo, ar_highlight_zone } that drives the
-                     AI camera takeover in the WebGL scene
-Stage (e) PERSONALIZE analyst/casual fork · PlayerLock 360 insight · EN/ES/AR/HI ·
-                     persona / metric-lock / club-lens / locked-player adaptation
+python -m pip install -r requirements.txt
+python -m uvicorn main:app --reload --port 8000
 ```
 
-WebSocket packets: `hello | tick (10Hz) | metrics (2Hz) | event | insight |
-pipeline (2Hz) | recap`. REST: `POST /api/scenario/{chaos_counter |
-high_press_turnover | tactical_inversion | halftime_recap}`, `GET/POST
-/api/personalization`, `GET/POST /api/match-recap`.
+Terminal 2 — frontend:
 
----
-
-## EA FC 27 Broadcast Chrome
-
-- **Top-left** — Premier League-style scorebug with synthetic crests, possession
-  indicator and a win-probability / momentum bar.
-- **Top-center** — Tactical Pulse: chaos waveform, segmented power bar, numeric
-  gauge, a crimson **counter-attack window countdown** above 0.68, and the
-  **Run 60s Judge Autopilot** control.
-- **Top-right** — Camera Director (4 modes + xT Grid / Ghost Pass / Def. Lasers /
-  Pitch Control / Passing Network toggles), the **Fan Personalization Tuner**, and
-  the TwinCast dock (Analyst HUD / Casual Fan / Split + EN/ES/AR/HI pills + Web
-  Speech voice with `en-GB / es-ES / ar-SA / hi-IN` voice selection).
-- **Bottom-left** — EA FC Ultimate-Team style PlayerLock 360 hologram: quick-roster
-  strip, kit silhouette, PlayStyle+ hex badge, radial speedometer with 30 km/h
-  overdrive zone, PDR / ΔxT / stamina, live voice synthesis.
-- **Bottom-center** — TV lower-third banner + PitchForge God-Mode deck
-  (keys `1`–`4`; `4` opens the 3-act Studio Match Recap) + collapsible 5-stage
-  pipeline strip with a live/edge status pill.
-- **GOAL slam** — skewed team-color banner + canvas shockwave + screen flash.
-
----
-
-## Repo layout
-
+```bash
+cd frontend
+npm install
+npm run dev
 ```
-├── backend/                      # FastAPI + 5-stage pipeline (see above)
+
+Open http://localhost:3000.
+
+### Docker Compose
+
+```bash
+docker compose up --build
+```
+
+The backend health check uses `GET /api/health`; the frontend waits for the backend to become healthy before starting.
+
+## Configuration
+
+Copy the example environment file before adding Azure credentials:
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+On Windows PowerShell:
+
+```powershell
+Copy-Item backend/.env.example backend/.env
+```
+
+All Azure settings are optional. Without them, the studio runs on deterministic local fallbacks.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `AZURE_OPENAI_ENDPOINT` | empty | Azure OpenAI / AI Foundry endpoint for Stage C |
+| `AZURE_OPENAI_API_KEY` | empty | Stage C API key |
+| `AZURE_OPENAI_API_VERSION` | `2024-06-01` | Azure OpenAI API version |
+| `AZURE_OPENAI_TRIAGE_DEPLOYMENT` | `gpt-4o-mini` | Fast triage model deployment |
+| `AZURE_OPENAI_NARRATIVE_DEPLOYMENT` | `gpt-4o` | Narrative and recap model deployment |
+| `AZURE_TRANSLATOR_KEY` | empty | Azure AI Translator key for Stage E |
+| `AZURE_TRANSLATOR_ENDPOINT` | `https://api.cognitive.microsofttranslator.com` | Translator endpoint |
+| `AZURE_TRANSLATOR_REGION` | `global` | Translator region |
+| `AZURE_WEBPUBSUB_CONNECTION_STRING` | empty | Optional Web PubSub configuration; local WebSocket is the default |
+| `AZURE_WEBPUBSUB_HUB` | `aether` | Web PubSub hub name |
+| `MATCH_START_MINUTE` | `62.0` | Match clock at engine startup |
+| `AETHER_SEED` | `42` | Deterministic simulation seed |
+| `AETHER_HOST` | `0.0.0.0` | Backend bind address |
+| `AETHER_PORT` | `8000` | Backend bind port |
+
+Frontend environment variables (set in `frontend/.env.local` or the container environment):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | REST base URL |
+| `NEXT_PUBLIC_WS_URL` | `ws://localhost:8000/ws` | WebSocket URL |
+
+## Using the Studio
+
+1. Open http://localhost:3000 and let the match clock begin at minute 62.
+2. Click **Run 60s Judge Autopilot** for a guided tour of the CV viewport, camera direction, DVR/telestrator, alpha mode, personalization, and the three-act recap.
+3. Use the Camera Director to switch modes and toggle xT, Ghost Pass, defensive lasers, pitch control, and the passing network.
+4. Freeze the DVR to scrub the last 15 seconds; selecting a historical frame pauses live recording until playback resumes.
+5. Open http://localhost:3000/?overlay=alpha for the transparent broadcast layer.
+
+### Scenario shortcuts
+
+| Key | Scenario | Effect |
+|---|---|---|
+| `1` | `chaos_counter` | Injects a chaotic counter-attack window |
+| `2` | `high_press_turnover` | Forces a high-press turnover and pressure trap |
+| `3` | `tactical_inversion` | Inverts the tactical shape and triggers AI analysis |
+| `4` | `halftime_recap` | Opens the three-act Studio Match Recap |
+
+Keyboard shortcuts are ignored while typing in inputs, textareas, selects, or editable fields, and while a modal is open.
+
+### Camera modes
+
+| Mode | Behavior |
+|---|---|
+| **Tele Cam** | Classic broadcast angle |
+| **Pro Cam** | Third-person chase behind the locked avatar |
+| **Drone Orbit** | Free orbit around the 3D twin |
+| **Auto-Director** | Switches to a dramatic low angle during high-chaos moments or directed overlays |
+
+## API Reference
+
+Base URL: `http://localhost:8000` · WebSocket: `ws://localhost:8000/ws`
+
+### REST endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/health` | Service health, active stage backends, connected clients, clock, and score |
+| `GET` | `/api/health/pipeline-audit` | Synchronous five-stage self-test with per-stage timings and sample payloads |
+| `GET` | `/api/state` | Latest match state, metrics, and pipeline trace |
+| `GET` | `/api/insights` | Recent Stage C insight packets |
+| `GET` | `/api/personalization` | Current personalization state |
+| `POST` | `/api/personalization` | Update persona, metric, club, player, or language preferences |
+| `GET` | `/api/match-recap` | Build and return the current three-act recap |
+| `POST` | `/api/match-recap` | Trigger the same recap build |
+| `GET` / `POST` | `/api/scenario/{name}` | Inject `chaos_counter`, `high_press_turnover`, `tactical_inversion`, or `halftime_recap` |
+| `POST` | `/api/studio-query` | Ask the tactical co-pilot a question |
+
+### Studio query example
+
+```bash
+curl -X POST http://localhost:8000/api/studio-query \
+  -H "Content-Type: application/json" \
+  -d '{"query":"Why did the high press leave a gap?","language":"en","persona":"analyst","locked_player_id":"NLA_7"}'
+```
+
+`query` is required and must be a non-empty string. `language`, `persona`, and `locked_player_id` are optional; malformed JSON objects or non-string queries return `400`.
+
+### Personalization example
+
+```bash
+curl -X POST http://localhost:8000/api/personalization \
+  -H "Content-Type: application/json" \
+  -d '{"persona_mode":"ANALYST_HUD","metric_focus":"PASS_QUALITY","favorite_club_bias":"NLA_LOYALIST","market_language":"es","locked_player_id":"NLA_7"}'
+```
+
+Accepted values:
+
+- `persona_mode` — `ANALYST_HUD`, `CASUAL_STORY`, `TWINCAST_SPLIT`
+- `metric_focus` — `ALL`, `SPEED_VELOCITY`, `PASS_QUALITY`, `EXPECTED_THREAT_XT`, `CHAOS_PRESSING`
+- `favorite_club_bias` — `NEUTRAL`, `NLA_LOYALIST`, `MCS_LOYALIST`
+- `market_language` — `en`, `es`, `ar`, `hi`
+- `locked_player_id` — any player ID, for example `NLA_7`
+
+### Scenario example
+
+```bash
+curl -X POST http://localhost:8000/api/scenario/chaos_counter
+```
+
+### WebSocket packets
+
+The server broadcasts JSON packets over `/ws`:
+
+| Type | Rate | Content |
+|---|---|---|
+| `hello` | On connect | Initial state snapshot and connection metadata |
+| `tick` | 10 Hz | Full match state (players, ball, clock, score) |
+| `metrics` | 2 Hz | Tactical metrics and derived indicators |
+| `pipeline` | 2 Hz | Per-stage latency and payload trace |
+| `event` | On event | Match, tactical, and milestone events |
+| `insight` | Async | Stage C/D/E broadcast packet |
+| `recap` | On request | Three-act recap packet |
+
+The frontend interpolates the 10 Hz stream to 60 FPS through a mutable telemetry store, keeping React out of the per-tick render path.
+
+## Project Structure
+
+```text
+.
+├── backend/
+│   ├── main.py                        # FastAPI app, match loop, REST + WebSocket hub
+│   ├── config.py                      # Environment-backed settings
+│   ├── stage_a_synthetic_engine.py    # 10 Hz synthetic match, events, milestones
+│   ├── stage_b_math_engine.py         # Chaos, PDR, xT, Ghost Pass, gating
+│   ├── stage_c_foundry_agents.py      # Azure AI Foundry narratives and studio queries
+│   ├── stage_d_e_personalizer.py      # Render packets and fan personalization
+│   ├── test_pipeline.py               # Offline five-stage pipeline self-test
+│   ├── requirements.txt
+│   ├── .env.example
+│   └── Dockerfile
 ├── frontend/
-│   └── src/
-│       ├── app/                  # layout (Rajdhani/Teko/Inter/JetBrains Mono) + page
-│       ├── components/
-│       │   ├── three/            # HoloPitch3D, PlayerAvatar3D, StadiumEnvironment3D,
-│       │   │                     # TacticalOverlays3D, PassVectors3D, BroadcastCameraRig,
-│       │   │                     # SpatialControlSurface3D, RecapPassTubes
-│       │   ├── ScoreBug / TacticalPulseBar / CameraDirectorBar / TwinCastHUD
-│       │   ├── FanPersonalizationTuner / MatchRecapStudioModal / JudgeAutopilotTour
-│       │   ├── PlayerLock360 / StudioProducer / PitchForgeDeck / PipelineInspector
-│       │   └── Crests.tsx        # synthetic club crests (no real IP)
-│       ├── hooks/useResilientMatchEngine.ts  # WS + 10Hz edge hot-swap
-│       ├── lib/edgeEngine.ts     # browser-native synthetic fallback engine
-│       └── lib/                  # types (schema), telemetry store, utils
-├── start_studio.bat / .sh
+│   ├── src/app/                       # Next.js App Router page and layout
+│   ├── src/components/                # HUD, DVR, tuner, recap, autopilot, modals
+│   ├── src/components/three/          # Stadium, avatars, overlays, camera rig
+│   ├── src/hooks/                     # Resilient match engine, speech, studio state
+│   ├── src/lib/                       # Schema types, telemetry store, edge engine
+│   ├── package.json
+│   └── Dockerfile
+├── docker-compose.yml
+├── azure.yaml
+├── start_studio.bat
+├── start_studio.sh
 ├── SUBMISSION_GUIDE.md
 └── README.md
 ```
 
----
+## Testing & Verification
 
-## 3-minute demo script
+Run the backend pipeline self-test:
 
-| Time | Action | Say |
-|------|--------|-----|
-| 0:00–0:15 | Studio loads into the Tele Cam 3D stadium | "A live 3D broadcast built on a synthetic 10Hz physics engine — 22 articulated avatars, zero proprietary data." |
-| 0:15–0:30 | Click **Run 60s Judge Autopilot** | "Six rubric steps, sixty seconds, synchronized voiceover — the studio drives itself." |
-| 0:30–1:10 | Autopilot steps 2–3: God Mode + DVR freeze/telestrate | "Stage B math drives the control surface, defensive lasers, ghost lane, and AI camera takeover." |
-| 1:10–1:25 | Autopilot step 4: broadcast alpha | "Only the transparent AR layer remains — OBS / Vizrt / Singular.live ready." |
-| 1:25–1:50 | Autopilot step 5 + Fan Tuner: Pass Quality, NLA lens, ES→HI→AR | "Same moment, different fan: metric lock, club lens, and Stage E localization without a stream restart." |
-| 1:50–2:20 | Autopilot step 6: recap milestones, click **Load Act** | "Sprint record, five-pass mastery, 30-second press siege — restored as a full 22-player 3D snapshot." |
-| 2:20–2:40 | Export teleprompter, click **Verify** | "Producer-ready three-act script and a five-stage rubric audit." |
-| 2:40–3:00 | Go offline, then reconnect | "The edge engine keeps the picture alive at 10Hz and hot-swaps back to Azure." |
+```bash
+python backend/test_pipeline.py
+```
 
-Full architecture, math appendix, API smoke tests and the long-form script:
-**[SUBMISSION_GUIDE.md](SUBMISSION_GUIDE.md)**.
+Expected result: `RESULT: ALL PIPELINE TESTS PASSED`.
 
----
+Build the frontend for a production check:
 
-## Compliance checklist
+```bash
+cd frontend
+npm run build
+```
 
-- ✅ **100% synthetic data** — generated squads, physics-based tracking, no Opta/StatsBomb/Second Spectrum input.
-- ✅ **Azure cloud-native** — AI Foundry (Stage c), Translator (Stage e), Web PubSub-ready (Stage d); deterministic fallbacks keep the demo alive without credentials.
-- ✅ **Explicit 5-stage traceability** — on-screen Pipeline Inspector with per-stage latency + raw JSON payloads.
+Optional backend static check:
 
-## Notes
+```bash
+python -m pip install pyflakes
+python -m pyflakes backend
+```
 
-- Match time runs at `MATCH_TIME_SCALE=6` from minute 62 by default (env-tunable).
-- Stage (c) rate-limits AI takes to one per 10 s; each AI camera take holds 6.5 s and any manual camera click cancels it.
-- The old 2D canvas was fully replaced by the R3F scene (`frontend/src/components/three/`).
+The backend self-test exercises all five stages without requiring Azure credentials or network access.
+
+## Deployment
+
+### Docker Compose
+
+```bash
+docker compose up --build
+```
+
+This starts the FastAPI engine on port 8000 and the Next.js studio on port 3000.
+
+### Azure Container Apps
+
+`azure.yaml` provides an Azure Developer CLI manifest for the two services. Configure your own `azd` environment and infrastructure, then run:
+
+```bash
+azd up
+```
+
+Set `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` to the public backend endpoints in the deployed frontend environment.
+
+## Synthetic Data
+
+- All clubs, players, crests, names, and tracking data are fictional and generated locally.
+- No Opta, StatsBomb, Second Spectrum, broadcast footage, or other proprietary source is used.
+- The simulation is seeded (`AETHER_SEED`) for reproducible runs.
+- This is a hackathon demonstration, not a production match-data or betting system.
+
+## Contributing
+
+Issues and pull requests are welcome. Before opening a pull request:
+
+1. Run `python backend/test_pipeline.py`.
+2. Run `npm run build` in `frontend/`.
+3. Keep new telemetry fields typed in `frontend/src/lib/types.ts` and mirrored in the backend packet schemas.
+
+## License
+
+No license file is currently included in this repository. All rights remain with the repository owner. Third-party product names and trademarks belong to their respective owners.
