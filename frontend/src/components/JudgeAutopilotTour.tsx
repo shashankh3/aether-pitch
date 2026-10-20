@@ -108,8 +108,7 @@ export default function JudgeAutopilotTour({ onStep, onStop, currentStep }: Prop
       }, step.at * 1000));
     });
     timers.current.push(setTimeout(() => {
-      stop(false);
-      setElapsed(60);
+      stop();
     }, 60000));
   }, [clearAll, onStep, speakInsight, stop]);
 

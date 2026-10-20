@@ -8,7 +8,7 @@
 //                              dramatic low-angle swoop on high chaos /
 //                              Stage (d) overlay triggers
 // The AI camera_directive from Stage (c)/(d) temporarily overrides the
-// judge's selection (director override, 8 s hold).
+// judge's selection (director override, 6.5 s hold).
 
 import { useRef } from "react";
 import * as THREE from "three";
@@ -23,6 +23,8 @@ interface Props {
   lockedId: string | null;
   override: { directive: CameraDirective; at: number } | null;
 }
+
+const OVERRIDE_MS = 6500;
 
 function ballWorld(out: THREE.Vector3, now: number): THREE.Vector3 {
   const b = telemetry.ball;
@@ -44,9 +46,12 @@ export default function BroadcastCameraRig({ mode, lockedId, override }: Props) 
   const tmpTarget = useRef(new THREE.Vector3());
   const tmpLook = useRef(new THREE.Vector3());
 
+  // OrbitControls must follow the *effective* mode, not the manual selection.
+  const overrideMode = override?.directive.recommended_mode;
+  const effectiveMode: CameraMode | "TACTICAL_DRONE" =
+    overrideMode === "ACTION_ZOOM" ? "AUTO_DIRECTOR" : overrideMode ?? mode;
   const droneActive =
-    mode === "TACTICAL_DRONE_ORBIT" ||
-    (!!override && override.directive.recommended_mode === "TACTICAL_DRONE");
+    effectiveMode === "TACTICAL_DRONE" || effectiveMode === "TACTICAL_DRONE_ORBIT";
 
   useFrame((state, delta) => {
     const now = performance.now();
@@ -55,14 +60,14 @@ export default function BroadcastCameraRig({ mode, lockedId, override }: Props) 
     // ---- AI director override (6.5s hold; page clears the prop) ----
     let effective: CameraMode | "TACTICAL_DRONE" = mode;
     let focusId: string | null = null;
-    if (override && now - override.at < 6500) {
+    if (override && now - override.at < OVERRIDE_MS) {
       const d = override.directive;
       if (d.recommended_mode === "ACTION_ZOOM") effective = "AUTO_DIRECTOR";
       else effective = d.recommended_mode;
       focusId = d.focus_target_id;
     }
 
-    if (droneActive || effective === "TACTICAL_DRONE") {
+    if (effective === "TACTICAL_DRONE" || effective === "TACTICAL_DRONE_ORBIT") {
       return; // OrbitControls owns the camera in this mode
     }
 
@@ -93,7 +98,7 @@ export default function BroadcastCameraRig({ mode, lockedId, override }: Props) 
 
     if (effective === "AUTO_DIRECTOR") {
       const chaos = telemetry.metrics?.chaos_index ?? 0;
-      const swoop = chaos > 0.72 || (override && now - override.at < 6500);
+      const swoop = chaos > 0.72 || (override && now - override.at < OVERRIDE_MS);
       if (swoop) {
         // dramatic low-angle close-up orbiting the ball
         const t = state.clock.elapsedTime * 0.25;

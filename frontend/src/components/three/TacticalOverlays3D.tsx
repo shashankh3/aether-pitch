@@ -65,7 +65,7 @@ export function XTGrid({ visible, possession }: { visible: boolean; possession: 
     }
     m.instanceMatrix.needsUpdate = true;
     if (m.instanceColor) m.instanceColor.needsUpdate = true;
-  }, [possession]);
+  }, [possession, visible]);
 
   if (!visible) return null;
   return (

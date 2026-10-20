@@ -275,6 +275,9 @@ class PitchForgeEngine:
         self._trap_cd = 0.0
         self._kick: Optional[Tuple[str, float]] = None      # (pid, expire_t)
         self._badges: Dict[str, Tuple[str, float]] = {}     # pid -> (name, expire_t)
+        self._pending_events: List[dict] = []
+        self._pending_kickoff: Optional[str] = None
+        self._in_tick = False
         self.milestones = MilestoneTracker()
         self.kickoff("NLA", quiet=True)
 
@@ -315,7 +318,7 @@ class PitchForgeEngine:
         self.pass_urge_timer = 0.0
         self._kick = None
         if not quiet:
-            self.events.append({"type": "KICKOFF", "team": team, "x": 52.5, "y": 34.0})
+            self._emit({"type": "KICKOFF", "team": team, "x": 52.5, "y": 34.0})
 
     @property
     def events(self) -> List[dict]:
@@ -380,7 +383,8 @@ class PitchForgeEngine:
     def _emit(self, ev: dict) -> None:
         ev.setdefault("t_match", round(self.t_match, 2))
         ev.setdefault("clock", self.clock())
-        self.events.append(ev)
+        target = self.events if self._in_tick else self._pending_events
+        target.append(ev)
 
     # --------------------------------------------- PlayStyle+ badge registry
     def set_badge(self, pids: List[str], name: str, duration_s: float) -> None:
@@ -394,6 +398,9 @@ class PitchForgeEngine:
     def inject(self, name: str) -> Dict[str, Any]:
         if name not in self.SCENARIOS:
             raise ValueError(f"Unknown scenario '{name}'. Valid: {self.SCENARIOS}")
+        if self.scenario:
+            self._end_scenario()
+        self.by_id["NLA_2"].inverted = False
         if name == "chaos_counter":
             self.scenario = {"name": name, "left": 16.0, "forced_pass": True,
                              "forced_turnover_at": None, "done": False}
@@ -449,26 +456,35 @@ class PitchForgeEngine:
 
     # ------------------------------------------------------------- main tick
     def tick(self, dt: float) -> Tuple[dict, List[dict]]:
-        self._events = []
-        self.t_match += dt
-        if self.scenario:
-            self.scenario["left"] -= dt
-            fta = self.scenario.get("forced_turnover_at")
-            if fta is not None and not self.scenario["done"] and self.t_match >= fta:
-                self._forced_press_turnover()
-                self.scenario["done"] = True
-            if self.scenario["left"] <= 0:
-                self._end_scenario()
-        self._badges = {pid: b for pid, b in self._badges.items() if b[1] > self.t_match}
-        if self.flight:
-            self._advance_flight(dt)
-        elif self.owner:
-            self._decide(dt)
-        self._team_motion(dt)
-        self._attach_ball()
-        self._update_headings()
-        self._auto_events(dt)
-        return self.state(), self.events
+        self._events = self._pending_events
+        self._pending_events = []
+        self._in_tick = True
+        try:
+            self.t_match += dt
+            if self._pending_kickoff:
+                team = self._pending_kickoff
+                self._pending_kickoff = None
+                self.kickoff(team)
+            if self.scenario:
+                self.scenario["left"] -= dt
+                fta = self.scenario.get("forced_turnover_at")
+                if fta is not None and not self.scenario["done"] and self.t_match >= fta:
+                    self._forced_press_turnover()
+                    self.scenario["done"] = True
+                if self.scenario["left"] <= 0:
+                    self._end_scenario()
+            self._badges = {pid: b for pid, b in self._badges.items() if b[1] > self.t_match}
+            if self.flight:
+                self._advance_flight(dt)
+            elif self.owner:
+                self._decide(dt)
+            self._team_motion(dt)
+            self._attach_ball()
+            self._update_headings()
+            self._auto_events(dt)
+            return self.state(), self.events
+        finally:
+            self._in_tick = False
 
     def _update_headings(self) -> None:
         ball_xy = (self.ball["x"], self.ball["y"])
@@ -647,10 +663,12 @@ class PitchForgeEngine:
                             "player_name": f.get("shooter_name"),
                             "x": round(bx, 2), "y": round(by, 2),
                             "score": dict(self.score)})
-                self.kickoff("MCS" if shooter_team == "NLA" else "NLA")
+                # Defer the restart so the GOAL tick still snapshots the goalmouth.
+                self._pending_kickoff = "MCS" if shooter_team == "NLA" else "NLA"
             else:
-                self._emit({"type": "SAVE", "team": shooter_team,
+                self._emit({"type": "SAVE", "team": gk.team,
                             "player_id": gk.pid, "player_name": gk.name,
+                            "shooter_team": shooter_team,
                             "shooter_pid": f.get("shooter_pid"),
                             "shooter_name": f.get("shooter_name"),
                             "x": round(bx, 2), "y": round(by, 2), "outcome": "SAVE"})

@@ -20,7 +20,7 @@ import asyncio
 import json
 import re
 import time
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 import requests
 
@@ -247,6 +247,11 @@ class FoundryRouter:
         ev = ctx.get("event") or {}
         m = ctx.get("metrics") or {}
         return {
+            "query": ctx.get("query"),
+            "language": ctx.get("language"),
+            "persona": ctx.get("persona"),
+            "locked_player_id": ctx.get("locked_player_id"),
+            "spatial": ctx.get("spatial") or {},
             "clock": ctx.get("clock"),
             "score": ctx.get("score"),
             "possession": ctx.get("possession"),
@@ -276,7 +281,6 @@ class FoundryRouter:
         chaos = m.get("chaos_index", 0.5)
         lines = m.get("def_lines", {})
         line_m = lines.get(opp, 40.0)
-        ghost = ev.get("ghost_pass") or {}
         speed = ev.get("speed_kmh") or ev.get("ball_speed_kmh") or 0.0
 
         if archetype == "counter_overload":
@@ -296,10 +300,10 @@ class FoundryRouter:
             c = {
                 "moment_headline": "Coordinated Pressing Trap Strangles the Buildup",
                 "why_it_matters_causal": (
-                    f"Three {opp} defenders collapsed within 6 m of the carrier, forcing the turnover "
-                    f"with {team} still set to play out. Chaos sits at {chaos:.2f} and the trap "
-                    f"converted position into a shot-worthy field position instantly."),
-                "tactical_catalyst": f"3+ defenders inside 6 m; PPDA {m.get('ppda', {}).get(opp, 0):.1f}",
+                    f"Three {team} defenders collapsed within 6 m of the {opp} carrier, forcing the "
+                    f"turnover with {opp} still set to play out. Chaos sits at {chaos:.2f} and the "
+                    f"trap converted position into a shot-worthy field position instantly."),
+                "tactical_catalyst": f"3+ defenders inside 6 m; PPDA {m.get('ppda', {}).get(team, 0):.1f}",
                 "commentator_talking_point": (
                     f"See the triangle close — that is a rehearsed trap, not a scramble. "
                     f"The moment {player} took the first touch, the exit was already shut."),
@@ -313,8 +317,8 @@ class FoundryRouter:
                     f"flank he abandoned is the space a counter will target."),
                 "tactical_catalyst": "Right-back inverted; flank vacated on the far side",
                 "commentator_talking_point": (
-                    f"Number 2 is playing in midfield now — extra man in the build-up, but keep one "
-                    f"eye on the channel he just vacated."),
+                    "Number 2 is playing in midfield now — extra man in the build-up, but keep one "
+                    "eye on the channel he just vacated."),
             }
         elif archetype == "difficult_progression":
             c = {

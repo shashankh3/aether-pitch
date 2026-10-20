@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import math
 from collections import deque
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -41,6 +41,7 @@ class TacticalMathEngine:
         self.ball_speeds: deque = deque()             # (t, kmh)
         self.chaos_hist: deque = deque(maxlen=600)    # (t, chaos) sampled 2Hz (match time)
         self.chaos = 0.30
+        self.scenario_active: Optional[str] = None
         self.scenario_boost = 0.0
         self._last_recompute = -1e9
         self._last_hist = -1e9

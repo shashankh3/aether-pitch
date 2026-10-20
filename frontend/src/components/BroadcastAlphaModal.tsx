@@ -62,6 +62,8 @@ export function buildProductionPacket(insight: Insight | null) {
       style: p.speed_kmh >= 30 ? "CRIMSON_SPRINT_PULSE" : telemetry.match.carrier === p.id ? "GOLD_CARRIER_RING" : "TEAM_STANDARD",
     }));
   const peak = b.is_lofted ? 6.5 : 1.2;
+  const ghost = telemetry.ghost;
+  const freshGhost = ghost && performance.now() - ghost.at < 4200 ? ghost : null;
   const lt = insight?.stage_d_broadcast_overlay;
   return {
     protocol: "AETHER_RENDER_PARTNER_V2",
@@ -90,11 +92,11 @@ export function buildProductionPacket(insight: Insight | null) {
             is_lofted: b.is_lofted,
           }
         : null,
-      counterfactual_ghost_arc: telemetry.ghost
+      counterfactual_ghost_arc: freshGhost
         ? {
             start_m: [b.x - 52.5, b.y - 34, 0.0],
-            end_m: [telemetry.ghost.x - 52.5, telemetry.ghost.y - 34, 0.0],
-            delta_xt: telemetry.ghost.delta_xt,
+            end_m: [freshGhost.x - 52.5, freshGhost.y - 34, 0.0],
+            delta_xt: freshGhost.delta_xt,
           }
         : null,
       possession_team: poss,

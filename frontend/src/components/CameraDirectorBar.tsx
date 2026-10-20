@@ -8,11 +8,11 @@ import type { CameraMode } from "@/lib/types";
 import type { OverlayToggles } from "@/components/three/HoloPitch3D";
 import { cn } from "@/lib/utils";
 
-const CAMS: { id: CameraMode; label: string; icon: React.ReactNode; key: string }[] = [
-  { id: "TELE_BROADCAST", label: "Tele Cam", icon: <Video size={14} />, key: "1" },
-  { id: "PLAYER_LOCK_3RD_PERSON", label: "Pro Cam", icon: <User size={14} />, key: "2" },
-  { id: "TACTICAL_DRONE_ORBIT", label: "Drone Orbit", icon: <Orbit size={14} />, key: "3" },
-  { id: "AUTO_DIRECTOR", label: "Auto-Director", icon: <Sparkles size={14} />, key: "4" },
+const CAMS: { id: CameraMode; label: string; icon: React.ReactNode }[] = [
+  { id: "TELE_BROADCAST", label: "Tele Cam", icon: <Video size={14} /> },
+  { id: "PLAYER_LOCK_3RD_PERSON", label: "Pro Cam", icon: <User size={14} /> },
+  { id: "TACTICAL_DRONE_ORBIT", label: "Drone Orbit", icon: <Orbit size={14} /> },
+  { id: "AUTO_DIRECTOR", label: "Auto-Director", icon: <Sparkles size={14} /> },
 ];
 
 const TOGGLES: { id: keyof OverlayToggles; label: string; icon: React.ReactNode }[] = [
@@ -55,7 +55,7 @@ export default function CameraDirectorBar({ mode, onMode, toggles, onToggle, aiD
                 ? "bg-tactical/20 text-tactical shadow-[0_0_14px_rgba(0,240,255,0.25)]"
                 : "bg-white/[0.03] text-slate-400 hover:bg-white/[0.07] hover:text-slate-200"
             )}
-            title={`${c.label} (key ${c.key})`}
+            title={c.label}
           >
             {c.icon}
             {c.label}

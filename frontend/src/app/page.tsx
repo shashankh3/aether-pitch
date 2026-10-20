@@ -46,6 +46,7 @@ const SCENARIO_KEYS: Record<string, string> = {
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const CAMERA_OVERRIDE_MS = 6500;
 
 const PERSONA_MAP: Record<PersonaModeV5, PersonaMode> = {
   ANALYST_HUD: "analyst",
@@ -97,6 +98,7 @@ export default function StudioPage() {
   // ---- v3.0 DVR + telestrator ----
   const [isDvrPaused, setDvrPaused] = useState(false);
   const [dvrOffsetTicks, setDvrOffsetTicks] = useState(0);
+  const [pausedClock, setPausedClock] = useState<string | null>(null);
   const [telestrator, setTelestrator] = useState<TelestratorState>(EMPTY_TELESTRATOR);
   const [highlightZone, setHighlightZone] = useState<HighlightZone | null>(null);
 
@@ -115,6 +117,8 @@ export default function StudioPage() {
 
   // ---- v4.0 two-phase scenario UX ----
   const [phase2Pending, setPhase2Pending] = useState(false);
+  const phase2BaselineRef = useRef<string | null>(null);
+  const latestInsightIdRef = useRef<string | null>(null);
 
   const { isSpeaking, isVoiceMuted, toggleMute, speakInsight } = useSpeechController();
 
@@ -127,6 +131,9 @@ export default function StudioPage() {
 
   // lower-third: show for 8s whenever a new insight lands
   const latest = insights[0] ?? null;
+  useEffect(() => {
+    latestInsightIdRef.current = latest?.id ?? null;
+  }, [latest?.id]);
   const [lowerThird, setLowerThird] = useState<Insight | null>(null);
   useEffect(() => {
     if (!latest) return;
@@ -141,12 +148,13 @@ export default function StudioPage() {
     if (!directive) return;
     setOverride({ directive, at: performance.now() });
     if (overrideTimer.current) clearTimeout(overrideTimer.current);
-    overrideTimer.current = setTimeout(() => setOverride(null), 6500);
+    overrideTimer.current = setTimeout(() => setOverride(null), CAMERA_OVERRIDE_MS);
   }, [latest?.id]);
 
-  // two-phase scenario UX: phase 2 resolves when the AI insight lands
+  // two-phase scenario UX: phase 2 resolves when a *new* AI insight lands
   useEffect(() => {
-    if (phase2Pending && latest) setPhase2Pending(false);
+    if (!phase2Pending) return;
+    if (latest && latest.id !== phase2BaselineRef.current) setPhase2Pending(false);
   }, [latest?.id, phase2Pending]);
 
   // GOAL slam banner
@@ -173,6 +181,7 @@ export default function StudioPage() {
         return;
       }
       setBusy(name);
+      phase2BaselineRef.current = latestInsightIdRef.current;
       setPhase2Pending(true);
       setTimeout(() => setPhase2Pending(false), 3500); // causal stream fallback
       await sendScenario(name);
@@ -183,6 +192,13 @@ export default function StudioPage() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (
+        target.tagName === "INPUT" || target.tagName === "TEXTAREA"
+        || target.tagName === "SELECT" || target.isContentEditable
+      )) return;
+      if (document.querySelector('[aria-modal="true"]')) return;
       const name = SCENARIO_KEYS[e.key];
       if (name && !busy) inject(name);
     };
@@ -258,31 +274,37 @@ export default function StudioPage() {
 
   // ---- DVR controls ----
   const togglePause = useCallback(() => {
-    setDvrPaused((paused) => {
-      const next = !paused;
-      telemetry.playbackPaused = next;
-      if (!next) {
-        setDvrOffsetTicks(0);
-        setRecapPass(null);
-        setTelestrator((t) => ({ ...t, animateGhostReplay: false, customTacticalArrows: [] }));
-        if (tickRef.current) telemetry.applyTick(tickRef.current, false);
-      } else {
-        telemetry.replay(dvrOffsetTicks);
-      }
-      return next;
-    });
-  }, [dvrOffsetTicks, tickRef]);
+    const next = !isDvrPaused;
+    setDvrPaused(next);
+    telemetry.playbackPaused = next;
+    setPausedClock(null);
+    if (next) {
+      setDvrOffsetTicks(dvrOffsetTicks);
+      telemetry.replay(dvrOffsetTicks);
+    } else {
+      setDvrOffsetTicks(0);
+      setRecapPass(null);
+      setTelestrator((t) => ({ ...t, animateGhostReplay: false, customTacticalArrows: [] }));
+      if (tickRef.current) telemetry.applyTick(tickRef.current, false);
+    }
+  }, [dvrOffsetTicks, isDvrPaused, tickRef]);
 
   const scrub = useCallback((offset: number) => {
+    if (!isDvrPaused) {
+      setDvrPaused(true);
+      telemetry.playbackPaused = true;
+    }
+    setPausedClock(null);
     setDvrOffsetTicks(offset);
     telemetry.replay(offset);
-  }, []);
+  }, [isDvrPaused]);
 
   const handleLoadRecapAct = useCallback(
     (act: RecapAct, recap: MatchRecapStoryboard) => {
       setDvrPaused(true);
       telemetry.playbackPaused = true;
       setDvrOffsetTicks(0);
+      setPausedClock(act.clock ?? null);
       applySnapshot(act.snapshot);
       setCamMode(act.camera_mode);
       setLockedId(act.key_player_ids[0] ?? act.player_id ?? null);
@@ -382,7 +404,7 @@ export default function StudioPage() {
         at: performance.now(),
       });
       if (overrideTimer.current) clearTimeout(overrideTimer.current);
-      overrideTimer.current = setTimeout(() => setOverride(null), 12000);
+      overrideTimer.current = setTimeout(() => setOverride(null), CAMERA_OVERRIDE_MS);
     },
     [lockedId]
   );
@@ -404,6 +426,7 @@ export default function StudioPage() {
         case 2: {
           setCvExpanded(false);
           setDvrPaused(true);
+          setPausedClock(null);
           telemetry.playbackPaused = true;
           telemetry.replay(dvrOffsetTicks);
           pickCamera("TACTICAL_DRONE_ORBIT");
@@ -452,6 +475,7 @@ export default function StudioPage() {
         }
         case 3:
           setDvrPaused(false);
+          setPausedClock(null);
           telemetry.playbackPaused = false;
           setDvrOffsetTicks(0);
           setRecapPass(null);
@@ -507,7 +531,17 @@ export default function StudioPage() {
     setAlphaMode(false);
     setCvExpanded(null);
     setAutopilotStep(-1);
-  }, []);
+    setDvrPaused(false);
+    setPausedClock(null);
+    telemetry.playbackPaused = false;
+    setDvrOffsetTicks(0);
+    setRecapPass(null);
+    setHighlightZone(null);
+    setTelestrator((t) => ({ ...t, animateGhostReplay: false, customTacticalArrows: [] }));
+    telemetry.telestratorSpotlightIds = [];
+    if (tickRef.current) telemetry.applyTick(tickRef.current, false);
+    pickCamera("TELE_BROADCAST");
+  }, [pickCamera, tickRef]);
 
   const lt = lowerThird?.stage_d_broadcast_overlay;
   const ltIsAlert =
@@ -776,6 +810,7 @@ export default function StudioPage() {
               <TelestratorDVRBar
                 isDvrPaused={isDvrPaused}
                 dvrOffsetTicks={dvrOffsetTicks}
+                pausedClock={pausedClock}
                 onTogglePause={togglePause}
                 onScrub={scrub}
                 telestrator={telestrator}

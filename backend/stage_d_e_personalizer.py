@@ -11,7 +11,7 @@ Stage (e): forks every insight into `analyst_view` vs `casual_fan_view`,
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 import requests
 
@@ -42,7 +42,7 @@ STORIES = {
         "Lightning counter-attack! {team} stole it in midfield and exploded forward at "
         "{speed:.0f} km/h — the defence was caught square with nowhere to run."),
     "pressing_trap": (
-        "{opp} just sprang a perfectly-timed pressing trap — three defenders swarmed the ball "
+        "{team} just sprang a perfectly-timed pressing trap — three defenders swarmed the ball "
         "and won it back high up the pitch. The crowd can smell a chance!"),
     "inversion": (
         "Clever switch by {team}: their right-back has moved into midfield as an extra playmaker. "
@@ -67,9 +67,9 @@ TRANSLATIONS = {
         "hi": "बिजली जैसा काउंटर-अटैक! {team} ने मिडफ़ील्ड में गेंद छीनी और तेज़ी से दौड़ पड़ा — बचाव पूरी तरह फैल गया।",
     },
     "pressing_trap": {
-        "es": "¡Trampa de presión perfecta de {opp}! Tres defensores cercaron el balón y lo recuperaron arriba.",
-        "ar": "فخ ضغط مثالي من {opp}! ثلاثة مدافعين حاصروا الكرة واستعادوها في مقدمة الملعب.",
-        "hi": "{opp} का शानदार प्रेसिंग ट्रैप! तीन डिफेंडर्स ने गेंद घेरी और ऊपर ही वापस ले ली।",
+        "es": "¡Trampa de presión perfecta de {team}! Tres defensores cercaron el balón y lo recuperaron arriba.",
+        "ar": "فخ ضغط مثالي من {team}! ثلاثة مدافعين حاصروا الكرة واستعادوها في مقدمة الملعب.",
+        "hi": "{team} का शानदार प्रेसिंग ट्रैप! तीन डिफेंडर्स ने गेंद घेरी और ऊपर ही वापस ले ली।",
     },
     "inversion": {
         "es": "Cambio valiente de {team}: el lateral derecho se instala en el mediocampo… ¡pero deja el ala abierta!",
@@ -237,7 +237,7 @@ class Personalizer:
 
     # ------------------------------------------------------------- Stage (d)+(e)
     def build(self, stage_c: dict, ev: dict, metrics: dict, score: dict,
-              pref: Optional[dict] = None) -> dict:
+              pref: Optional[dict] = None, state: Optional[dict] = None) -> dict:
         arch = stage_c.get("archetype") or pick_archetype(ev, metrics)
         chaos = metrics.get("chaos_index", 0.5)
         pdr = ev.get("pdr")
@@ -256,10 +256,20 @@ class Personalizer:
         subtitle_parts.append(f"Chaos {chaos:.2f}")
         highlight = [p for p in [ev.get("player_id"),
                                  (ev.get("ghost_pass") or {}).get("target_id")] if p]
-        if arch == "counter_overload":
-            for pid in ("NLA_9", "NLA_11"):
-                if pid not in highlight:
+        if arch == "counter_overload" and state:
+            attackers = sorted(
+                (p for p in state.get("players", [])
+                 if p.get("team") == team and p.get("role") != "GK"),
+                key=lambda p: (p.get("x", 0.0) if team == "NLA"
+                               else 105.0 - p.get("x", 0.0)),
+                reverse=True,
+            )
+            for p in attackers:
+                pid = p.get("id")
+                if pid and pid not in highlight:
                     highlight.append(pid)
+                if len(highlight) >= 3:
+                    break
         overlay = {
             "timecode": ev.get("clock", "00:00"),
             "overlay_type": OVERLAY_TYPES.get(arch, "TACTICAL_PULSE_UPDATE"),
@@ -410,5 +420,5 @@ class Personalizer:
         return {t["to"]: t["text"] for t in data if t.get("to") in ("es", "ar", "hi")}
 
     async def build_async(self, stage_c: dict, ev: dict, metrics: dict, score: dict,
-                          pref: Optional[dict] = None) -> dict:
-        return await asyncio.to_thread(self.build, stage_c, ev, metrics, score, pref)
+                          pref: Optional[dict] = None, state: Optional[dict] = None) -> dict:
+        return await asyncio.to_thread(self.build, stage_c, ev, metrics, score, pref, state)

@@ -143,7 +143,13 @@ class TelemetryStore {
     const isMarker =
       (this.metrics ? Math.abs(this.metrics.delta_chaos) > 0.15 : false) ||
       (tick.players.some((p) => p.speed_kmh >= 30));
-    if (last && tick.t_match - last.t_match < 0.05) return; // dedupe restarts
+    if (last) {
+      if (tick.t_match < last.t_match - 1.0) {
+        this.history = []; // backend clock reset -> start a fresh session
+      } else if (Math.abs(tick.t_match - last.t_match) < 0.05) {
+        return; // dedupe restarts
+      }
+    }
     this.history.push({
       seq: this.history.length ? last.seq + 1 : 0,
       t_match: tick.t_match,
@@ -204,8 +210,8 @@ class TelemetryStore {
     bl.x = b.x; bl.y = b.y; bl.z = b.z;
     bl.vx = b.vx; bl.vy = b.vy; bl.vz = b.vz;
     bl.speed_kmh = b.speed_kmh;
-    if (b.pass_start) bl.pass_start = b.pass_start;
-    if (b.pass_end) bl.pass_end = b.pass_end;
+    bl.pass_start = b.pass_start;
+    bl.pass_end = b.pass_end;
     bl.is_lofted = b.is_lofted;
     bl.prevTickAt = bl.currTickAt;
     bl.currTickAt = now;
@@ -228,10 +234,11 @@ class TelemetryStore {
     if (record) this.recordHistory(tick, this.metrics);
   }
 
-  /** Live stream entry: always record DVR history; apply only when not scrubbing. */
+  /** Live stream entry: frozen playback stops the buffer so scrubs stay anchored. */
   recordLive(tick: MatchTick) {
+    if (this.playbackPaused) return;
     this.recordHistory(tick, this.metrics);
-    if (!this.playbackPaused) this.applyTick(tick, false);
+    this.applyTick(tick, false);
   }
 
   applyMetrics(m: Metrics) {

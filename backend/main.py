@@ -217,9 +217,13 @@ async def build_match_recap() -> dict:
         }
         team = used_ev.get("team") or state.get("possession") or "NLA"
         carrier = state.get("carrier")
+        pressers = [pid for pid in (used_ev.get("players") or []) if pid]
+        primary_id = used_ev.get("player_id") or (pressers[0] if pressers else carrier)
+        names_by_id = {p.get("id"): p.get("name") for p in state.get("players", [])}
+        primary_name = (used_ev.get("player_name") or names_by_id.get(primary_id)
+                        or "the carrier")
         key_ids = [pid for pid in (
-            used_ev.get("player_id"), carrier, ghost.get("target_id"),
-            *((used_ev.get("players") or [])[:2]),
+            primary_id, *pressers[:2], carrier, ghost.get("target_id"),
         ) if pid]
         key_ids = list(dict.fromkeys(key_ids))[:3]
         if len(key_ids) < 3:
@@ -238,8 +242,8 @@ async def build_match_recap() -> dict:
             "score": state.get("score", {"NLA": 1, "MCS": 1}),
             "team": team,
             "event_type": used_ev.get("type", "PASS"),
-            "player_id": used_ev.get("player_id") or carrier,
-            "player_name": used_ev.get("player_name") or "the carrier",
+            "player_id": primary_id,
+            "player_name": primary_name,
             "pdr": float(used_ev.get("pdr") or 0.0),
             "delta_xt": float(used_ev.get("delta_xt") or ghost.get("delta_xt") or 0.0),
             "chaos": float(metrics.get("chaos_index", 0.5) or 0.5),
@@ -296,7 +300,7 @@ async def make_insight(ev: dict, metrics: dict, state: dict) -> None:
     }
     stage_c = await foundry.explain(ctx)
     packet = await personalizer.build_async(
-        stage_c, ev, metrics, state["score"], active_personalization)
+        stage_c, ev, metrics, state["score"], active_personalization, state)
     insight_counter += 1
     data = {
         "id": f"insight_{insight_counter:04d}",
@@ -437,7 +441,6 @@ def _spatial_context(team: Optional[str] = None) -> dict:
     if not players:
         return {}
     team = team or st.get("possession", "NLA")
-    opp = "MCS" if team == "NLA" else "NLA"
     defs = [p for p in players if p["team"] == team and p["role"] == "DEF"]
     defs_sorted = sorted(defs, key=lambda p: p["y"])
     stretch = (max((p["y"] for p in defs_sorted), default=0.0)
@@ -451,7 +454,7 @@ def _spatial_context(team: Optional[str] = None) -> dict:
             gap_center = {"x": round((a["x"] + b["x"]) / 2, 1),
                           "y": round((a["y"] + b["y"]) / 2, 1)}
             gap_defender = {"id": b["id"], "name": b["name"]}  # defender leaving the seam
-    sprinters = [p for p in players if p["role"] != "GK"]
+    sprinters = [p for p in players if p["role"] != "GK" and p["team"] != team]
     fastest = max(sprinters, key=lambda p: p["speed_kmh"], default=None)
     return {
         "team": team,
@@ -470,16 +473,22 @@ def _spatial_context(team: Optional[str] = None) -> dict:
 
 
 async def _studio_query_handler(body: dict) -> dict:
-    query = (body.get("query") or "").strip()
+    if not isinstance(body, dict):
+        raise HTTPException(400, "JSON object body required")
+    raw_query = body.get("query")
+    query = raw_query.strip() if isinstance(raw_query, str) else ""
     if not query:
         raise HTTPException(400, "query is required")
-    locked_id = body.get("locked_player_id") or ""
+    raw_locked = body.get("locked_player_id")
+    locked_id = raw_locked if isinstance(raw_locked, str) else ""
     locked_team = locked_id.split("_")[0] if locked_id else None
+    language = body.get("language")
+    persona = body.get("persona")
     ctx = {
         "query": query,
-        "language": body.get("language", "en"),
-        "persona": body.get("persona", "analyst"),
-        "locked_player_id": body.get("locked_player_id"),
+        "language": language if isinstance(language, str) else "en",
+        "persona": persona if isinstance(persona, str) else "analyst",
+        "locked_player_id": locked_id or None,
         "spatial": _spatial_context(locked_team if locked_team in ("NLA", "MCS") else None),
         "metrics": last_metrics,
         "recent_events": [e for e in list(math.stream) if e[1] not in ("_tick",)][-8:],
@@ -606,6 +615,8 @@ async def get_personalization() -> dict:
 @app.post("/api/personalization")
 async def set_personalization(body: dict) -> dict:
     global active_personalization
+    if body is not None and not isinstance(body, dict):
+        raise HTTPException(400, "JSON object body required")
     active_personalization = personalizer.normalize_preferences(
         {**active_personalization, **(body or {})})
     return {"status": "ok", "personalization": dict(active_personalization)}
@@ -624,7 +635,6 @@ async def match_recap_post() -> dict:
 
 
 async def _handle_scenario(name: str) -> dict:
-    global top_inflections
     if name == "halftime_recap":
         if not last_state:
             raise HTTPException(503, "Match engine not started yet")

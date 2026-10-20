@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 interface Props {
   isDvrPaused: boolean;
   dvrOffsetTicks: number;
+  pausedClock?: string | null;
   onTogglePause: () => void;
   onScrub: (offsetTicks: number) => void;
   telestrator: TelestratorState;
@@ -22,10 +23,12 @@ interface Props {
 const MAX_BACK = -150; // -15.0 s at 10 Hz
 
 export default function TelestratorDVRBar({
-  isDvrPaused, dvrOffsetTicks, onTogglePause, onScrub, telestrator, onToggleTelestrator, onToggleSpotlight,
+  isDvrPaused, dvrOffsetTicks, pausedClock, onTogglePause, onScrub, telestrator,
+  onToggleTelestrator, onToggleSpotlight,
 }: Props) {
   const history = telemetry.history;
   const secondsAgo = Math.abs(Math.min(0, dvrOffsetTicks)) / 10;
+  const snapshotClock = telemetry.snapshotAt(dvrOffsetTicks)?.clock ?? "--:--";
 
   // timeline markers: high-chaos spikes + sprint bursts recorded in the buffer
   const markers = history
@@ -72,7 +75,9 @@ export default function TelestratorDVRBar({
           <div className="flex justify-between font-tech text-[8.5px] uppercase tracking-[0.18em] text-slate-500">
             <span>-15.0s</span>
             <span className={isDvrPaused ? "text-gold" : "text-pitch"}>
-              {isDvrPaused ? `⏸ DVR ${secondsAgo.toFixed(1)}s · ${history[history.length - 1 + Math.round(dvrOffsetTicks)]?.clock ?? "--:--"}` : "● LIVE STREAM"}
+              {isDvrPaused
+                ? `⏸ DVR ${secondsAgo.toFixed(1)}s · ${pausedClock ?? snapshotClock}`
+                : "● LIVE STREAM"}
             </span>
             <span>LIVE</span>
           </div>
