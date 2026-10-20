@@ -1,0 +1,298 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Clapperboard, Download, Loader2, Play, RefreshCw, Sparkles, X,
+} from "lucide-react";
+import type {
+  LangCode, MatchEvent, MatchRecapStoryboard, MatchTick, RecapAct,
+} from "@/lib/types";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  onLoadAct: (act: RecapAct, recap: MatchRecapStoryboard) => void;
+  lang: LangCode;
+  tick: MatchTick | null;
+  events: MatchEvent[];
+}
+
+function fallbackStoryboard(tick: MatchTick | null, events: MatchEvent[]): MatchRecapStoryboard {
+  const base = tick ?? {
+    t_match: 3720, clock: "62:00", score: { NLA: 1, MCS: 1 }, possession: "NLA" as const,
+    players: [], ball: {
+      x: 52.5, y: 34, z: 0, vx: 0, vy: 0, vz: 0, speed_kmh: 0,
+      pass_start: null, pass_end: null, is_lofted: false,
+    },
+    carrier: null, scenario: null, scenario_left: null,
+  };
+  const passEvents = events.filter((e) => e.type === "PASS");
+  const specs = [
+    ["The Tactical Catalyst", "The inversion that broke the first line"],
+    ["The Pressure Rupture", "The defensive line pushed beyond its safe limit"],
+    ["The Counter-Factual Storm", "The transition where the game turned"],
+  ];
+  const acts: RecapAct[] = specs.map(([title, subtitle], i) => {
+    const ev = passEvents[i] ?? passEvents[0];
+    const start = ev?.start ?? [52.5, 34] as [number, number];
+    const end = ev?.end ?? [78, 34] as [number, number];
+    const ghost = ev?.ghost_pass;
+    const targetId = ev?.target_id ?? ghost?.target_id ?? base.players[i + 3]?.id ?? null;
+    const target = base.players.find((p) => p.id === targetId);
+    return {
+      act: i + 1,
+      title,
+      subtitle,
+      clock: ev?.clock ?? base.clock,
+      score: base.score,
+      team: ev?.team ?? base.possession,
+      event_type: ev?.type ?? "PASS",
+      player_id: ev?.player_id ?? base.carrier,
+      player_name: ev?.player_name ?? base.carrier ?? "the carrier",
+      pdr: ev?.pdr ?? 84,
+      delta_xt: ev?.delta_xt ?? 0.12,
+      chaos: 0.6 + i * 0.08,
+      actual_pass: {
+        start: { x: start[0], y: start[1] },
+        end: { x: end[0], y: end[1] },
+      },
+      ghost_pass: {
+        start: { x: start[0], y: start[1] },
+        end: { x: ghost?.x ?? 82, y: ghost?.y ?? 48 },
+        delta_xt: ghost?.delta_xt ?? 0.214,
+        target_id: targetId,
+        openness_m: ghost?.openness_m ?? 12,
+      },
+      key_player_ids: [ev?.player_id, targetId, target?.id].filter(Boolean) as string[],
+      highlight_zone: {
+        x_min: Math.max(0, Math.min(start[0], end[0]) - 12),
+        x_max: Math.min(105, Math.max(start[0], end[0]) + 12),
+        y_min: Math.max(0, Math.min(start[1], end[1]) - 9),
+        y_max: Math.min(68, Math.max(start[1], end[1]) + 9),
+        label: title.toUpperCase(),
+      },
+      camera_mode: "TACTICAL_DRONE_ORBIT",
+      snapshot: base,
+      analyst_tactical_summary: `Act ${i + 1} — ${title}. ${subtitle}. PDR ${(ev?.pdr ?? 84).toFixed(0)}% for ${(ev?.delta_xt ?? 0.12).toFixed(2)} xT.`,
+      casual_story: `Act ${i + 1}: ${title}! The stadium felt the momentum swing.`,
+      localized_commentary: {
+        en: `Act ${i + 1} — ${title}. ${subtitle}.`,
+        es: `Acto ${i + 1} — ${title}. ${subtitle}.`,
+        ar: `الفصل ${i + 1} — ${title}. ${subtitle}.`,
+        hi: `अंक ${i + 1} — ${title}. ${subtitle}.`,
+      },
+    };
+  });
+  return {
+    title: "The Championship Finale — Three Acts That Decided It",
+    subtitle: "Offline Edge Storyboard · full UI fallback",
+    model: "edge-autonomous-engine-v5",
+    score: base.score,
+    timecode: base.clock,
+    acts,
+    milestones: [
+      { id: "fallback_1", type: "MILESTONE_SPRINT_PEAK", clock: acts[0].clock, headline: "Sprint peak crossed 31.5 km/h", detail: "Edge speed detector" },
+      { id: "fallback_2", type: "MILESTONE_PASS_MASTERY", clock: acts[1].clock, headline: "Five consecutive line-breaking passes", detail: "PDR ≥78 streak" },
+      { id: "fallback_3", type: "MILESTONE_PRESS_DOMINANCE", clock: acts[2].clock, headline: "Sustained press siege converted", detail: "30s final-third threshold" },
+    ],
+  };
+}
+
+export default function MatchRecapStudioModal({
+  open, onClose, onLoadAct, lang, tick, events,
+}: Props) {
+  const [data, setData] = useState<MatchRecapStoryboard | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const live = useRef({ tick, events });
+
+  useEffect(() => {
+    live.current = { tick, events };
+  }, [tick, events]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetch(`${API_URL}/api/match-recap`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json() as Promise<MatchRecapStoryboard>;
+      })
+      .then((storyboard) => {
+        if (!cancelled) setData(storyboard);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setData(fallbackStoryboard(live.current.tick, live.current.events));
+        setError("Azure storyboard unreachable — showing the edge-generated 3-act cut.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [open, attempt]);
+
+  const teleprompter = useMemo(() => {
+    if (!data) return "";
+    const lines = [
+      data.title,
+      data.subtitle,
+      `${data.timecode} · NLA ${data.score.NLA}–${data.score.MCS} MCS`,
+      "",
+      "MILESTONES",
+      ...data.milestones.map((m) => `• ${m.clock} — ${m.headline}: ${m.detail}`),
+      "",
+      ...data.acts.flatMap((act) => [
+        `ACT ${act.act} · ${act.clock} · ${act.title}`,
+        act.subtitle,
+        act.localized_commentary?.[lang] ?? act.analyst_tactical_summary ?? "",
+        `PDR ${act.pdr.toFixed(0)}% · ΔxT ${act.delta_xt.toFixed(2)} · Ghost ${act.ghost_pass.delta_xt.toFixed(3)} xT`,
+        "",
+      ]),
+      `MODEL: ${data.model}`,
+    ];
+    return lines.join("\n");
+  }, [data, lang]);
+
+  const exportTeleprompter = () => {
+    if (!teleprompter) return;
+    const blob = new Blob([teleprompter], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `aether-pitch-recap-${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-3 backdrop-blur-md" onClick={onClose}>
+      <div
+        className="clip-ea relative flex max-h-[92vh] w-[min(1040px,calc(100vw-24px))] flex-col border border-gold/30 bg-[#060A12] shadow-[0_0_80px_rgba(255,194,77,0.12)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3">
+          <div>
+            <div className="flex items-center gap-2 font-display text-[18px] font-bold uppercase tracking-[0.18em] text-white">
+              <Clapperboard size={18} className="text-gold" /> Studio Match Recap
+            </div>
+            <div className="font-tech text-[9px] uppercase tracking-[0.24em] text-slate-500">
+              Milestone engine · ghost-pass counterfactuals · time travel
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={exportTeleprompter}
+              className="clip-skew flex items-center gap-1 bg-gold/15 px-2.5 py-1.5 font-tech text-[10px] font-bold uppercase tracking-wider text-gold hover:bg-gold/25"
+            >
+              <Download size={12} /> Export Teleprompter
+            </button>
+            <button onClick={onClose} className="p-1 text-slate-400 hover:text-white">
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        <div className="scroll-slim min-h-0 flex-1 overflow-y-auto p-4">
+          {loading && (
+            <div className="flex h-[280px] items-center justify-center gap-2 font-tech text-[12px] text-tactical">
+              <Loader2 size={18} className="animate-spin" /> Compiling 22-player snapshots and ghost lanes…
+            </div>
+          )}
+          {error && (
+            <div className="mb-3 flex items-center justify-between border border-gold/30 bg-gold/10 px-3 py-2 font-tech text-[10px] text-gold">
+              <span>{error}</span>
+              <button onClick={() => setAttempt((a) => a + 1)} className="flex items-center gap-1 hover:text-white">
+                <RefreshCw size={11} /> retry
+              </button>
+            </div>
+          )}
+          {data && !loading && (
+            <>
+              <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+                <div>
+                  <div className="font-display text-[26px] font-bold uppercase leading-tight tracking-wide text-white">
+                    {data.title}
+                  </div>
+                  <div className="font-tech text-[10px] uppercase tracking-[0.2em] text-slate-500">
+                    {data.subtitle}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-display text-[24px] font-bold text-white">
+                    {data.score.NLA}–{data.score.MCS}
+                  </div>
+                  <div className="font-tech text-[9px] uppercase tracking-[0.2em] text-slate-500">
+                    {data.timecode} · {data.model}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-3 grid grid-cols-3 gap-2">
+                {data.acts.map((act) => (
+                  <div key={act.act} className="clip-chamfer flex flex-col border border-white/10 bg-white/[0.025] p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-display text-[11px] font-bold uppercase tracking-[0.25em] text-gold">
+                        Act {act.act}
+                      </span>
+                      <span className="font-tech text-[10px] font-bold text-tactical">{act.clock}</span>
+                    </div>
+                    <div className="mt-1 font-display text-[16px] font-bold uppercase leading-tight text-white">
+                      {act.title}
+                    </div>
+                    <div className="mt-1 min-h-[30px] text-[10.5px] leading-snug text-slate-400">
+                      {act.subtitle}
+                    </div>
+                    <div className="mt-2 grid grid-cols-3 gap-1 border-t border-white/10 pt-2">
+                      {[
+                        ["PDR", `${act.pdr.toFixed(0)}%`],
+                        ["ΔxT", `${act.delta_xt >= 0 ? "+" : ""}${act.delta_xt.toFixed(2)}`],
+                        ["GHOST", `${act.ghost_pass.delta_xt >= 0 ? "+" : ""}${act.ghost_pass.delta_xt.toFixed(2)}`],
+                      ].map(([k, v]) => (
+                        <div key={k}>
+                          <div className="font-display text-[8px] uppercase tracking-wider text-slate-600">{k}</div>
+                          <div className="font-tech text-[12px] font-bold text-pitch">{v}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-2 line-clamp-3 text-[10.5px] leading-relaxed text-slate-300">
+                      {act.localized_commentary?.[lang] ?? act.analyst_tactical_summary}
+                    </p>
+                    <button
+                      onClick={() => { onLoadAct(act, data); onClose(); }}
+                      className="clip-skew mt-2 flex items-center justify-center gap-1 bg-gold/15 py-1.5 font-tech text-[10px] font-bold uppercase tracking-wider text-gold transition hover:bg-gold/30"
+                    >
+                      <Play size={11} /> Load Act · Time Travel
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="clip-chamfer border border-tactical/20 bg-tactical/[0.04] p-3">
+                <div className="mb-2 flex items-center gap-1.5 font-display text-[10px] font-bold uppercase tracking-[0.22em] text-tactical">
+                  <Sparkles size={12} /> Milestone Engine
+                </div>
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                  {data.milestones.map((m) => (
+                    <div key={m.id} className="border-l-2 border-tactical/50 pl-2">
+                      <div className="font-tech text-[9px] font-bold text-tactical">{m.clock}</div>
+                      <div className="text-[10.5px] font-semibold leading-snug text-slate-200">{m.headline}</div>
+                      <div className="font-tech text-[9px] leading-snug text-slate-500">{m.detail}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

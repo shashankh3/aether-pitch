@@ -99,6 +99,85 @@ RECAP_INTROS = {
     "hi": "स्टूडियो रिकैप: तीन पल जिन्होंने मैच का फ़ैसला किया।",
 }
 
+PERSONA_MODES = ("ANALYST_HUD", "CASUAL_STORY", "TWINCAST_SPLIT")
+METRIC_FOCUS_OPTIONS = (
+    "ALL", "SPEED_VELOCITY", "PASS_QUALITY", "EXPECTED_THREAT_XT", "CHAOS_PRESSING",
+)
+CLUB_BIAS_OPTIONS = ("NEUTRAL", "NLA_LOYALIST", "MCS_LOYALIST")
+
+METRIC_FOCUS_META = {
+    "ALL": {
+        "label": "Complete Broadcast",
+        "tags": ["xt_grid", "ghost_pass", "defensive_lasers", "player_tags"],
+    },
+    "SPEED_VELOCITY": {
+        "label": "Speed & Velocity",
+        "tags": ["sprint_kmh", "ball_speed_kmh", "shot_velocity_kmh"],
+    },
+    "PASS_QUALITY": {
+        "label": "Pass Quality (PDR)",
+        "tags": ["pdr", "delta_xt", "openness_m", "pass_network"],
+    },
+    "EXPECTED_THREAT_XT": {
+        "label": "Expected Threat (xT)",
+        "tags": ["xt_grid", "delta_xt", "ghost_pass", "pitch_control"],
+    },
+    "CHAOS_PRESSING": {
+        "label": "Chaos & Pressing",
+        "tags": ["chaos_index", "ppda", "defensive_lasers", "pitch_control"],
+    },
+}
+
+METRIC_FOCUS_TEXT = {
+    "SPEED_VELOCITY": {
+        "en": "METRIC LOCK — SPEED & VELOCITY: only sprint, ball-speed and shot-velocity tags are live.",
+        "es": "BLOQUEO DE MÉTRICA — VELOCIDAD: solo velocidad de sprint, balón y remate.",
+        "ar": "قفل المقياس — السرعة: تُعرض فقط سرعة العدو والكرة والتسديد.",
+        "hi": "मेट्रिक लॉक — गति: केवल स्प्रिंट, बॉल और शॉट गति दिख रही है।",
+    },
+    "PASS_QUALITY": {
+        "en": "METRIC LOCK — PASS QUALITY: filtered to pass difficulty, space and xT gained.",
+        "es": "BLOQUEO DE MÉTRICA — CALIDAD DE PASE: dificultad, espacio y xT ganado.",
+        "ar": "قفل المقياس — جودة التمرير: صعوبة التمريرة والمساحة وxT المكتسب.",
+        "hi": "मेट्रिक लॉक — पास क्वालिटी: पास कठिनाई, स्पेस और xT लाभ।",
+    },
+    "EXPECTED_THREAT_XT": {
+        "en": "METRIC LOCK — EXPECTED THREAT: xT grid and ghost-pass alternatives only.",
+        "es": "BLOQUEO DE MÉTRICA — AMENAZA ESPERADA: solo rejilla xT y pase fantasma.",
+        "ar": "قفل المقياس — التهديد المتوقع: شبكة xT والتمريرة الشبحية فقط.",
+        "hi": "मेट्रिक लॉक — अपेक्षित खतरा: केवल xT ग्रिड और घोस्ट पास।",
+    },
+    "CHAOS_PRESSING": {
+        "en": "METRIC LOCK — CHAOS & PRESSING: PPDA, pressing intensity and defensive lasers.",
+        "es": "BLOQUEO DE MÉTRICA — CAOS Y PRESIÓN: PPDA, intensidad y láseres defensivos.",
+        "ar": "قفل المقياس — الفوضى والضغط: PPDA وشدة الضغط وأشعة الدفاع.",
+        "hi": "मेट्रिक लॉक — कैओस और प्रेसिंग: PPDA, प्रेसिंग तीव्रता और डिफेंसिव लेज़र।",
+    },
+}
+
+CLUB_FRAMES = {
+    "NLA_LOYALIST": {
+        "en": "NLA fan lens: every NLA forward burst is framed as a momentum surge the North Stand can feel.",
+        "es": "Visión del aficionado del NLA: cada arranque del NLA se vive como una ola de impulso en la grada norte.",
+        "ar": "من منظور مشجع NLA: كل انطلاقة هجومية تُعرض كموجة حماس تهز المدرجات الشمالية.",
+        "hi": "NLA फैन नज़रिया: NLA का हर आगे बढ़ना नॉर्थ स्टैंड में जोश की लहर बनकर दिखता है।",
+    },
+    "MCS_LOYALIST": {
+        "en": "MCS fan lens: every MCS possession is framed as control turning into inevitable danger.",
+        "es": "Visión del aficionado del MCS: cada posesión del MCS se vive como control que se convierte en peligro.",
+        "ar": "من منظور مشجع MCS: كل استحواذ يُعرض كسيطرة تتحول إلى خطر محتوم.",
+        "hi": "MCS फैन नज़रिया: MCS का हर कब्ज़ा ऐसा नियंत्रण दिखता है जो खतरे में बदल रहा है।",
+    },
+}
+
+DEFAULT_PERSONALIZATION = {
+    "persona_mode": "TWINCAST_SPLIT",
+    "metric_focus": "ALL",
+    "favorite_club_bias": "NEUTRAL",
+    "locked_player_id": None,
+    "market_language": "en",
+}
+
 
 CAMERA_ZONES = {
     "counter_overload": "FINAL_THIRD_OVERLOAD",
@@ -140,8 +219,25 @@ class Personalizer:
     def __init__(self, cfg=settings):
         self.s = cfg
 
+    @staticmethod
+    def normalize_preferences(pref: Optional[dict]) -> dict:
+        pref = dict(pref or {})
+        persona = str(pref.get("persona_mode") or "TWINCAST_SPLIT").upper()
+        focus = str(pref.get("metric_focus") or "ALL").upper()
+        bias = str(pref.get("favorite_club_bias") or "NEUTRAL").upper()
+        lang = str(pref.get("market_language") or "en").lower()
+        locked = pref.get("locked_player_id") or None
+        return {
+            "persona_mode": persona if persona in PERSONA_MODES else "TWINCAST_SPLIT",
+            "metric_focus": focus if focus in METRIC_FOCUS_OPTIONS else "ALL",
+            "favorite_club_bias": bias if bias in CLUB_BIAS_OPTIONS else "NEUTRAL",
+            "locked_player_id": str(locked) if locked else None,
+            "market_language": lang if lang in ("en", "es", "ar", "hi") else "en",
+        }
+
     # ------------------------------------------------------------- Stage (d)+(e)
-    def build(self, stage_c: dict, ev: dict, metrics: dict, score: dict) -> dict:
+    def build(self, stage_c: dict, ev: dict, metrics: dict, score: dict,
+              pref: Optional[dict] = None) -> dict:
         arch = stage_c.get("archetype") or pick_archetype(ev, metrics)
         chaos = metrics.get("chaos_index", 0.5)
         pdr = ev.get("pdr")
@@ -214,12 +310,58 @@ class Personalizer:
             "player_lock_insight": lock_insight,
             "translations": translations,
         }
-        return {
+        packet = {
             "stage_c_explainability": stage_c.get("stage_c_explainability", {}),
             "stage_d_broadcast_overlay": overlay,
             "stage_e_personalization": personalization,
             "camera_directive": build_camera_directive(ev, metrics, arch),
         }
+        return self.apply_personalization(packet, ev, metrics, pref)
+
+    def apply_personalization(self, packet: dict, ev: dict, metrics: dict,
+                              pref: Optional[dict] = None) -> dict:
+        prefs = self.normalize_preferences(pref)
+        stage_e = packet.setdefault("stage_e_personalization", {})
+        focus = prefs["metric_focus"]
+        bias = prefs["favorite_club_bias"]
+        meta = METRIC_FOCUS_META[focus]
+        translations = dict(stage_e.get("translations") or {})
+        story = translations.get("en") or (
+            stage_e.get("casual_fan_mode", {}).get("story_card", ""))
+
+        focus_text = METRIC_FOCUS_TEXT.get(focus)
+        club_text = CLUB_FRAMES.get(bias)
+        if focus_text:
+            for lang in ("en", "es", "ar", "hi"):
+                base = translations.get(lang, story)
+                translations[lang] = f"{focus_text[lang]} {base}".strip()
+            story = translations["en"]
+            stage_e.setdefault("analyst_mode", {})["metric_focus_note"] = focus_text["en"]
+        if club_text:
+            for lang in ("en", "es", "ar", "hi"):
+                translations[lang] = f"{translations.get(lang, story)} {club_text[lang]}".strip()
+            story = translations["en"]
+            stage_e.setdefault("analyst_mode", {})["club_bias_note"] = club_text["en"]
+
+        if focus != "ALL":
+            stage_e["metric_focus_note"] = focus_text["en"] if focus_text else meta["label"]
+        stage_e["metric_lock"] = {
+            "active": focus != "ALL",
+            "focus": focus,
+            "label": meta["label"],
+            "filtered_tags": list(meta["tags"]),
+        }
+        stage_e["favorite_club_bias"] = bias
+        stage_e["club_bias_frame"] = club_text["en"] if club_text else None
+        stage_e["persona_mode"] = prefs["persona_mode"]
+        stage_e["locked_player_id"] = prefs["locked_player_id"] or ev.get("player_id")
+        stage_e["translations"] = translations
+        stage_e["casual_fan_mode"] = {
+            **(stage_e.get("casual_fan_mode") or {}),
+            "story_card": story,
+        }
+        packet["personalization"] = prefs
+        return packet
 
     def build_recap_packet(self, recap: dict, score: dict, clock: str) -> dict:
         translations = {"en": "Studio recap: the three moments that shaped the match."}
@@ -267,5 +409,6 @@ class Personalizer:
         data = r.json()[0].get("translations", [])
         return {t["to"]: t["text"] for t in data if t.get("to") in ("es", "ar", "hi")}
 
-    async def build_async(self, stage_c: dict, ev: dict, metrics: dict, score: dict) -> dict:
-        return await asyncio.to_thread(self.build, stage_c, ev, metrics, score)
+    async def build_async(self, stage_c: dict, ev: dict, metrics: dict, score: dict,
+                          pref: Optional[dict] = None) -> dict:
+        return await asyncio.to_thread(self.build, stage_c, ev, metrics, score, pref)

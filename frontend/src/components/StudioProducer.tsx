@@ -66,7 +66,9 @@ export default function StudioProducer({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: q, language: lang, persona: "analyst", locked_player_id: lockedId }),
       });
+      if (!r.ok) throw new Error(`studio query HTTP ${r.status}`);
       const data: StudioQueryResponse = await r.json();
+      if (!data.scene_directive) throw new Error("studio query returned no scene directive");
       setResponse(data);
       onStudioDirective(data.scene_directive);
       if (!isVoiceMuted) speakInsight(data.studio_answer_localized, lang);
@@ -156,9 +158,9 @@ export default function StudioProducer({
           </div>
         )}
 
-        {/* ---- latest passive insight ---- */}
+        {/* ---- latest passive insight (hidden on short viewports to keep the rail compact) ---- */}
         {latest && (
-          <div className="mb-2 space-y-1">
+          <div className="mb-2 hidden space-y-1 [@media(min-height:820px)]:block">
             <div className="flex items-start gap-2">
               <span className="clip-skew mt-0.5 shrink-0 bg-crimson/20 px-1.5 py-0.5 font-tech text-[9px] font-bold uppercase tracking-wider text-crimson">
                 {latest.stage_d_broadcast_overlay.overlay_type.replace(/_/g, " ")}
@@ -218,7 +220,7 @@ export default function StudioProducer({
 
           {/* agent response */}
           {(response || busy) && (
-            <div className="clip-chamfer mt-1.5 border border-tactical/30 bg-tactical/[0.06] p-2">
+            <div className="scroll-slim mt-1.5 max-h-[210px] overflow-y-auto border border-tactical/30 bg-tactical/[0.06] p-2 clip-chamfer">
               {busy && !response && (
                 <div className="flex items-center gap-1.5 font-tech text-[10px] font-bold uppercase tracking-wider text-tactical">
                   <Loader2 size={11} className="animate-spin" /> Azure AI Foundry agents reasoning over 60s spatial buffer…

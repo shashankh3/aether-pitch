@@ -29,18 +29,20 @@ function applyH(x: number, y: number): [number, number] {
 
 interface Props {
   events: MatchEvent[];
+  expandedOverride?: boolean | null;
 }
 
 type LogLine = { id: number; text: string };
 
 let logSeq = 0;
 
-export default function VisionAutoEventerHUD({ events }: Props) {
+export default function VisionAutoEventerHUD({ events, expandedOverride = null }: Props) {
   const [enabled, setEnabled] = useState(true);
   const [expanded, setExpanded] = useState(false);
   const [showGrid, setShowGrid] = useState(false);
+  const isExpanded = expandedOverride ?? expanded;
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const logRef = useRef<LogLine[]>([]);
+  const [log, setLog] = useState<LogLine[]>([]);
   const seenEvent = useRef<string>("");
 
   // ---- auto-event emission log (machine-detected, zero manual tagging) ----
@@ -57,7 +59,7 @@ export default function VisionAutoEventerHUD({ events }: Props) {
       line = `🛡️ [AUTO-TAG] HIGH-PRESSURE CLOSURE: ${newest.players?.length ?? 3} Defenders within 5.2m`;
     }
     if (line) {
-      logRef.current = [{ id: ++logSeq, text: line }, ...logRef.current].slice(0, 3);
+      setLog((prev) => [{ id: ++logSeq, text: line }, ...prev].slice(0, 3));
     }
   }, [events]);
 
@@ -234,7 +236,7 @@ export default function VisionAutoEventerHUD({ events }: Props) {
 
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [enabled, showGrid, expanded]);
+  }, [enabled, showGrid, isExpanded]);
 
   if (!enabled) {
     return (
@@ -251,9 +253,9 @@ export default function VisionAutoEventerHUD({ events }: Props) {
     <div
       className={cn(
         "clip-ea pointer-events-auto border border-tactical/30 bg-slate-950/85 backdrop-blur-xl",
-        expanded
-          ? "fixed left-1/2 top-1/2 z-50 w-[900px] -translate-x-1/2 -translate-y-1/2"
-          : "w-[340px]"
+        isExpanded
+          ? "fixed left-1/2 top-1/2 z-50 w-[min(900px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2"
+          : "w-[340px] max-w-full"
       )}
     >
       <div className="flex items-center justify-between border-b border-white/10 px-2 py-1">
@@ -278,17 +280,17 @@ export default function VisionAutoEventerHUD({ events }: Props) {
           <button
             onClick={() => setExpanded((e) => !e)}
             className="p-0.5 text-slate-400 transition hover:text-white"
-            title={expanded ? "Collapse" : "Expand to modal"}
+            title={isExpanded ? "Collapse" : "Expand to modal"}
           >
-            {expanded ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+            {isExpanded ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
           </button>
         </div>
       </div>
 
       <canvas
         ref={canvasRef}
-        width={expanded ? 896 : 336}
-        height={expanded ? 470 : 190}
+        width={isExpanded ? 896 : 336}
+        height={isExpanded ? 470 : 190}
         className="block w-full"
       />
 
@@ -297,10 +299,10 @@ export default function VisionAutoEventerHUD({ events }: Props) {
         <div className="font-tech text-[8.5px] font-bold uppercase tracking-[0.2em] text-slate-500">
           Auto-Event Emission Log (zero manual tagging)
         </div>
-        {logRef.current.length === 0 && (
+        {log.length === 0 && (
           <div className="py-0.5 font-tech text-[9.5px] text-slate-600">waiting for machine detections…</div>
         )}
-        {logRef.current.map((l, i) => (
+        {log.map((l, i) => (
           <div
             key={l.id}
             className={cn("truncate py-[1px] font-tech text-[9.5px]", i === 0 ? "text-pitch" : "text-slate-500")}

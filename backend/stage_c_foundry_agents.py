@@ -81,6 +81,99 @@ class FoundryRouter:
         result["latency_ms"] = round((time.perf_counter() - t0) * 1000.0, 1)
         return result
 
+    async def recap_storyboard(self, ctx: dict) -> dict:
+        """Compile the v5.0 three-act storyboard with dual-persona + i18n copy."""
+        t0 = time.perf_counter()
+        raw_acts = (ctx.get("acts") or [])[:3]
+        milestones = ctx.get("milestones") or []
+        acts = []
+        for i, raw in enumerate(raw_acts, 1):
+            n = int(raw.get("act") or i)
+            title = str(raw.get("title") or f"Act {n}")
+            subtitle = str(raw.get("subtitle") or "Tactical inflection")
+            clock = str(raw.get("clock") or "—")
+            team = raw.get("team") or "NLA"
+            player = raw.get("player_name") or "the ball carrier"
+            pdr = float(raw.get("pdr") or 0.0)
+            dxt = float(raw.get("delta_xt") or 0.0)
+            chaos = float(raw.get("chaos") or 0.0)
+            event_type = str(raw.get("event_type") or "PASS")
+            ghost = raw.get("ghost_pass") or {}
+            actual = raw.get("actual_pass") or {}
+            catalyst = str(raw.get("catalyst") or
+                          f"{event_type.replace('_', ' ').title()} • PDR {pdr:.0f}% • ΔxT {dxt:+.2f}")
+            localized = self._localize_act(
+                n, title, subtitle, clock, team, player, pdr, dxt, chaos, catalyst)
+            analyst = (
+                f"Act {n} — {title}. {subtitle}. At {clock}, {player} ({team}) produced "
+                f"{pdr:.0f}% pass difficulty for {dxt:+.2f} xT while the Chaos Index sat at "
+                f"{chaos:.2f}. The alternative ghost lane to {ghost.get('target_id') or 'the free man'} "
+                f"offered {float(ghost.get('delta_xt') or 0.0):+.2f} xT."
+            )
+            casual = (
+                f"Act {n}: {title}! {player} lit up {clock} with a moment the whole stadium felt — "
+                f"{pdr:.0f}% difficulty, {dxt:+.2f} expected threat, and chaos at {chaos:.2f}. "
+                f"{subtitle}."
+            )
+            acts.append({
+                **raw,
+                "act": n,
+                "analyst_tactical_summary": analyst,
+                "casual_story": casual,
+                "localized_commentary": localized,
+                "catalyst": catalyst,
+                "actual_pass": actual,
+                "ghost_pass": ghost,
+                "key_player_ids": (raw.get("key_player_ids") or [])[:3],
+            })
+        while len(acts) < 3:
+            n = len(acts) + 1
+            acts.append({
+                "act": n,
+                "title": f"Act {n}",
+                "subtitle": "The tactical pattern held",
+                "clock": "—",
+                "event_type": "STRUCTURE",
+                "team": "NLA",
+                "pdr": 0.0,
+                "delta_xt": 0.0,
+                "chaos": 0.0,
+                "actual_pass": {},
+                "ghost_pass": {},
+                "key_player_ids": [],
+                "analyst_tactical_summary": "The deterministic engine found no further high-leverage swing.",
+                "casual_story": "The match settled into a tense, tactical rhythm.",
+                "localized_commentary": {
+                    "en": "The match settled into a tense, tactical rhythm.",
+                    "es": "El partido entró en un ritmo táctico y tenso.",
+                    "ar": "استقرت المباراة في إيقاع تكتيكي متوتر.",
+                    "hi": "मैच एक तनावपूर्ण रणनीतिक लय में आ गया।",
+                },
+            })
+        return {
+            "title": "The Championship Finale — Three Acts That Decided It",
+            "subtitle": "Milestone Engine • Ghost-Pass Counterfactuals • Dual-Persona Storyboard",
+            "acts": acts,
+            "milestones": milestones[:3],
+            "model": "aether-recap-storyboard-v5",
+            "latency_ms": round((time.perf_counter() - t0) * 1000.0, 1),
+        }
+
+    @staticmethod
+    def _localize_act(n: int, title: str, subtitle: str, clock: str, team: str,
+                      player: str, pdr: float, dxt: float, chaos: float,
+                      catalyst: str) -> Dict[str, str]:
+        return {
+            "en": (f"Act {n} — {title}. {subtitle}. At {clock}, {player} produced {pdr:.0f}% "
+                   f"pass difficulty for {dxt:+.2f} xT as chaos held at {chaos:.2f}. {catalyst}"),
+            "es": (f"Acto {n} — {title}. {subtitle}. En {clock}, {player} generó {pdr:.0f}% de "
+                   f"dificultad de pase y {dxt:+.2f} xT con el caos en {chaos:.2f}. {catalyst}"),
+            "ar": (f"الفصل {n} — {title}. {subtitle}. في {clock}، صنع {player} تمريرة بصعوبة "
+                   f"{pdr:.0f}% و{dxt:+.2f} xT بينما استقرت الفوضى عند {chaos:.2f}. {catalyst}"),
+            "hi": (f"अंक {n} — {title}. {subtitle}. {clock} पर {player} ने {pdr:.0f}% पास कठिनाई "
+                   f"के साथ {dxt:+.2f} xT बनाया, जब कैओस {chaos:.2f} था। {catalyst}"),
+        }
+
     # ----------------------------------------------------------- Azure calls
     def _chat(self, deployment: str, messages: List[dict],
               max_tokens: int = 400, temperature: float = 0.2) -> str:

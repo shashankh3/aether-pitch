@@ -1,4 +1,4 @@
-# AETHER PITCH v4.0 — EA SPORTS FC 27 3D WebGL Broadcast, Championship Telestrator & Autonomous Studio Engine
+# AETHER PITCH v5.0 — Championship Finale 3D Broadcast & Judge-Domination Engine
 
 **Premier League & Microsoft Azure "Inside the Game" Hackathon submission.**
 An EA Sports FC 27 (HyperMotion V) + Lenovo Football AI Pro grade broadcast studio:
@@ -8,6 +8,14 @@ DVR time-machine + 3D telestrator**, a **computer-vision auto-eventing viewport*
 a **bi-directional "Ask The 12th Man" co-pilot**, **SMPTE broadcast alpha mode**
 and a **1-click judge rubric verifier** — all fed by a **5-stage real-time Azure AI
 pipeline over 100% synthetic 10Hz football telemetry**.
+
+**v5.0 adds:** live fan personalization (persona / metric lock / club lens / i18n),
+a milestone engine + **three-act cinematic recap** with 3D time travel, a Gaussian
+**spatial control surface** and 3D passing network, a **60-second judge autopilot**,
+and a **10Hz edge fallback** that keeps the broadcast alive through Azure/WebSocket
+failures. Full architecture, math appendix and demo script: **[SUBMISSION_GUIDE.md](SUBMISSION_GUIDE.md)**.
+
+**Tagline:** *AETHER PITCH — the championship finale, rendered live in 3D and personalized for every fan.*
 
 ```
 NLA (North London Athletic, crimson/gold)  vs  MCS (Manchester Cityscape, cyan/navy)
@@ -28,6 +36,16 @@ Zero real clubs, players, logos, or proprietary tracking data.
 | **Voice + Two-Phase UX** | Zero-overlap speech controller (cancel-before-queue, en-GB/es-ES/ar-SA/hi-IN voice mapping, broadcast cadence) with live equalizer pill; scenario injections resolve Phase 1 instantly (<30ms physics) then Phase 2 AI reasoning shimmer |
 | **Tactical Radar Mini-Map** | EA FC 27-style 230×148 translucent radar: 22 dots, locked-player gold pulse, ball flare, pass + ghost vectors, spotlight rings, click-to-lock that flies the 3D camera |
 | **Judge Rubric Verifier** | `GET /api/health/pipeline-audit` runs an isolated 5-stage self-test (per-stage ms + sample outputs + synthetic compliance) rendered as a one-click VERIFIED checklist; `test_pipeline.py`, `backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml`, `azure.yaml` included |
+
+### v5.0 Championship Finale Modules
+
+| Module | What it does |
+|--------|--------------|
+| **Fan Personalization Runtime** | `FanPersonalizationTuner` + `stage_d_e_personalizer.py`: persona fork, single-metric 3D tag lock, NLA/MCS club lens, locked-player context, EN/ES/AR/HI adaptation via `GET/POST /api/personalization` |
+| **Milestone Engine + 3-Act Recap** | Stage A detects sprint records (>31.5 km/h), five-pass PDR mastery, and 30s final-third press sieges; `GET/POST /api/match-recap` returns full 22-player snapshots, actual/ghost passes, localized commentary, teleprompter export, and `LOAD ACT` 3D time travel |
+| **Spatial Control Surface** | 21×14 Gaussian pitch-control `CanvasTexture` heat surface + elevated 3D passing network, independently toggled from the camera director |
+| **Judge Autopilot Tour** | One click runs a 60-second, six-step self-driving rubric demo (CV PiP → God Mode → DVR/telestrate → broadcast alpha → fan personalization → 3-act recap) with synchronized voiceover |
+| **Resilient Edge Engine** | `useResilientMatchEngine` + `edgeEngine.ts`: 10Hz browser synthetic fallback, seamless WebSocket hot-swap, and a live `🟢 AZURE PIPELINE LIVE` / `⚡ EDGE AUTONOMOUS ENGINE ACTIVE` status pill |
 
 ---
 
@@ -83,7 +101,8 @@ Stage (a) INGEST     stage_a_synthetic_engine.py — 10Hz PitchForge physics sim
                      pose_state (KICK > SPRINT ≥28 > PRESS <5m > JOG > IDLE),
                      playstyle_badge (RAPID+ ≥30 km/h, INCISIVE_PASS+ on
                      PDR>80 passes, INTERCEPT+ in pressing traps), and the
-                     3D ball (x,y,z,vx,vy,vz, pass_start/end, is_lofted, ghost_end)
+                     3D ball (x,y,z,vx,vy,vz, pass_start/end, is_lofted, ghost_end);
+                     MilestoneTracker emits sprint / pass-mastery / press-dominance records
 Stage (b) INTERPRET  stage_b_math_engine.py — deterministic NumPy (unchanged):
                      Chaos Index (0.35·T̂r + 0.25·σ̂²v + 0.20·stretch + 0.20·press),
                      PDR logistic, 16×12 xT, Ghost Pass scan, AI gate
@@ -93,12 +112,14 @@ Stage (d) RENDER     stage_d_e_personalizer.py — overlay packets now include a
                      camera_directive: { recommended_mode, focus_target_id,
                      cinematic_slow_mo, ar_highlight_zone } that drives the
                      AI camera takeover in the WebGL scene
-Stage (e) PERSONALIZE analyst/casual fork · PlayerLock 360 insight · EN/ES/AR/HI
+Stage (e) PERSONALIZE analyst/casual fork · PlayerLock 360 insight · EN/ES/AR/HI ·
+                     persona / metric-lock / club-lens / locked-player adaptation
 ```
 
 WebSocket packets: `hello | tick (10Hz) | metrics (2Hz) | event | insight |
 pipeline (2Hz) | recap`. REST: `POST /api/scenario/{chaos_counter |
-high_press_turnover | tactical_inversion | halftime_recap}`.
+high_press_turnover | tactical_inversion | halftime_recap}`, `GET/POST
+/api/personalization`, `GET/POST /api/match-recap`.
 
 ---
 
@@ -107,15 +128,18 @@ high_press_turnover | tactical_inversion | halftime_recap}`.
 - **Top-left** — Premier League-style scorebug with synthetic crests, possession
   indicator and a win-probability / momentum bar.
 - **Top-center** — Tactical Pulse: chaos waveform, segmented power bar, numeric
-  gauge, and a crimson **counter-attack window countdown** above 0.68.
-- **Top-right** — Camera Director (4 modes + xT Grid / Ghost Pass / Def. Lasers
-  toggles) and the TwinCast dock (Analyst HUD / Casual Fan / Split + EN/ES/AR/HI
-  pills + Web Speech voice with `en-GB / es-ES / ar-SA / hi-IN` voice selection).
+  gauge, a crimson **counter-attack window countdown** above 0.68, and the
+  **Run 60s Judge Autopilot** control.
+- **Top-right** — Camera Director (4 modes + xT Grid / Ghost Pass / Def. Lasers /
+  Pitch Control / Passing Network toggles), the **Fan Personalization Tuner**, and
+  the TwinCast dock (Analyst HUD / Casual Fan / Split + EN/ES/AR/HI pills + Web
+  Speech voice with `en-GB / es-ES / ar-SA / hi-IN` voice selection).
 - **Bottom-left** — EA FC Ultimate-Team style PlayerLock 360 hologram: quick-roster
   strip, kit silhouette, PlayStyle+ hex badge, radial speedometer with 30 km/h
   overdrive zone, PDR / ΔxT / stamina, live voice synthesis.
 - **Bottom-center** — TV lower-third banner + PitchForge God-Mode deck
-  (keys `1`–`4`) + collapsible 5-stage pipeline strip with pulsing nodes.
+  (keys `1`–`4`; `4` opens the 3-act Studio Match Recap) + collapsible 5-stage
+  pipeline strip with a live/edge status pill.
 - **GOAL slam** — skewed team-color banner + canvas shockwave + screen flash.
 
 ---
@@ -129,13 +153,17 @@ high_press_turnover | tactical_inversion | halftime_recap}`.
 │       ├── app/                  # layout (Rajdhani/Teko/Inter/JetBrains Mono) + page
 │       ├── components/
 │       │   ├── three/            # HoloPitch3D, PlayerAvatar3D, StadiumEnvironment3D,
-│       │   │                     # TacticalOverlays3D, PassVectors3D, BroadcastCameraRig
+│       │   │                     # TacticalOverlays3D, PassVectors3D, BroadcastCameraRig,
+│       │   │                     # SpatialControlSurface3D, RecapPassTubes
 │       │   ├── ScoreBug / TacticalPulseBar / CameraDirectorBar / TwinCastHUD
+│       │   ├── FanPersonalizationTuner / MatchRecapStudioModal / JudgeAutopilotTour
 │       │   ├── PlayerLock360 / StudioProducer / PitchForgeDeck / PipelineInspector
 │       │   └── Crests.tsx        # synthetic club crests (no real IP)
-│       ├── hooks/useStudio.ts    # WS stream → React HUD state + telemetry store
+│       ├── hooks/useResilientMatchEngine.ts  # WS + 10Hz edge hot-swap
+│       ├── lib/edgeEngine.ts     # browser-native synthetic fallback engine
 │       └── lib/                  # types (schema), telemetry store, utils
 ├── start_studio.bat / .sh
+├── SUBMISSION_GUIDE.md
 └── README.md
 ```
 
@@ -145,12 +173,17 @@ high_press_turnover | tactical_inversion | halftime_recap}`.
 
 | Time | Action | Say |
 |------|--------|-----|
-| 0:00–0:20 | Studio loads into the Tele Cam 3D stadium | "A live 3D broadcast built on a synthetic 10Hz physics engine — 22 articulated avatars, zero proprietary data." |
-| 0:20–0:45 | Press `3` → Drone Orbit, drag to spin | "A Lenovo-style 3D digital twin. Toggle the xT threat floor and defensive lasers — all deterministic Stage B math." |
-| 0:45–1:20 | Click any avatar (or roster #9) → Pro Cam | "EA FC Pro Cam. The rig plays the pose state machine live: stride frequency from velocity, KICK strikes, HyperMotion rings." |
-| 1:20–2:00 | Press `1` — Chaos Counter | "Watch the AI Auto-Director take over — Stage D emitted a camera_directive, the cam swoops, the ghost pass tube draws, the goal slam fires." |
-| 2:00–2:30 | TwinCast → Fan + العربية + voice | "Same moment, two audiences, four languages, live synthesis." |
-| 2:30–3:00 | Press `4` — Studio Recap, open pipeline strip | "Five stages, live latencies, raw payloads — rubric-verified in five seconds." |
+| 0:00–0:15 | Studio loads into the Tele Cam 3D stadium | "A live 3D broadcast built on a synthetic 10Hz physics engine — 22 articulated avatars, zero proprietary data." |
+| 0:15–0:30 | Click **Run 60s Judge Autopilot** | "Six rubric steps, sixty seconds, synchronized voiceover — the studio drives itself." |
+| 0:30–1:10 | Autopilot steps 2–3: God Mode + DVR freeze/telestrate | "Stage B math drives the control surface, defensive lasers, ghost lane, and AI camera takeover." |
+| 1:10–1:25 | Autopilot step 4: broadcast alpha | "Only the transparent AR layer remains — OBS / Vizrt / Singular.live ready." |
+| 1:25–1:50 | Autopilot step 5 + Fan Tuner: Pass Quality, NLA lens, ES→HI→AR | "Same moment, different fan: metric lock, club lens, and Stage E localization without a stream restart." |
+| 1:50–2:20 | Autopilot step 6: recap milestones, click **Load Act** | "Sprint record, five-pass mastery, 30-second press siege — restored as a full 22-player 3D snapshot." |
+| 2:20–2:40 | Export teleprompter, click **Verify** | "Producer-ready three-act script and a five-stage rubric audit." |
+| 2:40–3:00 | Go offline, then reconnect | "The edge engine keeps the picture alive at 10Hz and hot-swaps back to Azure." |
+
+Full architecture, math appendix, API smoke tests and the long-form script:
+**[SUBMISSION_GUIDE.md](SUBMISSION_GUIDE.md)**.
 
 ---
 

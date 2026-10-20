@@ -3,7 +3,7 @@
 // 4 broadcast camera modes + volumetric AR overlay toggles
 // (xT grid, ghost pass vector, defensive lasers).
 
-import { Video, User, Orbit, Sparkles, Grid3x3, Ghost, Zap } from "lucide-react";
+import { Video, User, Orbit, Sparkles, Grid3x3, Ghost, Zap, Waves, Share2 } from "lucide-react";
 import type { CameraMode } from "@/lib/types";
 import type { OverlayToggles } from "@/components/three/HoloPitch3D";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,8 @@ const TOGGLES: { id: keyof OverlayToggles; label: string; icon: React.ReactNode 
   { id: "xtGrid", label: "xT Grid", icon: <Grid3x3 size={12} /> },
   { id: "ghost", label: "Ghost Pass", icon: <Ghost size={12} /> },
   { id: "lasers", label: "Def. Lasers", icon: <Zap size={12} /> },
+  { id: "pitchControl", label: "Control", icon: <Waves size={12} /> },
+  { id: "passingNetwork", label: "Pass Net", icon: <Share2 size={12} /> },
 ];
 
 interface Props {
@@ -31,7 +33,7 @@ interface Props {
 
 export default function CameraDirectorBar({ mode, onMode, toggles, onToggle, aiDirected }: Props) {
   return (
-    <div className="clip-ea pointer-events-auto w-[240px] border border-white/15 bg-slate-950/80 p-2 backdrop-blur-xl">
+    <div className="clip-ea pointer-events-auto w-full border border-white/15 bg-slate-950/80 p-2 backdrop-blur-xl">
       <div className="mb-1.5 flex items-center justify-between px-1">
         <span className="font-display text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">
           Camera Director
@@ -60,13 +62,13 @@ export default function CameraDirectorBar({ mode, onMode, toggles, onToggle, aiD
           </button>
         ))}
       </div>
-      <div className="mt-1.5 flex gap-1.5 border-t border-white/10 pt-1.5">
+      <div className="mt-1.5 grid grid-cols-3 gap-1.5 border-t border-white/10 pt-1.5">
         {TOGGLES.map((t) => (
           <button
             key={t.id}
             onClick={() => onToggle(t.id)}
             className={cn(
-              "clip-skew flex flex-1 items-center justify-center gap-1 px-1 py-1 font-tech text-[9.5px] font-bold uppercase tracking-wider transition",
+              "clip-skew flex items-center justify-center gap-1 px-1 py-1 font-tech text-[9.5px] font-bold uppercase tracking-wider transition",
               toggles[t.id] ? "bg-pitch/20 text-pitch" : "bg-white/[0.03] text-slate-500 hover:text-slate-300"
             )}
           >

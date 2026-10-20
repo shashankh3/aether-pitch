@@ -9,6 +9,11 @@ import asyncio
 import math
 import sys
 
+# Windows consoles default to cp1252 and crash on Δ / — in check details.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 from stage_a_synthetic_engine import PitchForgeEngine
 from stage_b_math_engine import TacticalMathEngine, CHAOS_CONTROL, CHAOS_CHAOS, XT_MAX, XT_MIN
 from stage_c_foundry_agents import FoundryRouter

@@ -43,6 +43,18 @@ export interface GhostSample {
   at: number;
 }
 
+export interface PassLink {
+  key: string;
+  from: string;
+  to: string;
+  team: "NLA" | "MCS";
+  count: number;
+  deltaXt: number;
+  start: [number, number] | null;
+  end: [number, number] | null;
+  lastAt: number;
+}
+
 /** One 10Hz snapshot in the 15-second DVR circular buffer. */
 export interface MatchSnapshot {
   seq: number;
@@ -79,6 +91,7 @@ class TelemetryStore {
   insight: Insight | null = null;
   ghost: GhostSample | null = null;
   pdrByPlayer = new Map<string, number>();
+  passLinks = new Map<string, PassLink>();
 
   // ---- v3.0 DVR circular buffer + playback ----
   history: MatchSnapshot[] = [];
@@ -93,6 +106,36 @@ class TelemetryStore {
 
   setPassReceiver(id: string | null) {
     this.passReceiver = id ? { id, at: performance.now() } : null;
+  }
+
+  recordPassLink(
+    from: string,
+    to: string,
+    team: "NLA" | "MCS",
+    start?: [number, number] | null,
+    end?: [number, number] | null,
+    deltaXt = 0
+  ) {
+    if (!from || !to || from === to) return;
+    const key = [from, to].sort().join("|");
+    const existing = this.passLinks.get(key);
+    if (existing) {
+      existing.count = Math.min(40, existing.count + 1);
+      existing.deltaXt += deltaXt;
+      existing.lastAt = performance.now();
+      if (start) existing.start = start;
+      if (end) existing.end = end;
+      return;
+    }
+    this.passLinks.set(key, {
+      key, from, to, team, count: 1, deltaXt,
+      start: start ?? null, end: end ?? null, lastAt: performance.now(),
+    });
+    if (this.passLinks.size > 96) {
+      const oldest = Array.from(this.passLinks.values())
+        .sort((a, b) => a.lastAt - b.lastAt)[0];
+      if (oldest) this.passLinks.delete(oldest.key);
+    }
   }
 
   private recordHistory(tick: MatchTick, metrics: Metrics | null) {

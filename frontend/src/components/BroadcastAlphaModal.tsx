@@ -149,8 +149,17 @@ export default function BroadcastAlphaModal({ open, onClose, insight }: Props) {
     }
   };
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-8 backdrop-blur-sm">
-      <div className="clip-ea flex max-h-full w-[640px] flex-col border border-gold/40 bg-slate-950/95 shadow-2xl animate-slide-up">
+    <div
+      className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm sm:p-8"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Production overlay JSON"
+    >
+      <div
+        className="clip-ea flex max-h-full w-[640px] flex-col border border-gold/40 bg-slate-950/95 shadow-2xl animate-slide-up"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
           <div>
             <h3 className="flex items-center gap-2 font-display text-[19px] font-bold uppercase tracking-wide text-gold">

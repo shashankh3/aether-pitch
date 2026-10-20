@@ -44,8 +44,17 @@ export default function RubricVerifierModal({ open, onClose }: Props) {
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-8 backdrop-blur-sm">
-      <div className="clip-ea max-h-full w-[680px] overflow-y-auto border border-pitch/40 bg-slate-950/95 p-5 shadow-2xl animate-slide-up scroll-slim">
+    <div
+      className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm sm:p-8"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="5-stage rubric diagnostic"
+    >
+      <div
+        className="clip-ea max-h-full w-[680px] overflow-y-auto border border-pitch/40 bg-slate-950/95 p-5 shadow-2xl animate-slide-up scroll-slim"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="mb-3 flex items-start justify-between">
           <div>
             <h3 className="flex items-center gap-2 font-display text-[22px] font-bold uppercase tracking-wide text-pitch">

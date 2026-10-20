@@ -39,7 +39,7 @@ export default function TelestratorDVRBar({
         <button
           onClick={onTogglePause}
           className={cn(
-            "clip-skew flex items-center gap-1.5 px-2.5 py-1 font-tech text-[11px] font-bold uppercase tracking-wider transition",
+            "clip-skew flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1 font-tech text-[11px] font-bold uppercase tracking-wider transition",
             isDvrPaused ? "bg-gold/25 text-gold" : "bg-crimson/20 text-crimson hover:bg-crimson/35"
           )}
         >
@@ -92,7 +92,7 @@ export default function TelestratorDVRBar({
           title="Spotlight Key Players (carrier + nearest presser + ghost receiver; click any 3D player to toggle their beam)"
         >
           <Focus size={12} />
-          <span className="hidden lg:inline">Spotlight Key Players</span>
+          <span className="hidden 2xl:inline">Spotlight Key Players</span>
         </button>
         {([
           { key: "showOffsideLaserWall" as const, label: "3D Offside / Line Wall", icon: <BrickWall size={12} /> },
@@ -109,7 +109,7 @@ export default function TelestratorDVRBar({
             title={t.label}
           >
             {t.icon}
-            <span className="hidden lg:inline">{t.label}</span>
+            <span className="hidden 2xl:inline">{t.label}</span>
           </button>
         ))}
       </div>

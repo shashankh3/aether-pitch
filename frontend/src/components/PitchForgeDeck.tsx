@@ -51,9 +51,9 @@ export default function PitchForgeDeck({ tick, busy, onInject }: Props) {
   const left = tick?.scenario_left ?? null;
 
   return (
-    <footer className="relative z-20 flex h-[70px] shrink-0 items-center gap-2.5 border-t border-white/10 bg-gradient-to-b from-[#0A101C] to-[#070B13] px-4">
+    <footer className="relative z-20 flex min-h-[70px] shrink-0 items-center gap-2 border-t border-white/10 bg-gradient-to-b from-[#0A101C] to-[#070B13] px-3">
       <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-pitch/50 to-transparent" />
-      <div className="mr-1 shrink-0 leading-none">
+      <div className="mr-1 hidden shrink-0 leading-none 2xl:block">
         <div className="font-display text-[14px] font-bold uppercase tracking-[0.2em] text-pitch">
           Pitch<span className="text-white">Forge</span>
         </div>
@@ -73,7 +73,7 @@ export default function PitchForgeDeck({ tick, busy, onInject }: Props) {
             key={s.id}
             onClick={() => onInject(s.id)}
             disabled={!!busy}
-            className={`clip-chamfer group relative flex min-w-0 flex-1 items-center gap-3 overflow-hidden px-4 py-2.5 text-left transition disabled:opacity-60 ${
+            className={`clip-chamfer group relative flex min-w-0 flex-1 items-center gap-2 overflow-hidden px-3 py-2.5 text-left transition disabled:opacity-60 ${
               isActive ? "bg-white/[0.06]" : "border border-white/10 bg-white/[0.02] hover:bg-white/[0.05]"
             }`}
             style={
@@ -111,7 +111,7 @@ export default function PitchForgeDeck({ tick, busy, onInject }: Props) {
               >
                 {s.label}
               </span>
-              <span className="block truncate font-tech text-[9.5px] uppercase tracking-[0.14em] text-slate-500">
+              <span className="hidden truncate font-tech text-[9.5px] uppercase tracking-[0.14em] text-slate-500 2xl:block">
                 {s.detail}
               </span>
             </span>

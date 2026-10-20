@@ -47,7 +47,7 @@ export default function TacticalPulseBar({ metrics }: Props) {
 
   return (
     <div
-      className={`clip-ea pointer-events-auto w-[520px] border border-white/15 bg-slate-950/80 px-3 py-2 backdrop-blur-xl ${
+      className={`clip-ea pointer-events-auto w-full max-w-[520px] border border-white/15 bg-slate-950/80 px-3 py-2 backdrop-blur-xl ${
         critical ? "animate-pulse-crimson border-crimson/60" : ""
       }`}
     >

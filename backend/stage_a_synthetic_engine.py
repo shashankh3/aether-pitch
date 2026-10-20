@@ -121,6 +121,134 @@ SCENARIO_DESCRIPTIONS = {
 }
 
 
+class MilestoneTracker:
+    """Live player / match milestone detector fed by Stage (a) + (b)."""
+
+    SPRINT_FLOOR_KMH = 31.5
+    PASS_STREAK_TARGET = 5
+    PRESS_TARGET_S = 30.0
+
+    def __init__(self) -> None:
+        self.sprint_peak_kmh = 0.0
+        self.sprint_peak_player: Optional[dict] = None
+        self.last_sprint_emit_t = -999.0
+        self.pass_streak = 0
+        self.pass_streak_xt = 0.0
+        self.pass_streak_pdr: List[float] = []
+        self.pass_mastery_emitted = False
+        self.final_third_s = 0.0
+        self.press_team: Optional[str] = None
+        self.press_emitted = False
+        self.last_t: Optional[float] = None
+        self.milestones: List[dict] = []
+        self._seq = 0
+
+    def _emit(self, kind: str, clock: str, t: float, headline: str,
+              detail: str, **extra: Any) -> dict:
+        self._seq += 1
+        event = {
+            "id": f"ms_{self._seq:04d}",
+            "type": kind,
+            "clock": clock,
+            "t_match": round(t, 2),
+            "headline": headline,
+            "detail": detail,
+            **extra,
+        }
+        self.milestones.append(event)
+        del self.milestones[:-24]
+        return event
+
+    def update(self, state: dict, events: List[dict],
+               metrics: Optional[dict] = None) -> List[dict]:
+        emitted: List[dict] = []
+        t = float(state.get("t_match", 0.0))
+        dt = max(0.0, min(0.5, t - self.last_t)) if self.last_t is not None else 0.0
+        self.last_t = t
+        clock = state.get("clock", "--:--")
+
+        fastest = max((p for p in state.get("players", []) if p.get("role") != "GK"),
+                      key=lambda p: p.get("speed_kmh", 0.0), default=None)
+        if fastest and fastest.get("speed_kmh", 0.0) > max(self.SPRINT_FLOOR_KMH, self.sprint_peak_kmh):
+            self.sprint_peak_kmh = float(fastest["speed_kmh"])
+            self.sprint_peak_player = dict(fastest)
+            if t - self.last_sprint_emit_t > 5.0:
+                self.last_sprint_emit_t = t
+                percentile = min(99.9, 95.0 + (self.sprint_peak_kmh - 32.0) * 1.4)
+                emitted.append(self._emit(
+                    "MILESTONE_SPRINT_PEAK", clock, t,
+                    f"New Match Sprint Record: #{fastest.get('shirt_number')} {fastest.get('name')} reached "
+                    f"{self.sprint_peak_kmh:.1f} km/h",
+                    f"Top {100.0 - percentile:.1f}% synthetic speed percentile",
+                    team=fastest.get("team"), player_id=fastest.get("id"),
+                    player_name=fastest.get("name"), speed_kmh=round(self.sprint_peak_kmh, 1),
+                ))
+
+        for ev in events:
+            if ev.get("type") == "PASS":
+                pdr = float(ev.get("pdr") or 0.0)
+                dxt = float(ev.get("delta_xt") or 0.0)
+                if pdr >= 78.0:
+                    self.pass_streak += 1
+                    self.pass_streak_xt += max(0.0, dxt)
+                    self.pass_streak_pdr.append(pdr)
+                    if self.pass_streak >= self.PASS_STREAK_TARGET and not self.pass_mastery_emitted:
+                        self.pass_mastery_emitted = True
+                        avg = sum(self.pass_streak_pdr) / len(self.pass_streak_pdr)
+                        emitted.append(self._emit(
+                            "MILESTONE_PASS_MASTERY", clock, t,
+                            f"{self.pass_streak}th Consecutive High-Difficulty Line-Breaking Pass",
+                            f"Avg PDR: {avg:.1f}% | +{self.pass_streak_xt:.2f} Cumulative xT",
+                            team=ev.get("team"), player_id=ev.get("player_id"),
+                            player_name=ev.get("player_name"), value=round(self.pass_streak_xt, 3),
+                            pdr=round(avg, 1),
+                        ))
+                elif pdr < 65.0:
+                    self.pass_streak = 0
+                    self.pass_streak_xt = 0.0
+                    self.pass_streak_pdr = []
+                    self.pass_mastery_emitted = False
+            elif ev.get("type") in ("TURNOVER", "INTERCEPTION"):
+                self.pass_streak = 0
+                self.pass_streak_xt = 0.0
+                self.pass_streak_pdr = []
+                self.pass_mastery_emitted = False
+
+        poss = state.get("possession")
+        ball = state.get("ball") or {}
+        in_final_third = (
+            (poss == "NLA" and ball.get("x", 0.0) >= 70.0)
+            or (poss == "MCS" and ball.get("x", 105.0) <= 35.0)
+        )
+        pressing = int((metrics or {}).get("pressing_intensity", 0) or 0)
+        if in_final_third and pressing >= 2:
+            if self.press_team != poss:
+                self.press_team = poss
+                self.final_third_s = 0.0
+                self.press_emitted = False
+            self.final_third_s += dt
+            if self.final_third_s >= self.PRESS_TARGET_S and not self.press_emitted:
+                self.press_emitted = True
+                ppda = ((metrics or {}).get("ppda") or {}).get(poss, 0.0)
+                emitted.append(self._emit(
+                    "MILESTONE_PRESS_DOMINANCE", clock, t,
+                    f"Sustained High-Press Siege: {poss} held possession in the final third for "
+                    f"{self.final_third_s:.0f}s",
+                    f"PPDA: {ppda} | pressing intensity {pressing}",
+                    team=poss, value=round(self.final_third_s, 1),
+                ))
+        else:
+            self.final_third_s = max(0.0, self.final_third_s - dt * 0.5)
+            if self.final_third_s == 0.0:
+                self.press_team = None
+                self.press_emitted = False
+
+        return emitted
+
+    def summary(self) -> List[dict]:
+        return list(self.milestones)
+
+
 class PitchForgeEngine:
     """Stateful 10Hz synthetic match simulator with 3D pose telemetry."""
 
@@ -147,6 +275,7 @@ class PitchForgeEngine:
         self._trap_cd = 0.0
         self._kick: Optional[Tuple[str, float]] = None      # (pid, expire_t)
         self._badges: Dict[str, Tuple[str, float]] = {}     # pid -> (name, expire_t)
+        self.milestones = MilestoneTracker()
         self.kickoff("NLA", quiet=True)
 
     # ------------------------------------------------------------------ setup

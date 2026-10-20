@@ -5,8 +5,10 @@
 
 import { useEffect, useRef } from "react";
 import { Volume2, VolumeX, Gauge, BrainCircuit, Sparkles, Users, Heart, Layers } from "lucide-react";
-import type { Insight, LangCode, Metrics, PersonaMode } from "@/lib/types";
-import { LANG_LABELS, SPEECH_LOCALES } from "@/lib/types";
+import type {
+  ClubBias, Insight, LangCode, MatchEvent, MatchTick, MetricFocus, Metrics, PersonaMode,
+} from "@/lib/types";
+import { LANG_LABELS } from "@/lib/types";
 import { useSpeechController } from "@/hooks/useSpeechController";
 import { cn } from "@/lib/utils";
 
@@ -17,18 +19,68 @@ interface Props {
   lang: LangCode;
   onLang: (l: LangCode) => void;
   metrics: Metrics | null;
+  tick: MatchTick | null;
+  latestEvent: MatchEvent | null;
+  metricFocus: MetricFocus;
+  clubBias: ClubBias;
 }
 
-function AnalystCard({ metrics }: { metrics: Metrics | null }) {
+const METRIC_LABELS: Record<MetricFocus, string> = {
+  ALL: "Complete Broadcast",
+  SPEED_VELOCITY: "Speed & Velocity",
+  PASS_QUALITY: "Pass Quality",
+  EXPECTED_THREAT_XT: "Expected Threat",
+  CHAOS_PRESSING: "Chaos & Pressing",
+};
+
+function AnalystCard({
+  metrics, tick, latestEvent, focus,
+}: {
+  metrics: Metrics | null;
+  tick: MatchTick | null;
+  latestEvent: MatchEvent | null;
+  focus: MetricFocus;
+}) {
+  const fastest = tick?.players.reduce((best, p) => p.speed_kmh > best ? p.speed_kmh : best, 0) ?? 0;
+  const sprinters = tick?.players.filter((p) => p.speed_kmh >= 30).length ?? 0;
+  const rows: [string, string, string][] = focus === "SPEED_VELOCITY"
+    ? [
+        ["TOP SPEED", `${fastest.toFixed(1)} km/h`, "text-crimson"],
+        ["BALL SPEED", `${(tick?.ball.speed_kmh ?? 0).toFixed(0)} km/h`, "text-gold"],
+        ["SPRINTERS >30", `${sprinters} / 22`, "text-pitch"],
+        ["SHOT VELOCITY", `${latestEvent?.ball_speed_kmh?.toFixed(0) ?? "—"} km/h`, "text-tactical"],
+      ]
+    : focus === "PASS_QUALITY"
+      ? [
+          ["PASS DIFF (PDR)", `${latestEvent?.pdr?.toFixed(0) ?? "—"}%`, "text-crimson"],
+          ["Δ xT", `${(latestEvent?.delta_xt ?? 0) >= 0 ? "+" : ""}${(latestEvent?.delta_xt ?? 0).toFixed(2)}`, "text-pitch"],
+          ["PASS DISTANCE", `${latestEvent?.distance_m?.toFixed(1) ?? "—"} m`, "text-gold"],
+          ["OPEN GHOST", `${latestEvent?.ghost_pass?.openness_m?.toFixed(0) ?? "—"} m`, "text-tactical"],
+        ]
+      : focus === "EXPECTED_THREAT_XT"
+        ? [
+            ["Δ xT NOW", `${(latestEvent?.delta_xt ?? 0) >= 0 ? "+" : ""}${(latestEvent?.delta_xt ?? 0).toFixed(2)}`, "text-tactical"],
+            ["GHOST xT", `+${(latestEvent?.ghost_pass?.delta_xt ?? 0).toFixed(2)}`, "text-pitch"],
+            ["CHAOS", (metrics?.chaos_index ?? 0).toFixed(2), "text-gold"],
+            ["DEFLINE", `${metrics?.def_lines.NLA ?? 0}m / ${metrics?.def_lines.MCS ?? 0}m`, "text-slate-300"],
+          ]
+        : focus === "CHAOS_PRESSING"
+          ? [
+              ["CHAOS", (metrics?.chaos_index ?? 0).toFixed(2), "text-tactical"],
+              ["Δ CHAOS", (metrics?.delta_chaos ?? 0).toFixed(2), "text-gold"],
+              ["PPDA", `${metrics?.ppda.NLA ?? 0}/${metrics?.ppda.MCS ?? 0}`, "text-pitch"],
+              ["PRESS", `${metrics?.pressing_intensity ?? 0}/3`, "text-crimson"],
+            ]
+          : [
+              ["CHAOS", (metrics?.chaos_index ?? 0).toFixed(2), "text-tactical"],
+              ["PPDA", `${metrics?.ppda.NLA ?? 0}/${metrics?.ppda.MCS ?? 0}`, "text-pitch"],
+              ["Δ CHAOS 10s", (metrics?.delta_chaos ?? 0).toFixed(2), "text-gold"],
+              ["LINE", `${metrics?.def_lines.NLA ?? 0}m / ${metrics?.def_lines.MCS ?? 0}m`, "text-slate-300"],
+            ];
   return (
     <div className="space-y-2.5">
       <div className="grid grid-cols-2 gap-1.5">
-        {[
-          ["CHAOS", (metrics?.chaos_index ?? 0).toFixed(2), "text-tactical"],
-          ["PPDA", `${metrics?.ppda.NLA ?? 0}/${metrics?.ppda.MCS ?? 0}`, "text-pitch"],
-          ["Δ CHAOS 10s", (metrics?.delta_chaos ?? 0).toFixed(2), "text-gold"],
-          ["LINE", `${metrics?.def_lines.NLA ?? 0}m / ${metrics?.def_lines.MCS ?? 0}m`, "text-slate-300"],
-        ].map(([k, v, c]) => (
+        {rows.map(([k, v, c]) => (
           <div key={k} className="clip-chamfer border border-white/10 bg-white/[0.03] px-2 py-1.5">
             <div className="font-display text-[9px] font-semibold uppercase tracking-[0.2em] text-slate-500">{k}</div>
             <div className={`font-tech text-[14px] font-bold ${c}`}>{v}</div>
@@ -37,12 +89,14 @@ function AnalystCard({ metrics }: { metrics: Metrics | null }) {
       </div>
       <div className="clip-chamfer border border-white/10 bg-white/[0.03] px-2.5 py-2">
         <div className="mb-1 flex items-center gap-1 font-display text-[10px] font-bold uppercase tracking-[0.2em] text-tactical">
-          <Gauge size={11} /> Live Metrics (Stage B)
+          <Gauge size={11} /> {focus === "ALL" ? "Live Metrics (Stage B)" : `Metric Lock · ${METRIC_LABELS[focus]}`}
         </div>
         <div className="font-tech text-[10.5px] leading-relaxed text-slate-300">
-          {metrics
-            ? `Turnovers/min ${metrics.turnover_rate.toFixed(1)} | Ball-σ² ${metrics.ball_speed_var.toFixed(0)} | Press ${metrics.pressing_intensity}/3 | Stretch ${metrics.stretch_m.toFixed(1)} m`
-            : "—"}
+          {focus !== "ALL"
+            ? "3D pitch tags are filtered to this single metric lane."
+            : metrics
+              ? `Turnovers/min ${metrics.turnover_rate.toFixed(1)} | Ball-σ² ${metrics.ball_speed_var.toFixed(0)} | Press ${metrics.pressing_intensity}/3 | Stretch ${metrics.stretch_m.toFixed(1)} m`
+              : "—"}
         </div>
       </div>
     </div>
@@ -86,7 +140,9 @@ const PERSONAS: { id: PersonaMode; label: string; icon: React.ReactNode }[] = [
   { id: "split", label: "TwinCast", icon: <Layers size={12} /> },
 ];
 
-export default function TwinCastHUD({ insights, persona, onPersona, lang, onLang, metrics }: Props) {
+export default function TwinCastHUD({
+  insights, persona, onPersona, lang, onLang, metrics, tick, latestEvent, metricFocus, clubBias,
+}: Props) {
   const { isSpeaking, isVoiceMuted, speakInsight, toggleMute } = useSpeechController();
   const spokenRef = useRef<string>("");
   const latest = insights[0];
@@ -123,6 +179,20 @@ export default function TwinCastHUD({ insights, persona, onPersona, lang, onLang
             {isSpeaking && !isVoiceMuted && <span className="animate-breathe">LIVE</span>}
           </button>
         </div>
+        {(metricFocus !== "ALL" || clubBias !== "NEUTRAL") && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {metricFocus !== "ALL" && (
+              <span className="clip-skew bg-pitch/15 px-1.5 py-0.5 font-tech text-[8.5px] font-bold uppercase tracking-wider text-pitch">
+                METRIC LOCK · {METRIC_LABELS[metricFocus]}
+              </span>
+            )}
+            {clubBias !== "NEUTRAL" && (
+              <span className="clip-skew bg-crimson/15 px-1.5 py-0.5 font-tech text-[8.5px] font-bold uppercase tracking-wider text-crimson">
+                {clubBias === "NLA_LOYALIST" ? "NLA LENS" : "MCS LENS"}
+              </span>
+            )}
+          </div>
+        )}
         <div className="mt-1.5 flex gap-1">
           {PERSONAS.map((p) => (
             <button
@@ -190,7 +260,7 @@ export default function TwinCastHUD({ insights, persona, onPersona, lang, onLang
               </p>
             </div>
             <div className="mt-2.5">
-              <AnalystCard metrics={metrics} />
+              <AnalystCard metrics={metrics} tick={tick} latestEvent={latestEvent} focus={metricFocus} />
             </div>
             <div className="clip-chamfer mt-2.5 border border-white/10 bg-white/[0.03] px-2.5 py-2">
               <div className="mb-0.5 font-display text-[9px] font-bold uppercase tracking-[0.2em] text-slate-500">

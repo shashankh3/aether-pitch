@@ -15,16 +15,20 @@ import PlayerAvatar3D from "./PlayerAvatar3D";
 import PassVectors3D from "./PassVectors3D";
 import BroadcastCameraRig from "./BroadcastCameraRig";
 import Telestrator3DOverlays from "./Telestrator3DOverlays";
+import SpatialControlSurface3D from "./SpatialControlSurface3D";
+import RecapPassTubes from "./RecapPassTubes";
 import { DefensiveLasers, XTGrid } from "./TacticalOverlays3D";
 import { telemetry, tickAlpha } from "@/lib/telemetry";
 import type {
-  CameraDirective, CameraMode, HighlightZone, Metrics, TelestratorState,
+  CameraDirective, CameraMode, HighlightZone, Metrics, RecapPassArc, TelestratorState,
 } from "@/lib/types";
 
 export interface OverlayToggles {
   xtGrid: boolean;
   ghost: boolean;
   lasers: boolean;
+  pitchControl: boolean;
+  passingNetwork: boolean;
 }
 
 interface Props {
@@ -37,6 +41,7 @@ interface Props {
   telestrator: TelestratorState;
   highlightZone: HighlightZone | null;
   alphaMode: boolean;
+  recapPass: RecapPassArc | null;
   onLock: (id: string | null) => void;
 }
 
@@ -109,7 +114,7 @@ function AvatarLayer({ lockedId, keyIds, alphaOnly, onLock }: {
 /* ------------------------------------------------------------------ scene */
 function Scene({
   camMode, override, toggles, lockedId, keyIds, metrics,
-  telestrator, highlightZone, alphaMode, onLock,
+  telestrator, highlightZone, alphaMode, recapPass, onLock,
 }: Props) {
   return (
     <>
@@ -143,7 +148,12 @@ function Scene({
       <XTGrid visible={toggles.xtGrid} possession={metrics?.possession ?? "NLA"} />
       <DefensiveLasers visible={toggles.lasers} metrics={metrics} />
       <PassVectors3D showGhost={toggles.ghost} />
+      <SpatialControlSurface3D
+        showControl={toggles.pitchControl}
+        showNetwork={toggles.passingNetwork}
+      />
       <Telestrator3DOverlays telestrator={telestrator} highlightZone={highlightZone} />
+      <RecapPassTubes arc={recapPass} />
 
       <BroadcastCameraRig mode={camMode} lockedId={lockedId} override={override} />
 

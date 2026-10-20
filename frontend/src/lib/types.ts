@@ -102,6 +102,7 @@ export interface MatchEvent {
   team: Team | null;
   player_id: string | null;
   player_name: string | null;
+  target_id?: string | null;
   start?: [number, number];
   end?: [number, number];
   distance_m?: number;
@@ -123,8 +124,107 @@ export interface MatchEvent {
   y?: number;
   players?: string[];
   detail?: string;
+  headline?: string;
+  value?: number;
   previous_team?: string;
   outcome?: string;
+}
+
+/* ------------------------------------------------ v5.0 judge domination */
+export type MetricFocus =
+  | "ALL"
+  | "SPEED_VELOCITY"
+  | "PASS_QUALITY"
+  | "EXPECTED_THREAT_XT"
+  | "CHAOS_PRESSING";
+
+export type PersonaModeV5 = "ANALYST_HUD" | "CASUAL_STORY" | "TWINCAST_SPLIT";
+export type ClubBias = "NEUTRAL" | "NLA_LOYALIST" | "MCS_LOYALIST";
+export type EngineStatus = "CONNECTED_AZURE_LIVE" | "EDGE_SYNTHETIC_FALLBACK";
+
+export interface PersonalizationState {
+  persona_mode: PersonaModeV5;
+  metric_focus: MetricFocus;
+  favorite_club_bias: ClubBias;
+  locked_player_id: string | null;
+  market_language: LangCode;
+}
+
+export interface MetricLock {
+  active: boolean;
+  focus: MetricFocus;
+  label: string;
+  filtered_tags: string[];
+}
+
+export interface RecapPass {
+  start: Vec2;
+  end: Vec2;
+}
+
+export interface RecapGhostPass extends RecapPass {
+  delta_xt: number;
+  target_id: string | null;
+  openness_m: number;
+}
+
+export interface MilestoneEvent {
+  id: string;
+  type: string;
+  clock: string;
+  t_match?: number;
+  headline: string;
+  detail: string;
+  team?: Team | null;
+  player_id?: string | null;
+  player_name?: string | null;
+  speed_kmh?: number;
+  value?: number;
+}
+
+export interface RecapAct {
+  act: number;
+  title: string;
+  subtitle: string;
+  clock: string;
+  score: { NLA: number; MCS: number };
+  team: Team;
+  event_type: string;
+  player_id: string | null;
+  player_name: string;
+  pdr: number;
+  delta_xt: number;
+  chaos: number;
+  catalyst?: string;
+  actual_pass: RecapPass;
+  ghost_pass: RecapGhostPass;
+  key_player_ids: string[];
+  highlight_zone: HighlightZone;
+  camera_mode: CameraMode;
+  snapshot: MatchTick;
+  analyst_tactical_summary?: string;
+  casual_story?: string;
+  localized_commentary?: Record<LangCode, string>;
+}
+
+export interface MatchRecapStoryboard {
+  title: string;
+  subtitle: string;
+  model: string;
+  score: { NLA: number; MCS: number };
+  timecode: string;
+  acts: RecapAct[];
+  milestones: MilestoneEvent[];
+  latency_ms?: number;
+}
+
+export interface RecapPassArc {
+  start: Vec2;
+  end: Vec2;
+  ghostStart: Vec2;
+  ghostEnd: Vec2;
+  deltaXt: number;
+  targetId: string | null;
 }
 
 export interface Insight {
@@ -149,11 +249,23 @@ export interface Insight {
     lower_third_subtitle: string;
   };
   stage_e_personalization: {
-    analyst_mode: { metrics_summary: string; tactical_note: string };
+    analyst_mode: {
+      metrics_summary: string;
+      tactical_note: string;
+      metric_focus_note?: string;
+      club_bias_note?: string;
+    };
     casual_fan_mode: { story_card: string; excitement_rating: number };
     player_lock_insight: string;
     translations: { en: string; es: string; ar: string; hi: string };
+    metric_lock?: MetricLock;
+    metric_focus_note?: string;
+    favorite_club_bias?: ClubBias;
+    club_bias_frame?: string | null;
+    persona_mode?: PersonaModeV5;
+    locked_player_id?: string | null;
   };
+  personalization?: PersonalizationState;
 }
 
 export interface Pipeline {

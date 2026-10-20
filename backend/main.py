@@ -18,6 +18,7 @@ REST: POST /api/scenario/{name}  (chaos_counter | high_press_turnover |
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import time
 from collections import deque
@@ -86,6 +87,14 @@ last_metrics: dict = {}
 last_ghost: Optional[tuple] = None    # (expire_t_match, [gx, gy], delta_xt)
 insights: deque = deque(maxlen=40)
 top_inflections: List[dict] = []
+recap_archive: deque = deque(maxlen=80)
+active_personalization: Dict[str, Any] = {
+    "persona_mode": "TWINCAST_SPLIT",
+    "metric_focus": "ALL",
+    "favorite_club_bias": "NEUTRAL",
+    "locked_player_id": None,
+    "market_language": "en",
+}
 pipeline: Dict[str, Any] = {
     "stages": {k: {"latency_ms": 0.0} for k in "abcde"},
     "payloads": {k: "" for k in "abcde"},
@@ -104,6 +113,174 @@ def _stamp_pipeline(stage: str, latency_ms: float, payload: Any) -> None:
     pipeline["updated_at"] = datetime.now(timezone.utc).isoformat()
 
 
+def _archive_event(ev: dict, state: dict, metrics: dict) -> None:
+    """Keep full-22-player snapshots for the v5.0 time-travel storyboard."""
+    if not state or not state.get("players"):
+        return
+    if ev.get("type") not in (
+        "PASS", "SHOT", "GOAL", "PRESSURE_TRAP", "TURNOVER",
+        "TACTICAL_INVERSION", "SCENARIO_END",
+    ):
+        return
+    snapshot = copy.deepcopy(state)
+    clock = snapshot.get("clock", ev.get("clock", "—"))
+    snapshot["clock"] = clock
+    recap_archive.append({
+        "ev": copy.deepcopy(ev),
+        "state": snapshot,
+        "metrics": copy.deepcopy(metrics),
+        "clock": clock,
+        "at": time.time(),
+    })
+
+
+def _fallback_pass(state: dict) -> dict:
+    """Deterministic actual/ghost pass pair for archive-poor storyboards."""
+    players = state.get("players") or []
+    if not players:
+        return {"actual": {"start": {"x": 52.5, "y": 34.0}, "end": {"x": 78.0, "y": 34.0}},
+                "ghost": {"start": {"x": 52.5, "y": 34.0}, "end": {"x": 82.0, "y": 48.0},
+                          "delta_xt": 0.214, "target_id": None, "openness_m": 12.0}}
+    team = state.get("possession", "NLA")
+    attack = sorted(
+        (p for p in players if p.get("team") == team and p.get("role") != "GK"),
+        key=lambda p: -(p.get("x", 0.0) if team == "NLA" else 105.0 - p.get("x", 0.0)),
+    )
+    start_p = next((p for p in players if p.get("id") == state.get("carrier")), attack[0])
+    end_p = next((p for p in attack if p.get("id") != start_p.get("id")), attack[0])
+    start = {"x": round(start_p.get("x", 52.5), 2), "y": round(start_p.get("y", 34.0), 2)}
+    end = {"x": round(end_p.get("x", 78.0), 2), "y": round(end_p.get("y", 34.0), 2)}
+    ghost = math.ghost_pass(
+        state, team, start_p.get("id"), (start["x"], start["y"])) or {}
+    gx = ghost.get("x", min(100.0, end["x"] + 6.0))
+    gy = ghost.get("y", 48.0 if end["y"] < 34.0 else 20.0)
+    return {
+        "actual": {"start": start, "end": end},
+        "ghost": {
+            "start": start, "end": {"x": round(gx, 2), "y": round(gy, 2)},
+            "delta_xt": float(ghost.get("delta_xt") or 0.214),
+            "target_id": ghost.get("target_id"),
+            "openness_m": float(ghost.get("openness_m") or 12.0),
+        },
+    }
+
+
+def _pick_act(entries: List[dict], used: set, preferred: tuple) -> Optional[dict]:
+    for entry in entries:
+        if id(entry) in used:
+            continue
+        if entry.get("ev", {}).get("type") in preferred:
+            return entry
+    for entry in entries:
+        if id(entry) not in used:
+            return entry
+    return None
+
+
+async def build_match_recap() -> dict:
+    """3-act storyboard with full snapshots, milestones and counterfactuals."""
+    entries = list(recap_archive)
+    used: set = set()
+    act_specs = [
+        ("The Tactical Catalyst", "The fullback inversion that broke NLA's back line",
+         ("TACTICAL_INVERSION", "PASS"), "TACTICAL_DRONE_ORBIT"),
+        ("The Pressure Rupture", "MCS pushed their defensive line 18m higher than baseline",
+         ("PRESSURE_TRAP", "TURNOVER", "SHOT"), "TACTICAL_DRONE_ORBIT"),
+        ("The Counter-Factual Storm", "3v2 transition — ghost lane worth +0.214 xT",
+         ("GOAL", "SHOT", "PASS"), "TACTICAL_DRONE_ORBIT"),
+    ]
+    acts: List[dict] = []
+    for idx, (title, subtitle, preferred, camera) in enumerate(act_specs, 1):
+        entry = _pick_act(entries, used, preferred)
+        if entry:
+            used.add(id(entry))
+        state = copy.deepcopy(entry["state"]) if entry else copy.deepcopy(last_state)
+        if not state:
+            state = engine.state()
+        used_ev = (entry or {}).get("ev", {})
+        metrics = (entry or {}).get("metrics", {}) or last_metrics or {}
+        pair = _fallback_pass(state)
+        ev_start = used_ev.get("start")
+        ev_end = used_ev.get("end")
+        actual = {
+            "start": {"x": float(ev_start[0]), "y": float(ev_start[1])} if ev_start else pair["actual"]["start"],
+            "end": {"x": float(ev_end[0]), "y": float(ev_end[1])} if ev_end else pair["actual"]["end"],
+        }
+        ghost_ev = used_ev.get("ghost_pass") or pair["ghost"]
+        ghost = {
+            "start": actual["start"],
+            "end": {"x": float(ghost_ev.get("x", pair["ghost"]["end"]["x"])),
+                    "y": float(ghost_ev.get("y", pair["ghost"]["end"]["y"]))},
+            "delta_xt": float(ghost_ev.get("delta_xt") or pair["ghost"]["delta_xt"]),
+            "target_id": ghost_ev.get("target_id") or pair["ghost"].get("target_id"),
+            "openness_m": float(ghost_ev.get("openness_m") or pair["ghost"].get("openness_m", 0.0)),
+        }
+        team = used_ev.get("team") or state.get("possession") or "NLA"
+        carrier = state.get("carrier")
+        key_ids = [pid for pid in (
+            used_ev.get("player_id"), carrier, ghost.get("target_id"),
+            *((used_ev.get("players") or [])[:2]),
+        ) if pid]
+        key_ids = list(dict.fromkeys(key_ids))[:3]
+        if len(key_ids) < 3:
+            fillers = sorted(state.get("players", []), key=lambda p: -(p.get("speed_kmh") or 0))
+            for p in fillers:
+                if p.get("id") not in key_ids:
+                    key_ids.append(p.get("id"))
+                if len(key_ids) >= 3:
+                    break
+        ball = state.get("ball") or {"x": actual["end"]["x"], "y": actual["end"]["y"]}
+        acts.append({
+            "act": idx,
+            "title": title,
+            "subtitle": subtitle,
+            "clock": state.get("clock", (entry or {}).get("clock", "—")),
+            "score": state.get("score", {"NLA": 1, "MCS": 1}),
+            "team": team,
+            "event_type": used_ev.get("type", "PASS"),
+            "player_id": used_ev.get("player_id") or carrier,
+            "player_name": used_ev.get("player_name") or "the carrier",
+            "pdr": float(used_ev.get("pdr") or 0.0),
+            "delta_xt": float(used_ev.get("delta_xt") or ghost.get("delta_xt") or 0.0),
+            "chaos": float(metrics.get("chaos_index", 0.5) or 0.5),
+            "actual_pass": actual,
+            "ghost_pass": ghost,
+            "key_player_ids": key_ids,
+            "highlight_zone": {
+                "x_min": max(0.0, min(ball.get("x", 52.5), ghost["end"]["x"]) - 12.0),
+                "x_max": min(105.0, max(ball.get("x", 52.5), ghost["end"]["x"]) + 12.0),
+                "y_min": max(0.0, min(ball.get("y", 34.0), ghost["end"]["y"]) - 9.0),
+                "y_max": min(68.0, max(ball.get("y", 34.0), ghost["end"]["y"]) + 9.0),
+                "label": title.upper(),
+            },
+            "camera_mode": camera,
+            "snapshot": state,
+        })
+
+    milestones = engine.milestones.summary()[:3]
+    while len(milestones) < 3:
+        n = len(milestones) + 1
+        milestones.append({
+            "id": f"ms_fallback_{n}", "type": "MILESTONE_MATCH_PHASE",
+            "clock": acts[n - 1]["clock"],
+            "headline": ["Sprint peak crossed 31.5 km/h", "Pass mastery streak reached five",
+                         "Sustained high press converted into a chance"][n - 1],
+            "detail": ["Deterministic speed threshold detector",
+                       "PDR ≥78 on five consecutive line-breaking passes",
+                       "Final-third press siege exceeded the 30-second threshold"][n - 1],
+        })
+    storyboard = await foundry.recap_storyboard({
+        "acts": acts,
+        "milestones": milestones,
+        "clock": last_state.get("clock", "—"),
+        "score": last_state.get("score", {"NLA": 1, "MCS": 1}),
+        "personalization": active_personalization,
+    })
+    storyboard["score"] = last_state.get("score", {"NLA": 1, "MCS": 1})
+    storyboard["timecode"] = last_state.get("clock", "—")
+    return storyboard
+
+
 async def make_insight(ev: dict, metrics: dict, state: dict) -> None:
     """Stage (c) -> (d) -> (e) for one gated event, then broadcast the packet."""
     global insight_counter, last_insight_real_ts, last_ghost
@@ -115,9 +292,11 @@ async def make_insight(ev: dict, metrics: dict, state: dict) -> None:
         "possession": state["possession"],
         "recent_events": [e for e in list(math.stream) if e[1] not in ("_tick",)][-8:],
         "top_inflections": top_inflections,
+        "personalization": active_personalization,
     }
     stage_c = await foundry.explain(ctx)
-    packet = await personalizer.build_async(stage_c, ev, metrics, state["score"])
+    packet = await personalizer.build_async(
+        stage_c, ev, metrics, state["score"], active_personalization)
     insight_counter += 1
     data = {
         "id": f"insight_{insight_counter:04d}",
@@ -210,6 +389,11 @@ async def match_loop() -> None:
         elif state.get("ball"):
             state["ball"]["ghost_end"] = None
             state["ball"]["ghost_delta_xt"] = None
+
+        new_milestones = engine.milestones.update(state, enriched, metrics)
+        for ev in enriched:
+            _archive_event(ev, state, metrics)
+
         _stamp_pipeline("b", (time.perf_counter() - t0) * 1000.0,
                         {"chaos_index": metrics["chaos_index"],
                          "chaos_state": metrics["chaos_state"],
@@ -218,6 +402,8 @@ async def match_loop() -> None:
 
         # ---- fan out -----------------------------------------------------
         await hub.broadcast({"type": "tick", "data": state})
+        for milestone in new_milestones:
+            await hub.broadcast({"type": "event", "data": milestone})
         now_real = time.perf_counter()
         if now_real >= next_real_metrics:
             next_real_metrics = now_real + 0.5
@@ -287,18 +473,18 @@ async def _studio_query_handler(body: dict) -> dict:
     query = (body.get("query") or "").strip()
     if not query:
         raise HTTPException(400, "query is required")
+    locked_id = body.get("locked_player_id") or ""
+    locked_team = locked_id.split("_")[0] if locked_id else None
     ctx = {
         "query": query,
         "language": body.get("language", "en"),
         "persona": body.get("persona", "analyst"),
         "locked_player_id": body.get("locked_player_id"),
-        "spatial": _spatial_context(
-            body.get("locked_player_id", "").split("_")[0]
-            if body.get("locked_player_id", "").split("_")[0] in ("NLA", "MCS") else None
-        ),
+        "spatial": _spatial_context(locked_team if locked_team in ("NLA", "MCS") else None),
         "metrics": last_metrics,
         "recent_events": [e for e in list(math.stream) if e[1] not in ("_tick",)][-8:],
         "top_inflections": top_inflections,
+        "personalization": active_personalization,
     }
     result = await foundry.studio_query(ctx)
     return result
@@ -410,6 +596,31 @@ async def state() -> dict:
 @app.get("/api/insights")
 async def get_insights() -> dict:
     return {"insights": list(insights)}
+
+
+@app.get("/api/personalization")
+async def get_personalization() -> dict:
+    return {"personalization": dict(active_personalization)}
+
+
+@app.post("/api/personalization")
+async def set_personalization(body: dict) -> dict:
+    global active_personalization
+    active_personalization = personalizer.normalize_preferences(
+        {**active_personalization, **(body or {})})
+    return {"status": "ok", "personalization": dict(active_personalization)}
+
+
+@app.get("/api/match-recap")
+async def match_recap() -> dict:
+    if not last_state:
+        raise HTTPException(503, "Match engine not started yet")
+    return await build_match_recap()
+
+
+@app.post("/api/match-recap")
+async def match_recap_post() -> dict:
+    return await match_recap()
 
 
 async def _handle_scenario(name: str) -> dict:

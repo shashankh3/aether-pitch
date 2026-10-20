@@ -5,11 +5,12 @@
 
 import { useState } from "react";
 import { Activity, ChevronDown, ChevronUp } from "lucide-react";
-import type { Pipeline } from "@/lib/types";
+import type { EngineStatus, Pipeline } from "@/lib/types";
 
 interface Props {
   pipeline: Pipeline | null;
   connected: boolean;
+  status: EngineStatus;
 }
 
 const STAGES = [
@@ -29,8 +30,9 @@ function pretty(raw: string): string {
   }
 }
 
-export default function PipelineInspector({ pipeline, connected }: Props) {
+export default function PipelineInspector({ pipeline, connected, status }: Props) {
   const [open, setOpen] = useState(false);
+  const live = status === "CONNECTED_AZURE_LIVE";
 
   return (
     <div className="glass z-20 shrink-0 border-t border-white/10">
@@ -38,9 +40,16 @@ export default function PipelineInspector({ pipeline, connected }: Props) {
         onClick={() => setOpen(!open)}
         className="flex h-[42px] w-full items-center gap-3 px-4 text-left"
       >
-        <Activity size={14} className={connected ? "text-pitch" : "text-crimson"} />
+        <Activity size={14} className={connected ? "text-pitch" : "text-gold"} />
         <span className="text-[10px] font-bold tracking-[0.25em] text-slate-400">
           5-STAGE AZURE PIPELINE
+        </span>
+        <span
+          className={`clip-skew shrink-0 px-1.5 py-0.5 font-tech text-[8.5px] font-bold uppercase tracking-wider ${
+            live ? "bg-pitch/20 text-pitch" : "animate-breathe bg-gold/20 text-gold"
+          }`}
+        >
+          {live ? "🟢 AZURE PIPELINE LIVE" : "⚡ EDGE AUTONOMOUS ENGINE ACTIVE"}
         </span>
         <div className="flex flex-1 items-center gap-1.5 overflow-hidden">
           {STAGES.map((s, i) => {
