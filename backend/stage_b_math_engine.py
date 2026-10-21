@@ -28,6 +28,26 @@ W_TURNOVER, W_VARIANCE, W_STRETCH, W_PRESS = 0.35, 0.25, 0.20, 0.20
 CHAOS_CONTROL = 0.40
 CHAOS_CHAOS = 0.68
 
+# Synthetic match-to-date baselines at the opening 62nd-minute snapshot. The
+# live counters below add to these totals, so the broadcast never opens on a
+# zero-pass match.
+TEAM_STAT_BASELINE = {
+    "NLA": {
+        "passes": 431, "passes_completed": 368, "shots": 12,
+        "shots_on_target": 6, "tackles": 15, "turnovers_won": 9,
+    },
+    "MCS": {
+        "passes": 398, "passes_completed": 339, "shots": 9,
+        "shots_on_target": 4, "tackles": 17, "turnovers_won": 7,
+    },
+}
+PLAYER_STAT_BASELINE = {
+    "GK": (20, 17, 0, 0),
+    "DEF": (36, 30, 0, 2),
+    "MID": (48, 41, 1, 1),
+    "FWD": (28, 22, 2, 0),
+}
+
 
 def _clip(v: float, lo: float = 0.0, hi: float = 1.0) -> float:
     return max(lo, min(hi, v))
@@ -45,6 +65,10 @@ class TacticalMathEngine:
         self.scenario_boost = 0.0
         self._last_recompute = -1e9
         self._last_hist = -1e9
+        self._stats_ready = False
+        self.team_stats: Dict[str, Dict[str, int]] = {}
+        self.player_stats: Dict[str, Dict[str, int]] = {}
+        self.possession_s: Dict[str, float] = {"NLA": 0.0, "MCS": 0.0}
 
     # ------------------------------------------------------------------ xT
     @staticmethod
@@ -121,6 +145,125 @@ class TacticalMathEngine:
             best = min(best, math.hypot(o["x"] - px, o["y"] - py))
         return best
 
+    # ------------------------------------------------------------ match stats
+    def _init_stats(self, state: dict, t: float) -> None:
+        """Seed the synthetic match-to-date totals on the first tick."""
+        self.team_stats = {
+            team: dict(values) for team, values in TEAM_STAT_BASELINE.items()
+        }
+        self.possession_s = {"NLA": t * 0.54, "MCS": t * 0.46}
+        self.player_stats = {}
+        for p in state.get("players", []):
+            passes, completed, shots, tackles = PLAYER_STAT_BASELINE.get(
+                p.get("role", "MID"), (24, 20, 0, 0))
+            self.player_stats[p["id"]] = {
+                "passes": passes, "passes_completed": completed,
+                "shots": shots, "shots_on_target": 0, "tackles": tackles,
+            }
+        self._stats_ready = True
+
+    def _player_stat(self, pid: Optional[str]) -> Optional[Dict[str, int]]:
+        if not pid:
+            return None
+        if pid not in self.player_stats:
+            self.player_stats[pid] = {
+                "passes": 0, "passes_completed": 0,
+                "shots": 0, "shots_on_target": 0, "tackles": 0,
+            }
+        return self.player_stats[pid]
+
+    def _track_match_stats(self, state: dict, events: List[dict], t: float,
+                           dt: float) -> None:
+        if not self._stats_ready:
+            self._init_stats(state, t)
+        self.possession_s[state.get("possession", "NLA")] = (
+            self.possession_s.get(state.get("possession", "NLA"), 0.0) + dt
+        )
+        for ev in events:
+            kind = ev.get("type")
+            team = ev.get("team")
+            if team not in self.team_stats:
+                continue
+            stats = self.team_stats[team]
+            player = self._player_stat(ev.get("player_id"))
+            if kind == "PASS":
+                stats["passes"] += 1
+                if player is not None:
+                    player["passes"] += 1
+            elif kind == "PASS_COMPLETE":
+                stats["passes_completed"] += 1
+                if player is not None:
+                    player["passes_completed"] += 1
+            elif kind == "SHOT":
+                stats["shots"] += 1
+                if ev.get("on_target"):
+                    stats["shots_on_target"] += 1
+                if player is not None:
+                    player["shots"] += 1
+                    if ev.get("on_target"):
+                        player["shots_on_target"] += 1
+            elif kind == "TACKLE":
+                stats["tackles"] += 1
+                if player is not None:
+                    player["tackles"] += 1
+            elif kind == "TURNOVER":
+                stats["turnovers_won"] += 1
+
+    @staticmethod
+    def _pct(numerator: float, denominator: float) -> float:
+        return round(100.0 * numerator / denominator, 1) if denominator else 0.0
+
+    def _match_stats_snapshot(self, state: dict) -> dict:
+        """Team + player totals for the broadcast stats strip and APIs."""
+        players = {p.get("id"): p for p in state.get("players", [])}
+        total_poss = sum(self.possession_s.values()) or 1.0
+        team_stats_out: Dict[str, dict] = {}
+        for team, stats in self.team_stats.items():
+            team_players = [p for p in state.get("players", []) if p.get("team") == team]
+            distance_km = sum((p.get("distance_m") or 0.0) for p in team_players) / 1000.0
+            sprint_km = sum((p.get("sprint_distance_m") or 0.0) for p in team_players) / 1000.0
+            team_stats_out[team] = {
+                **{k: int(v) for k, v in stats.items()},
+                "pass_accuracy": self._pct(stats["passes_completed"], stats["passes"]),
+                "shot_accuracy": self._pct(stats["shots_on_target"], stats["shots"]),
+                "possession_pct": round(100.0 * self.possession_s.get(team, 0.0) / total_poss, 1),
+                "distance_km": round(distance_km, 2),
+                "sprint_distance_km": round(sprint_km, 2),
+                "goals": int(state.get("score", {}).get(team, 0)),
+            }
+        player_stats_out = {}
+        for pid, stats in self.player_stats.items():
+            p = players.get(pid) or {}
+            if not p:
+                continue
+            player_stats_out[pid] = {
+                **{k: int(v) for k, v in stats.items()},
+                "pass_accuracy": self._pct(
+                    stats["passes_completed"], stats["passes"]),
+                "distance_km": round((p.get("distance_m") or 0.0) / 1000.0, 2),
+                "top_speed_kmh": p.get("top_speed_kmh", 0.0),
+            }
+        leaders = {}
+        if players:
+            fastest = max(players.values(), key=lambda p: p.get("top_speed_kmh", 0.0))
+            farthest = max(players.values(), key=lambda p: p.get("distance_m", 0.0))
+            leaders = {
+                "fastest": {
+                    "player_id": fastest.get("id"), "player_name": fastest.get("name"),
+                    "team": fastest.get("team"), "top_speed_kmh": fastest.get("top_speed_kmh", 0.0),
+                },
+                "farthest": {
+                    "player_id": farthest.get("id"), "player_name": farthest.get("name"),
+                    "team": farthest.get("team"), "distance_km": round(
+                        (farthest.get("distance_m") or 0.0) / 1000.0, 2),
+                },
+            }
+        return {
+            "team_stats": team_stats_out,
+            "player_stats": player_stats_out,
+            "leaders": leaders,
+        }
+
     # ---------------------------------------------------------------- chaos
     def update(self, state: dict, events: List[dict], t: float,
                scenario_active: Optional[str], dt: float) -> dict:
@@ -137,6 +280,7 @@ class TacticalMathEngine:
             self.scenario_active = scenario_active
         self.scenario_boost = max(0.0, self.scenario_boost - dt * 0.022)
         self._prune(t)
+        self._track_match_stats(state, events, t, dt)
 
         if t - self._last_recompute >= 0.5:
             self._last_recompute = t
@@ -238,6 +382,8 @@ class TacticalMathEngine:
         window = [s for s in self.stream if s[0] >= t - self.window_s]
         turnovers = sum(1 for s in window if s[1] == "TURNOVER")
         speeds = [v for (_, v) in self.ball_speeds] or [0.0]
+        if not self._stats_ready:
+            self._init_stats(state, t)
         return {
             "chaos_index": round(self.chaos, 3),
             "chaos_state": self.classify(self.chaos),
@@ -250,6 +396,7 @@ class TacticalMathEngine:
             "ball_speed_var": round(float(np.var(speeds)), 1),
             "stretch_m": round(self._line_stretch(state) * 35.0, 1),
             "possession": state["possession"],
+            **self._match_stats_snapshot(state),
         }
 
     # --------------------------------------------------------------- enrich
@@ -292,6 +439,8 @@ class TacticalMathEngine:
             reasons.append("ΔxT > 0.08")
         if ev.get("scenario"):
             reasons.append(f"Scenario: {ev['scenario']}")
+        if ev.get("scenario_signature"):
+            reasons.append("Scenario signature")
         ev["ai_gate"] = {"should_explain": bool(reasons), "reasons": reasons}
 
         pdr = ev.get("pdr") or 0.0

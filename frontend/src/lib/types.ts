@@ -31,6 +31,9 @@ export interface PlayerTick {
   speed_kmh: number;
   stamina: number;
   heading_rad: number;
+  distance_m: number;
+  sprint_distance_m: number;
+  top_speed_kmh: number;
   pose_state: PoseState;
   playstyle_badge: PlayStyleBadge | null;
 }
@@ -40,11 +43,34 @@ export interface Vec2 {
   y: number;
 }
 
+export interface MatchTeamMetadata {
+  id: Team;
+  name: string;
+  short_name: string;
+  kit: string;
+}
+
+export interface MatchMetadata {
+  match_id: string;
+  competition: string;
+  season: string;
+  matchday: number;
+  venue: string;
+  city: string;
+  kickoff_utc: string;
+  home_team: MatchTeamMetadata;
+  away_team: MatchTeamMetadata;
+  data_source: string;
+  synthetic: boolean;
+  disclaimer: string;
+}
+
 export interface MatchTick {
   t_match: number;
   clock: string;
   score: { NLA: number; MCS: number };
   possession: Team;
+  match_metadata?: MatchMetadata;
   players: PlayerTick[];
   ball: {
     x: number;
@@ -65,6 +91,40 @@ export interface MatchTick {
   scenario_left: number | null;
 }
 
+export interface TeamStats {
+  passes: number;
+  passes_completed: number;
+  shots: number;
+  shots_on_target: number;
+  tackles: number;
+  turnovers_won: number;
+  pass_accuracy: number;
+  shot_accuracy: number;
+  possession_pct: number;
+  distance_km: number;
+  sprint_distance_km: number;
+  goals: number;
+}
+
+export interface PlayerStats {
+  passes: number;
+  passes_completed: number;
+  pass_accuracy: number;
+  shots: number;
+  shots_on_target: number;
+  tackles: number;
+  distance_km: number;
+  top_speed_kmh: number;
+}
+
+export interface StatsLeader {
+  player_id: string;
+  player_name: string;
+  team: Team;
+  top_speed_kmh?: number;
+  distance_km?: number;
+}
+
 export interface Metrics {
   chaos_index: number;
   chaos_state: "STRUCTURED CONTROL" | "BALANCED RHYTHM" | "HIGH CHAOS TRANSITION";
@@ -77,6 +137,9 @@ export interface Metrics {
   ball_speed_var: number;
   stretch_m: number;
   possession: Team;
+  team_stats: Record<Team, TeamStats>;
+  player_stats: Record<string, PlayerStats>;
+  leaders: { fastest?: StatsLeader; farthest?: StatsLeader };
 }
 
 export interface GhostPass {
@@ -113,9 +176,19 @@ export interface MatchEvent {
   delta_xt?: number | null;
   ghost_pass?: GhostPass | null;
   speed_kmh?: number;
+  on_target?: boolean;
+  pass_seq?: number;
+  target_name?: string | null;
+  passer_id?: string | null;
+  passer_name?: string | null;
+  opponent_id?: string | null;
+  opponent_name?: string | null;
+  distance_km?: number;
+  threshold_km?: number;
   delta_chaos?: number;
   ai_gate?: { should_explain: boolean; reasons: string[] };
   scenario?: string | null;
+  scenario_signature?: boolean;
   leverage?: number;
   line_breaking?: boolean;
   middle_third?: boolean;
@@ -372,5 +445,18 @@ export interface PipelineAudit {
     stage_e_personalize_ms: number;
   };
   live_pipeline: Record<string, number | null>;
+  stage_modes?: Record<string, string>;
+  stage_c_audit_mode?: string;
+  azure?: {
+    configured: boolean;
+    last_attempted: boolean;
+    last_used: boolean;
+    last_error: string | null;
+    request_id: string | null;
+    usage: Record<string, unknown>;
+    triage_deployment: string;
+    narrative_deployment: string;
+    api_version: string;
+  };
   event_gate: { rule: string; gate_fired_in_audit: { should_explain: boolean; reasons: string[] } };
 }

@@ -4,6 +4,7 @@
 // panel (alpha / JSON / verify / recap).
 
 import ScoreBug from "@/components/ScoreBug";
+import MatchIntelPanel from "@/components/MatchIntelPanel";
 import VisionAutoEventerHUD from "@/components/VisionAutoEventerHUD";
 import ProductionPanel from "@/components/hud/ProductionPanel";
 import type { MatchEvent, MatchTick, Metrics } from "@/lib/types";
@@ -32,6 +33,7 @@ export default function LeftRail({
   return (
     <div className="flex min-h-0 flex-col items-center gap-2 xl:items-start">
       <ScoreBug tick={tick} metrics={metrics} />
+      <MatchIntelPanel tick={tick} metrics={metrics} />
 
       {/* CV auto-eventing — ANALYSIS mode, desktop (mobile: panel sheet → CV tab) */}
       {hudMode === "analysis" && isDesktop && (

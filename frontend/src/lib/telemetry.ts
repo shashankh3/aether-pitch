@@ -3,7 +3,7 @@
 // useFrame with velocity extrapolation, so the 3D scene never re-renders
 // React at tick rate.
 
-import type { Insight, MatchTick, Metrics } from "./types";
+import type { Insight, MatchMetadata, MatchTick, Metrics } from "./types";
 
 export interface PlayerSample {
   id: string;
@@ -17,6 +17,9 @@ export interface PlayerSample {
   vx: number; vy: number;
   speed_kmh: number;
   stamina: number;
+  distance_m: number;
+  sprint_distance_m: number;
+  top_speed_kmh: number;
   pose_state: string;
   playstyle_badge: string | null;
   prevTickAt: number;
@@ -86,6 +89,7 @@ class TelemetryStore {
     carrier: null as string | null,
     scenario: null as string | null,
     scenario_left: null as number | null,
+    metadata: null as MatchMetadata | null,
   };
   metrics: Metrics | null = null;
   insight: Insight | null = null;
@@ -188,6 +192,8 @@ class TelemetryStore {
           x: p.x, y: p.y, h: p.heading_rad,
           vx: p.vx, vy: p.vy,
           speed_kmh: p.speed_kmh, stamina: p.stamina,
+          distance_m: p.distance_m, sprint_distance_m: p.sprint_distance_m,
+          top_speed_kmh: p.top_speed_kmh,
           pose_state: p.pose_state, playstyle_badge: p.playstyle_badge,
           prevTickAt: now, currTickAt: now, kickT0: 0,
         });
@@ -198,6 +204,9 @@ class TelemetryStore {
       cur.vx = p.vx; cur.vy = p.vy;
       cur.speed_kmh = p.speed_kmh;
       cur.stamina = p.stamina;
+      cur.distance_m = p.distance_m;
+      cur.sprint_distance_m = p.sprint_distance_m;
+      cur.top_speed_kmh = p.top_speed_kmh;
       if (p.pose_state === "KICK" && cur.pose_state !== "KICK") cur.kickT0 = now;
       cur.pose_state = p.pose_state;
       cur.playstyle_badge = p.playstyle_badge;
@@ -230,6 +239,7 @@ class TelemetryStore {
       carrier: tick.carrier,
       scenario: tick.scenario,
       scenario_left: tick.scenario_left,
+      metadata: tick.match_metadata ?? this.match.metadata,
     };
     if (record) this.recordHistory(tick, this.metrics);
   }

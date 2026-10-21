@@ -14,6 +14,8 @@ export interface AutopilotStep {
   duration: number;
 }
 
+export const AUTOPILOT_TOTAL_SECONDS = 80;
+
 export const AUTOPILOT_STEPS: AutopilotStep[] = [
   {
     label: "LIVE 3D INGEST",
@@ -29,14 +31,14 @@ export const AUTOPILOT_STEPS: AutopilotStep[] = [
     rubric: "God Mode scenario + live control surface",
     voiceover: "Judge trigger: chaos counter. Watch the control mesh flip, the defensive lasers fire, and the line-breaking pass arrive in under two seconds.",
     at: 10,
-    duration: 10,
+    duration: 14,
   },
   {
     label: "FREEZE & TELESTRATE",
     title: "Time Machine + Spatial Beam",
     rubric: "DVR freeze · spotlight · ghost counterfactual",
     voiceover: "Freeze the live feed. The DVR holds every ten-hertz frame. We spotlight the key players and draw the optimal ghost lane in 3D space.",
-    at: 20,
+    at: 24,
     duration: 12,
   },
   {
@@ -44,7 +46,7 @@ export const AUTOPILOT_STEPS: AutopilotStep[] = [
     title: "Transparent AR Compositing",
     rubric: "Chromakey / alpha overlay for live TV",
     voiceover: "This is broadcast alpha. Every opaque surface is stripped away, leaving only the AR layer ready for a real television compositor.",
-    at: 32,
+    at: 36,
     duration: 12,
   },
   {
@@ -52,16 +54,16 @@ export const AUTOPILOT_STEPS: AutopilotStep[] = [
     title: "Metric Lock + Club Lens + i18n",
     rubric: "Stage E · ES / AR / HI localization",
     voiceover: "One fan wants pass quality, another wants chaos, another wants their club lens. Stage E adapts the same moment in Spanish, Arabic, and Hindi without freezing the stream.",
-    at: 44,
-    duration: 10,
+    at: 48,
+    duration: 14,
   },
   {
     label: "3-ACT FINALE",
     title: "Championship Storyboard",
     rubric: "Milestones · recap · rubric proof",
-    voiceover: "And the finale: three acts, full player snapshots, ghost-pass counterfactuals, and a downloadable teleprompter. That is the AETHER PITCH championship cut.",
-    at: 54,
-    duration: 6,
+    voiceover: "And the finale: three acts, full player snapshots, ghost-pass counterfactuals, and a downloadable teleprompter. The rubric proof follows on screen. That is the AETHER PITCH championship cut.",
+    at: 62,
+    duration: 18,
   },
 ];
 
@@ -100,7 +102,7 @@ export default function JudgeAutopilotTour({ active, currentStep, elapsed }: Pro
         <div className="mt-1.5 h-1 overflow-hidden bg-white/10">
           <div
             className="h-full bg-gradient-to-r from-gold via-tactical to-pitch transition-all duration-200"
-            style={{ width: `${Math.min(100, (elapsed / 60) * 100)}%` }}
+            style={{ width: `${Math.min(100, (elapsed / AUTOPILOT_TOTAL_SECONDS) * 100)}%` }}
           />
         </div>
       </div>

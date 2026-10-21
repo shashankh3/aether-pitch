@@ -53,31 +53,67 @@ def pick_archetype(ev: Optional[dict], metrics: dict) -> str:
 class FoundryRouter:
     def __init__(self, cfg=settings):
         self.s = cfg
+        self.last_attempted = False
+        self.last_used = False
+        self.last_error: Optional[str] = None
+        self.last_usage: dict = {}
+        self.last_request_id: Optional[str] = None
 
     # ------------------------------------------------------------- public API
+    def status(self) -> dict:
+        """Truthful Azure posture for the rubric audit / health endpoint."""
+        return {
+            "configured": bool(self.s.azure_enabled),
+            "last_attempted": self.last_attempted,
+            "last_used": self.last_used,
+            "last_error": self.last_error,
+            "request_id": self.last_request_id,
+            "usage": self.last_usage,
+            "triage_deployment": self.s.triage_deployment,
+            "narrative_deployment": self.s.narrative_deployment,
+            "api_version": self.s.azure_openai_api_version,
+        }
+
+    def _reset_trace(self) -> None:
+        self.last_attempted = False
+        self.last_used = False
+        self.last_error = None
+        self.last_usage = {}
+        self.last_request_id = None
+
     async def explain(self, ctx: dict) -> dict:
         t0 = time.perf_counter()
+        self._reset_trace()
         fallback = self._fallback_explain(ctx)
         if self.s.azure_enabled:
+            self.last_attempted = True
             try:
-                result = await asyncio.wait_for(self._azure_explain(ctx, fallback), 6.0)
-            except Exception:
-                result = fallback
+                result = await asyncio.wait_for(self._azure_explain(ctx, fallback), 6.5)
+                result["mode"] = "azure"
+                self.last_used = True
+            except Exception as exc:
+                self.last_error = f"{type(exc).__name__}: {exc}"
+                result = {**fallback, "mode": "fallback", "degraded": True}
         else:
-            result = fallback
+            result = {**fallback, "mode": "fallback"}
         result["latency_ms"] = round((time.perf_counter() - t0) * 1000.0, 1)
         return result
 
     async def recap(self, ctx: dict) -> dict:
         t0 = time.perf_counter()
+        self._reset_trace()
         fallback = self._fallback_recap(ctx)
         if self.s.azure_enabled:
+            self.last_attempted = True
             try:
-                result = await asyncio.wait_for(self._azure_recap(ctx, fallback), 8.0)
-            except Exception:
-                result = fallback
+                result = await asyncio.wait_for(self._azure_recap(ctx, fallback), 8.5)
+                result["mode"] = "azure"
+                self.last_used = True
+            except Exception as exc:
+                self.last_error = f"{type(exc).__name__}: {exc}"
+                result = {**fallback, "mode": "fallback", "degraded": True}
         else:
-            result = fallback
+            result = {**fallback, "mode": "fallback"}
         result["latency_ms"] = round((time.perf_counter() - t0) * 1000.0, 1)
         return result
 
@@ -176,17 +212,39 @@ class FoundryRouter:
 
     # ----------------------------------------------------------- Azure calls
     def _chat(self, deployment: str, messages: List[dict],
-              max_tokens: int = 400, temperature: float = 0.2) -> str:
+              max_tokens: int = 400, temperature: float = 0.2,
+              timeout: float = 4.0, json_mode: bool = False) -> str:
         url = (f"{self.s.azure_openai_endpoint.rstrip('/')}/openai/deployments/"
                f"{deployment}/chat/completions?api-version={self.s.azure_openai_api_version}")
-        r = requests.post(
-            url,
-            headers={"api-key": self.s.azure_openai_key, "Content-Type": "application/json"},
-            json={"messages": messages, "max_tokens": max_tokens, "temperature": temperature},
-            timeout=10,
-        )
-        r.raise_for_status()
-        return r.json()["choices"][0]["message"]["content"]
+        payload: Dict[str, object] = {
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        }
+        if json_mode:
+            payload["response_format"] = {"type": "json_object"}
+        last_exc: Optional[Exception] = None
+        for attempt in range(2):
+            try:
+                r = requests.post(
+                    url,
+                    headers={"api-key": self.s.azure_openai_key, "Content-Type": "application/json"},
+                    json=payload,
+                    timeout=timeout,
+                )
+                if r.status_code in (429, 500, 502, 503, 504) and attempt == 0:
+                    time.sleep(0.35)
+                    continue
+                r.raise_for_status()
+                body = r.json()
+                self.last_usage = body.get("usage") or {}
+                self.last_request_id = r.headers.get("x-request-id") or body.get("id")
+                return body["choices"][0]["message"]["content"]
+            except Exception as exc:  # narrow enough: network + JSON shape
+                last_exc = exc
+                if attempt == 0:
+                    time.sleep(0.2)
+        raise last_exc or RuntimeError("Azure call failed")
 
     async def _azure_explain(self, ctx: dict, fallback: dict) -> dict:
         compact = self._compact_ctx(ctx)
@@ -211,7 +269,7 @@ class FoundryRouter:
               "why_it_matters_causal (2 sentences, causal, cite the spatial numbers), "
               "tactical_catalyst (<=12 words), commentator_talking_point (1 punchy broadcast-ready sentence)."},
              {"role": "user", "content": json.dumps(compact)}],
-            max_tokens=350, temperature=0.4,
+            max_tokens=350, temperature=0.4, timeout=4.0, json_mode=True,
         )
         cleaned = re.sub(r"^```(json)?|```$", "", (narrative_raw or "").strip(), flags=re.M).strip()
         parsed = json.loads(cleaned)
@@ -234,7 +292,7 @@ class FoundryRouter:
               "You are a studio broadcast producer. Compile the top-3 match inflection points into "
               "STRICT JSON only: {\"title\": str, \"items\": [{\"clock\": str, \"headline\": str, \"detail\": str} x3]}."},
              {"role": "user", "content": json.dumps(self._compact_ctx(ctx))}],
-            max_tokens=500, temperature=0.5,
+            max_tokens=500, temperature=0.5, timeout=6.0, json_mode=True,
         )
         cleaned = re.sub(r"^```(json)?|```$", "", (raw or "").strip(), flags=re.M).strip()
         parsed = json.loads(cleaned)
@@ -259,10 +317,12 @@ class FoundryRouter:
                 "type", "team", "player_name", "start", "end", "distance_m",
                 "ball_speed_kmh", "defenders_in_cone", "nearest_defender_m",
                 "pdr", "delta_xt", "delta_chaos", "speed_kmh", "scenario",
-                "line_breaking", "ghost_pass", "reason") if k in ev},
+                "line_breaking", "ghost_pass", "reason", "on_target", "pass_seq") if k in ev},
             "metrics": {k: m.get(k) for k in (
                 "chaos_index", "chaos_state", "delta_chaos", "ppda", "def_lines",
-                "pressing_intensity", "turnover_rate", "stretch_m")},
+                "pressing_intensity", "turnover_rate", "stretch_m", "team_stats",
+                "leaders")},
+            "match_metadata": ctx.get("match_metadata"),
             "recent_events": ctx.get("recent_events", [])[:8],
             "top_inflections": ctx.get("top_inflections", []),
         }
@@ -282,6 +342,9 @@ class FoundryRouter:
         lines = m.get("def_lines", {})
         line_m = lines.get(opp, 40.0)
         speed = ev.get("speed_kmh") or ev.get("ball_speed_kmh") or 0.0
+        team_stats = (m.get("team_stats") or {}).get(team, {})
+        pass_acc = team_stats.get("pass_accuracy", 0.0)
+        shots = team_stats.get("shots", 0)
 
         if archetype == "counter_overload":
             c = {
@@ -349,9 +412,10 @@ class FoundryRouter:
                 "moment_headline": "Rhythm Holds: Structured Control Dominates",
                 "why_it_matters_causal": (
                     f"Turnover rate is {m.get('turnover_rate', 0):.1f} per minute and ball-speed "
-                    f"variance stays low, so possession is circulating without fracturing. "
+                    f"variance stays low, so possession is circulating without fracturing at "
+                    f"{pass_acc:.1f}% pass accuracy across {shots} shots. "
                     f"Chaos Index {chaos:.2f} — the block is doing its job."),
-                "tactical_catalyst": "Low turnover rate; compact unit spacing",
+                "tactical_catalyst": f"Low turnover rate; {pass_acc:.1f}% completion; compact unit spacing",
                 "commentator_talking_point": (
                     f"Patient, lateral, controlled — {team} are inviting the press precisely so they "
                     f"can play through it."),
@@ -386,8 +450,10 @@ class FoundryRouter:
         Returns the strict StudioQueryResponse schema with a scene_directive
         that physically drives the 3D pitch / camera / telestrator overlays.
         """
+        self._reset_trace()
         fallback = self._studio_query_fallback(ctx)
         if self.s.azure_enabled:
+            self.last_attempted = True
             try:
                 raw = await asyncio.wait_for(
                     asyncio.to_thread(self._azure_studio_query, ctx, fallback), 8.0
@@ -398,11 +464,14 @@ class FoundryRouter:
                 if all(k in raw for k in required):
                     raw.setdefault("query", ctx.get("query", ""))
                     raw.setdefault("model", f"azure-foundry:{self.s.narrative_deployment}")
+                    raw.setdefault("mode", "azure")
                     raw["scene_directive"] = {**fallback["scene_directive"], **raw["scene_directive"]}
+                    self.last_used = True
                     return raw
-            except Exception:
-                pass
-        return fallback
+                self.last_error = "Azure response missed required schema keys"
+            except Exception as exc:
+                self.last_error = f"{type(exc).__name__}: {exc}"
+        return {**fallback, "mode": "fallback"}
 
     def _azure_studio_query(self, ctx: dict, fallback: dict) -> dict:
         raw = self._chat(
@@ -419,7 +488,7 @@ class FoundryRouter:
               "enable_offside_wall (bool), enable_compactness_polygon (bool), draw_ghost_pass (bool), "
               "highlight_pitch_zone ({x_min,x_max,y_min,y_max,label}) using the provided spatial stats."},
              {"role": "user", "content": json.dumps(self._compact_ctx(ctx))}],
-            max_tokens=550, temperature=0.4,
+            max_tokens=550, temperature=0.4, timeout=5.0, json_mode=True,
         )
         cleaned = re.sub(r"^```(json)?|```$", "", (raw or "").strip(), flags=re.M).strip()
         return json.loads(cleaned)

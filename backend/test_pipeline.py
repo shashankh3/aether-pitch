@@ -50,6 +50,44 @@ def main() -> int:
     check("Stage a: pose states valid",
           all(pl["pose_state"] in ("KICK", "SPRINT", "PRESS", "JOG", "IDLE") for pl in st["players"]))
     check("Stage a: auto-eventing fired", len(seen_types) >= 4, f"types={sorted(seen_types)[:8]}")
+    check("Stage a: match metadata", all(k in st.get("match_metadata", {}) for k in
+          ("match_id", "competition", "venue", "home_team", "away_team", "synthetic"))
+          and st["match_metadata"]["synthetic"] is True)
+    check("Stage a: distance + top-speed telemetry", all(
+        all(k in pl for k in ("distance_m", "sprint_distance_m", "top_speed_kmh"))
+        and pl["distance_m"] > 0 and pl["top_speed_kmh"] > 0 for pl in st["players"]))
+    check("Stage a: pass completion + distance auto-tags",
+          {"PASS_COMPLETE", "AUTO_DISTANCE_ALERT"} <= seen_types)
+
+    # Scenario signatures must be tagged at the source, not inferred later.
+    sc_eng = PitchForgeEngine(seed=7, start_minute=62.0)
+    sc_eng.inject("chaos_counter")
+    chaos_events = []
+    for _ in range(30):
+        _, raw = sc_eng.tick(0.1)
+        chaos_events.extend(raw)
+    check("Stage a: chaos scenario tags every event",
+          any(e.get("scenario") == "chaos_counter" for e in chaos_events))
+    check("Stage a: chaos signature is the line-breaking pass",
+          any(e.get("scenario_signature") and e.get("type") == "PASS"
+              and e.get("line_breaking") for e in chaos_events))
+
+    press_eng = PitchForgeEngine(seed=8, start_minute=62.0)
+    press_eng.inject("high_press_turnover")
+    press_events = []
+    for _ in range(40):
+        _, raw = press_eng.tick(0.1)
+        press_events.extend(raw)
+    check("Stage a: pressing trap signature", any(
+        e.get("scenario_signature") and e.get("type") in ("TACKLE", "PRESSURE_TRAP")
+        for e in press_events))
+
+    inv_eng = PitchForgeEngine(seed=9, start_minute=62.0)
+    inv_eng.inject("tactical_inversion")
+    _, inv_events = inv_eng.tick(0.1)
+    check("Stage a: inversion signature", any(
+        e.get("type") == "TACTICAL_INVERSION" and e.get("scenario_signature")
+        for e in inv_events))
 
     # ---- Stage (b): deterministic math ----------------------------------
     c = math.chaos
@@ -64,6 +102,18 @@ def main() -> int:
     carrier = next((pl for pl in st["players"] if pl["role"] != "GK"), st["players"][0])
     ghost = math.ghost_pass(st, carrier["team"], None, (carrier["x"], carrier["y"]))
     check("Stage b: ghost pass scan", ghost is not None and "delta_xt" in ghost)
+    bs = math.snapshot(st)
+    ts = bs.get("team_stats", {})
+    check("Stage b: team match stats", all(k in ts for k in ("NLA", "MCS")) and all(
+        all(k in row for k in ("passes", "passes_completed", "pass_accuracy", "shots",
+                               "shots_on_target", "tackles", "possession_pct",
+                               "distance_km"))
+        and 0.0 <= row["pass_accuracy"] <= 100.0 and row["distance_km"] > 0
+        for row in ts.values()))
+    check("Stage b: possession sums to 100", abs(sum(
+        row["possession_pct"] for row in ts.values()) - 100.0) <= 0.2)
+    check("Stage b: per-player stats + leaders", bool(bs.get("player_stats"))
+          and "fastest" in bs.get("leaders", {}) and "farthest" in bs.get("leaders", {}))
 
     # ---- gate ------------------------------------------------------------
     ev = {"type": "PASS", "team": "NLA", "player_id": "NLA_7", "start": (50, 30),
@@ -83,6 +133,11 @@ def main() -> int:
     check("Stage c: explain schema", all(k in c_res["stage_c_explainability"] for k in
           ("moment_headline", "why_it_matters_causal", "tactical_catalyst",
            "commentator_talking_point")))
+    c_wrapped = asyncio.get_event_loop().run_until_complete(router.explain(ctx))
+    check("Stage c: explicit fallback mode", c_wrapped.get("mode") in ("fallback", "azure")
+          and c_wrapped.get("latency_ms", -1) >= 0)
+    check("Stage c: Azure status is inspectable", all(k in router.status() for k in
+          ("configured", "last_attempted", "last_used", "last_error", "usage")))
 
     spatial = {
         "team": "NLA", "chaos_index": c, "backline_stretch_m": 38.4,

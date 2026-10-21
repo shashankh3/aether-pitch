@@ -63,8 +63,8 @@ The project was built for the **Microsoft Premier League Hackathon ("Inside the 
 
 ### AI and analytics
 
-- **Stage A — ingest:** deterministic 10 Hz PitchForge simulation with 3D pose state, ball physics, event detection, and milestone tracking.
-- **Stage B — interpret:** NumPy tactical math for Chaos Index, PDR, 16 × 12 xT, Ghost Pass, AI gating, leverage, PPDA, and defensive lines.
+- **Stage A — ingest:** deterministic 10 Hz PitchForge simulation with match metadata, 3D pose state, ball physics, pass completion, tackles, auto-evented sprint/distance thresholds, and milestone tracking.
+- **Stage B — interpret:** NumPy tactical math for Chaos Index, PDR, 16 × 12 xT, Ghost Pass, AI gating, leverage, PPDA, defensive lines, and team/player match stats (passes, accuracy, shots, tackles, possession, distance).
 - **Stage C — explain:** asynchronous causal narratives and studio answers through Azure AI Foundry-hosted Azure OpenAI deployments (triage → narrative), with a deterministic local fallback.
 - **Stage D — render:** time-coded overlay packets, highlight zones, and camera directives for the 3D scene.
 - **Stage E — personalize:** analyst/casual/split personas, metric lock, club lens, locked-player context, and localized commentary.
@@ -74,8 +74,8 @@ The project was built for the **Microsoft Premier League Hackathon ("Inside the 
 ### Fan experience and reliability
 
 - **Fan Personalization Tuner** with live persona, metric, club, player, and language controls, pressed-state semantics, Escape dismissal, and outside-click close.
-- **60-second judge autopilot** that runs a six-step guided tour with synchronized voiceover.
-- **Five-stage pipeline inspector** and a one-click rubric audit at `GET /api/health/pipeline-audit`.
+- **80-second judge autopilot** that runs a six-step guided tour with synchronized voiceover, a sequenced recap-to-rubric finale, and no modal overlap.
+- **Always-visible five-stage pipeline ribbon**, match-intelligence panel, payload inspector, and one-click rubric audit at `GET /api/health/pipeline-audit`.
 - **Accessible production dialogs** for the overlay packet, rubric audit, three-act recap, and studio recap with focus trap, focus restoration, scroll lock, labelled titles, and live status regions.
 - **Responsive studio layout** — compact mobile dock, icon-first scenario controls, scroll-safe overlays, and reduced-motion support.
 - **Resilient match engine** that switches to a browser-native 10 Hz simulation during backend or Azure failures.
@@ -115,7 +115,7 @@ The 10 Hz loop never waits on Stage C. Cloud reasoning is dispatched as an async
 
 | Stage | Responsibility | Key outputs | Blocking |
 |---|---|---|---|
-| **A — Ingest** | Synthetic physics, player/ball state, event and milestone detection | 22 players, ball, pose state, raw events, milestones | Yes, 10 Hz heartbeat |
+| **A — Ingest** | Synthetic physics, player/ball state, event and milestone detection | Match metadata, 22 players, ball, pose state, distance/speed, pass/tackle events, milestones | Yes, 10 Hz heartbeat |
 | **B — Interpret** | Deterministic NumPy tactical analysis | Chaos, PDR, xT, Ghost Pass, gate, leverage | Yes, sub-millisecond |
 | **C — Explain** | Azure AI Foundry-hosted models (triage → narrative) and local fallback narratives | Commentary, studio answers, recap acts | No, asynchronous |
 | **D — Render** | Broadcast overlay and camera packets | Overlays, highlight zones, camera directives | Yes, cheap |
@@ -242,7 +242,7 @@ Frontend environment variables (set in `frontend/.env.local` or the container en
 ## Using the Studio
 
 1. Open http://localhost:3000 and let the match clock begin at minute 62.
-2. Click **Run 60s Judge Autopilot** for a guided tour of the CV viewport, camera direction, DVR/telestrator, alpha mode, personalization, and the three-act recap.
+2. Click **Run 80s Judge Autopilot** for a guided tour of the CV viewport, camera direction, DVR/telestrator, alpha mode, personalization, and the three-act recap.
 3. Use the Camera Director to switch modes and toggle xT, Ghost Pass, defensive lasers, pitch control, and the passing network.
 4. Freeze the DVR to scrub the last 15 seconds; selecting a historical frame pauses live recording until playback resumes.
 5. Open **Overlay JSON** or **Verify** for the render-partner packet and live five-stage audit; every dialog traps focus, closes on `Esc` or backdrop click, and restores the trigger.
@@ -282,6 +282,7 @@ Base URL: `http://localhost:8000` · WebSocket: `ws://localhost:8000/ws`
 | `GET` | `/api/health` | Service health, active stage backends, connected clients, clock, and score |
 | `GET` | `/api/health/pipeline-audit` | Synchronous five-stage self-test with per-stage timings and sample payloads |
 | `GET` | `/api/state` | Latest match state, metrics, and pipeline trace |
+| `GET` | `/api/match-stats` | Synthetic match metadata, team/player stats, pass accuracy, distance leaders |
 | `GET` | `/api/insights` | Recent Stage C insight packets |
 | `GET` | `/api/personalization` | Current personalization state |
 | `POST` | `/api/personalization` | Update persona, metric, club, player, or language preferences |
@@ -329,8 +330,8 @@ The server broadcasts JSON packets over `/ws`:
 | Type | Rate | Content |
 |---|---|---|
 | `hello` | On connect | Initial state snapshot and connection metadata |
-| `tick` | 10 Hz | Full match state (players, ball, clock, score) |
-| `metrics` | 2 Hz | Tactical metrics and derived indicators |
+| `tick` | 10 Hz | Full match state (players, ball, clock, score), match metadata, per-player distance/sprint/top speed |
+| `metrics` | 2 Hz | Tactical metrics, team/player stats (pass accuracy, shots, tackles, possession, distance), leaders |
 | `pipeline` | 2 Hz | Per-stage latency and payload trace |
 | `event` | On event | Match, tactical, and milestone events |
 | `insight` | Async | Stage C/D/E broadcast packet |

@@ -111,6 +111,7 @@ function PlayerAvatar3D({ id, locked, showPill, alphaOnly, onLock }: Props) {
   const plumbob = useRef<THREE.Mesh>(null);
   const plumbobMat = useRef<THREE.MeshStandardMaterial>(null);
   const pillSpeed = useRef<HTMLSpanElement>(null);
+  const pillDist = useRef<HTMLSpanElement>(null);
   const pillPdr = useRef<HTMLSpanElement>(null);
   const pillAt = useRef(0);
   const stridePhase = useRef(0);
@@ -287,6 +288,7 @@ function PlayerAvatar3D({ id, locked, showPill, alphaOnly, onLock }: Props) {
     if (now - pillAt.current >= 100) {
       pillAt.current = now;
       if (pillSpeed.current) pillSpeed.current.textContent = `${s.speed_kmh.toFixed(1)} km/h`;
+      if (pillDist.current) pillDist.current.textContent = `${(s.distance_m / 1000).toFixed(2)} km`;
       if (pillPdr.current) {
         const pdr = telemetry.pdrByPlayer.get(id);
         pillPdr.current.textContent = pdr != null ? `PDR ${pdr.toFixed(0)}%` : "—";
@@ -396,6 +398,7 @@ function PlayerAvatar3D({ id, locked, showPill, alphaOnly, onLock }: Props) {
             style={{ boxShadow: "0 4px 18px rgba(0,0,0,0.5)" }}>
             <span className="font-display text-[15px] leading-none text-white">#{num} {name}</span>
             <span ref={pillSpeed} className="font-tech text-[12px] font-bold leading-none text-tactical">0.0 km/h</span>
+            <span ref={pillDist} className="font-tech text-[11px] leading-none text-pitch">0.00 km</span>
             <span ref={pillPdr} className="font-tech text-[11px] leading-none text-gold">—</span>
           </div>
         </Html>

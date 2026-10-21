@@ -14,7 +14,8 @@ import TacticalPulseBar from "@/components/TacticalPulseBar";
 import BroadcastAlphaModal, { SMPTEChip } from "@/components/BroadcastAlphaModal";
 import RubricVerifierModal from "@/components/RubricVerifierModal";
 import MatchRecapStudioModal from "@/components/MatchRecapStudioModal";
-import JudgeAutopilotTour, { AUTOPILOT_STEPS } from "@/components/JudgeAutopilotTour";
+import JudgeAutopilotTour, { AUTOPILOT_STEPS, AUTOPILOT_TOTAL_SECONDS } from "@/components/JudgeAutopilotTour";
+import PipelineRibbon from "@/components/PipelineRibbon";
 import TopBar from "@/components/hud/TopBar";
 import LeftRail from "@/components/hud/LeftRail";
 import RightDock from "@/components/hud/RightDock";
@@ -40,7 +41,7 @@ const SCENARIO_KEYS: Record<string, string> = {
 };
 
 const CAMERA_OVERRIDE_MS = 6500;
-const AUTOPILOT_TOTAL_MS = 60000;
+const AUTOPILOT_TOTAL_MS = AUTOPILOT_TOTAL_SECONDS * 1000;
 
 const PERSONA_MAP: Record<PersonaModeV5, PersonaMode> = {
   ANALYST_HUD: "analyst",
@@ -132,7 +133,9 @@ function StudioOrchestrator() {
   const phase2BaselineRef = useRef<string | null>(null);
   const latestInsightIdRef = useRef<string | null>(null);
 
-  const { isSpeaking, isVoiceMuted, toggleMute, speakInsight, stopSpeaking } = useSpeechController();
+  const {
+    isSpeaking, isVoiceMuted, toggleMute, speakInsight, setAutoNarrationSuppressed, stopSpeaking,
+  } = useSpeechController();
 
   // URL params: ?overlay=alpha (broadcast compositing) and ?mode=analysis|studio
   useEffect(() => {
@@ -493,7 +496,7 @@ function StudioOrchestrator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hudMode]);
 
-  const handleAutopilotStop = useCallback(() => {
+  const handleAutopilotStop = useCallback((keepRubric = false, keepVoiceSuppressed = false) => {
     tourFxTimers.current.forEach((t) => clearTimeout(t));
     tourFxTimers.current = [];
     setAlphaMode(false);
@@ -504,13 +507,16 @@ function StudioOrchestrator() {
     telemetry.playbackPaused = false;
     setDvrOffsetTicks(0);
     setRecapPass(null);
+    setShowRecap(false);
+    if (!keepRubric) setShowRubric(false);
     setHighlightZone(null);
     setTelestrator((t) => ({ ...t, animateGhostReplay: false, customTacticalArrows: [] }));
     telemetry.telestratorSpotlightIds = [];
     if (tickRef.current) telemetry.applyTick(tickRef.current, false);
     pickCamera("TELE_BROADCAST");
-    setHudMode("live");
-  }, [pickCamera, tickRef, setHudMode]);
+    setHudMode(keepRubric ? "studio" : "live");
+    if (!keepVoiceSuppressed) setAutoNarrationSuppressed(false);
+  }, [pickCamera, tickRef, setHudMode, setAutoNarrationSuppressed]);
 
   const stopAutopilot = useCallback(() => {
     if (autopilotTicker.current) {
@@ -522,6 +528,22 @@ function StudioOrchestrator() {
     stopSpeaking();
     handleAutopilotStop();
   }, [handleAutopilotStop, stopSpeaking]);
+
+  const completeAutopilot = useCallback(() => {
+    if (autopilotTicker.current) {
+      clearInterval(autopilotTicker.current);
+      autopilotTicker.current = null;
+    }
+    setAutopilotActive(false);
+    setAutopilotElapsed(AUTOPILOT_TOTAL_SECONDS);
+    stopSpeaking();
+    // The finale's proof stays on screen; the editor can close it when ready.
+    handleAutopilotStop(true, true);
+  }, [handleAutopilotStop, stopSpeaking]);
+
+  useEffect(() => {
+    if (!autopilotActive && !showRubric) setAutoNarrationSuppressed(false);
+  }, [autopilotActive, showRubric, setAutoNarrationSuppressed]);
 
   const handleAutopilotStep = useCallback(
     (index: number) => {
@@ -634,8 +656,14 @@ function StudioOrchestrator() {
         }
         case 5:
           setHudMode("studio");
+          setShowRubric(false);
           setShowRecap(true);
-          tourFxTimers.current.push(setTimeout(() => setShowRubric(true), 4000));
+          // Recap first, then the rubric proof. Never stack them: the recap
+          // modal sits at z-70 and would hide the z-50 rubric verifier.
+          tourFxTimers.current.push(setTimeout(() => {
+            setShowRecap(false);
+            setShowRubric(true);
+          }, 8000));
           break;
         default:
           break;
@@ -647,11 +675,16 @@ function StudioOrchestrator() {
   );
 
   const startAutopilot = useCallback(() => {
+    tourFxTimers.current.forEach((t) => clearTimeout(t));
+    tourFxTimers.current = [];
+    setAutoNarrationSuppressed(true);
+    setShowRecap(false);
+    setShowRubric(false);
     setAutopilotActive(true);
     setAutopilotElapsed(0);
     const startedAt = performance.now();
     autopilotTicker.current = setInterval(() => {
-      setAutopilotElapsed(Math.min(60, (performance.now() - startedAt) / 1000));
+      setAutopilotElapsed(Math.min(AUTOPILOT_TOTAL_SECONDS, (performance.now() - startedAt) / 1000));
     }, 100);
     AUTOPILOT_STEPS.forEach((step, index) => {
       tourFxTimers.current.push(setTimeout(() => {
@@ -659,8 +692,8 @@ function StudioOrchestrator() {
         speakInsight(step.voiceover, "en");
       }, step.at * 1000));
     });
-    tourFxTimers.current.push(setTimeout(() => stopAutopilot(), AUTOPILOT_TOTAL_MS));
-  }, [handleAutopilotStep, speakInsight, stopAutopilot]);
+    tourFxTimers.current.push(setTimeout(() => completeAutopilot(), AUTOPILOT_TOTAL_MS));
+  }, [completeAutopilot, handleAutopilotStep, setAutoNarrationSuppressed, speakInsight]);
 
   const toggleAutopilot = useCallback(() => {
     if (autopilotActive) stopAutopilot();
@@ -729,10 +762,13 @@ function StudioOrchestrator() {
           cinemaMode ? "cinema-hide" : "cinema-show"
         )}
       >
-        <div className="grid h-full w-full grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto] gap-2 overflow-y-auto p-2 scroll-slim lg:gap-3 lg:p-3 xl:grid-cols-[352px_minmax(0,1fr)_368px] xl:overflow-hidden">
+        <div className={cn(
+          "grid h-full w-full grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto] gap-2 overflow-y-auto p-2 scroll-slim lg:gap-3 lg:p-3 xl:grid-cols-[352px_minmax(0,1fr)_368px] xl:overflow-hidden",
+          alphaMode && "hidden",
+        )}>
 
           {/* ---------- TopBar (all breakpoints) ---------- */}
-          <div className="xl:col-span-3 xl:row-start-1">
+          <div className="flex flex-col gap-1 xl:col-span-3 xl:row-start-1">
             <TopBar
               connected={connected}
               lang={lang}
@@ -747,6 +783,9 @@ function StudioOrchestrator() {
               autopilotStep={autopilotStep}
               onToggleAutopilot={toggleAutopilot}
             />
+            {!alphaMode && (
+              <PipelineRibbon pipeline={pipeline} connected={connected} status={status} />
+            )}
           </div>
 
           {/* ---------- middle band: left rail + centre stage (grid items on xl) ---------- */}
@@ -888,8 +927,34 @@ function StudioOrchestrator() {
         </div>
 
         {/* autopilot step banner (hidden with the HUD in cinema mode) */}
-        <JudgeAutopilotTour active={autopilotActive} currentStep={autopilotStep} elapsed={autopilotElapsed} />
+        <JudgeAutopilotTour active={autopilotActive && !alphaMode} currentStep={autopilotStep} elapsed={autopilotElapsed} />
       </div>
+
+      {alphaMode && (
+        <div className="pointer-events-none fixed inset-0 z-30">
+          <div className="pointer-events-auto absolute right-3 top-3 flex items-center gap-2">
+            <SMPTEChip visible />
+            <button
+              onClick={toggleAlpha}
+              className="clip-skew border border-tactical/40 bg-slate-950/85 px-3 py-1.5 font-tech text-[10px] font-bold uppercase tracking-[0.18em] text-tactical backdrop-blur-xl hover:bg-tactical/15 hover:text-white"
+              title="Exit clean alpha feed"
+            >
+              Exit Alpha
+            </button>
+          </div>
+          <div className="absolute bottom-3 left-3 flex items-end gap-2 opacity-90">
+            <span className="h-6 w-1 bg-gradient-to-b from-tactical to-transparent" />
+            <div className="leading-none">
+              <div className="font-display text-[14px] font-bold uppercase tracking-[0.16em] text-white">
+                AETHER<span className="text-tactical">PITCH</span>
+              </div>
+              <div className="mt-1 font-tech text-[8px] font-semibold uppercase tracking-[0.28em] text-slate-400">
+                Clean AR Layer · SMPTE Alpha · {alphaBackdrop === "green" ? "Chroma Green" : "Checkerboard"}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {cinemaMode && !alphaMode && (
         <>

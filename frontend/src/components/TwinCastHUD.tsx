@@ -42,19 +42,23 @@ function AnalystCard({
 }) {
   const fastest = tick?.players.reduce((best, p) => p.speed_kmh > best ? p.speed_kmh : best, 0) ?? 0;
   const sprinters = tick?.players.filter((p) => p.speed_kmh >= 30).length ?? 0;
+  const teamStats = latestEvent?.team ? metrics?.team_stats?.[latestEvent.team] : undefined;
+  const isShot = latestEvent?.type === "SHOT" || latestEvent?.type === "GOAL";
   const rows: [string, string, string][] = focus === "SPEED_VELOCITY"
     ? [
         ["TOP SPEED", `${fastest.toFixed(1)} km/h`, "text-crimson"],
         ["BALL SPEED", `${(tick?.ball.speed_kmh ?? 0).toFixed(0)} km/h`, "text-gold"],
         ["SPRINTERS >30", `${sprinters} / 22`, "text-pitch"],
-        ["SHOT VELOCITY", `${latestEvent?.ball_speed_kmh?.toFixed(0) ?? "—"} km/h`, "text-tactical"],
+        [isShot ? "SHOT VELOCITY" : "EVENT BALL SPEED", `${latestEvent?.ball_speed_kmh?.toFixed(0) ?? "-"} km/h`, "text-tactical"],
       ]
     : focus === "PASS_QUALITY"
       ? [
           ["PASS DIFF (PDR)", `${latestEvent?.pdr?.toFixed(0) ?? "—"}%`, "text-crimson"],
-          ["Δ xT", `${(latestEvent?.delta_xt ?? 0) >= 0 ? "+" : ""}${(latestEvent?.delta_xt ?? 0).toFixed(2)}`, "text-pitch"],
+          ["PASS ACCURACY", `${teamStats?.pass_accuracy?.toFixed(1) ?? "—"}%`, "text-pitch"],
           ["PASS DISTANCE", `${latestEvent?.distance_m?.toFixed(1) ?? "—"} m`, "text-gold"],
-          ["OPEN GHOST", `${latestEvent?.ghost_pass?.openness_m?.toFixed(0) ?? "—"} m`, "text-tactical"],
+          ["Δ xT", `${(latestEvent?.delta_xt ?? 0) >= 0 ? "+" : ""}${(latestEvent?.delta_xt ?? 0).toFixed(2)}`, "text-tactical"],
+          ["COMPLETED", `${teamStats?.passes_completed ?? "—"} / ${teamStats?.passes ?? "—"}`, "text-slate-300"],
+          ["OPEN GHOST", `${latestEvent?.ghost_pass?.openness_m?.toFixed(0) ?? "—"} m`, "text-gold"],
         ]
       : focus === "EXPECTED_THREAT_XT"
         ? [
@@ -142,7 +146,7 @@ const PERSONAS: { id: PersonaMode; label: string; icon: React.ReactNode }[] = [
 export default function TwinCastHUD({
   insights, persona, onPersona, lang, metrics, tick, latestEvent, metricFocus, clubBias,
 }: Props) {
-  const { isSpeaking, isVoiceMuted, speakInsight, toggleMute } = useSpeechController();
+  const { isSpeaking, isVoiceMuted, speakAuto, toggleMute } = useSpeechController();
   const spokenRef = useRef<string>("");
   const latest = insights[0];
 
@@ -151,7 +155,7 @@ export default function TwinCastHUD({
     spokenRef.current = latest.id;
     if (!isVoiceMuted) {
       const e = latest.stage_e_personalization;
-      speakInsight(
+      speakAuto(
         lang === "en" ? e.casual_fan_mode.story_card : e.translations[lang] || e.casual_fan_mode.story_card,
         lang
       );

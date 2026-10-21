@@ -117,19 +117,23 @@ export default function PlayerLock360({ tick, lockedId, onLock, events, lang, in
 
   const roster = useMemo(() => tick?.players ?? [], [tick?.players]);
 
+  const relevantInsight = player && insightLine?.toLowerCase().includes(player.name.toLowerCase())
+    ? insightLine
+    : null;
+
   const speak = () => {
     if (!player) return;
     const text =
-      insightLine && insightLine.length > 0
-        ? insightLine
-        : `${player.name}, ${player.team} ${player.role}, currently at ${player.speed_kmh.toFixed(1)} kilometres per hour, stamina ${Math.round(player.stamina)} percent.`;
+      relevantInsight && relevantInsight.length > 0
+        ? relevantInsight
+        : `${player.name}, ${player.team} ${player.role}, currently at ${player.speed_kmh.toFixed(1)} kilometres per hour, ${(player.distance_m / 1000).toFixed(2)} kilometres covered, top speed ${player.top_speed_kmh.toFixed(1)}, stamina ${Math.round(player.stamina)} percent.`;
     speakInsight(text, lang);
   };
 
   return (
     <section className="pointer-events-auto w-[352px]">
       {/* quick-roster strip */}
-      <div className="clip-ea mb-1.5 flex gap-[3px] overflow-hidden border border-white/10 bg-slate-950/80 p-1 backdrop-blur-xl">
+      <div className="clip-ea mb-1.5 flex flex-wrap gap-[3px] border border-white/10 bg-slate-950/80 p-1 backdrop-blur-xl">
         {roster.map((p) => (
           <button
             key={p.id}
@@ -216,6 +220,9 @@ export default function PlayerLock360({ tick, lockedId, onLock, events, lang, in
                   ? `${lastPass.delta_xt >= 0 ? "+" : ""}${lastPass.delta_xt.toFixed(2)}`
                   : "—", "text-pitch"],
                 ["Stamina", `${player.stamina.toFixed(0)}%`, "text-gold"],
+                ["DISTANCE", `${(player.distance_m / 1000).toFixed(2)} km`, "text-tactical"],
+                ["TOP SPEED", `${player.top_speed_kmh.toFixed(1)} km/h`, "text-crimson"],
+                ["SPRINT DIST", `${(player.sprint_distance_m / 1000).toFixed(2)} km`, "text-pitch"],
               ].map(([k, v, c]) => (
                 <div key={k} className="clip-chamfer border border-white/10 bg-white/[0.04] px-2 py-1">
                   <div className="font-display text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-500">{k}</div>

@@ -1,10 +1,29 @@
 import type {
-  MatchEvent, MatchTick, Metrics, Insight, Pipeline, PlayStyleBadge, PoseState,
-  Role, Team,
+  MatchEvent, MatchMetadata, MatchTick, Metrics, Insight, Pipeline, PlayerStats,
+  PlayStyleBadge, PoseState, Role, Team, TeamStats,
 } from "./types";
 
 const PITCH_L = 105;
 const PITCH_W = 68;
+
+const EDGE_MATCH_METADATA: MatchMetadata = {
+  match_id: "SYN-PL-2026-1019-NLA-MCS",
+  competition: "Synthetic Premier League",
+  season: "2026/27",
+  matchday: 9,
+  venue: "Aether Arena",
+  city: "Synthetic City",
+  kickoff_utc: "2026-10-19T19:45:00Z",
+  home_team: {
+    id: "NLA", name: "North Larchmont Athletic", short_name: "NLA", kit: "crimson/gold",
+  },
+  away_team: {
+    id: "MCS", name: "Meridian City SC", short_name: "MCS", kit: "cyan/navy",
+  },
+  data_source: "AETHER edge fallback engine",
+  synthetic: true,
+  disclaimer: "All clubs, players, crests and tracking samples are fictional.",
+};
 
 interface EdgePlayer {
   id: string;
@@ -22,6 +41,10 @@ interface EdgePlayer {
   heading: number;
   speedKmh: number;
   stamina: number;
+  distanceM: number;
+  sprintDistanceM: number;
+  topSpeedKmh: number;
+  nextDistanceAlertM: number;
   pose: PoseState;
   badge: PlayStyleBadge | null;
 }
@@ -31,11 +54,25 @@ interface Flight {
   to: [number, number];
   fromId: string;
   toId: string;
+  fromName: string;
+  passSeq: number;
   elapsed: number;
   duration: number;
   speedKmh: number;
+  distance: number;
   lofted: boolean;
 }
+
+const EDGE_STAT_BASELINE: Record<Team, Omit<TeamStats, "pass_accuracy" | "shot_accuracy" | "possession_pct" | "distance_km" | "sprint_distance_km" | "goals">> = {
+  NLA: {
+    passes: 431, passes_completed: 368, shots: 12, shots_on_target: 6,
+    tackles: 15, turnovers_won: 9,
+  },
+  MCS: {
+    passes: 398, passes_completed: 339, shots: 9, shots_on_target: 4,
+    tackles: 17, turnovers_won: 7,
+  },
+};
 
 const SQUADS: { team: Team; rows: [number, string, Role, number, number, number][] }[] = [
   {
@@ -111,7 +148,23 @@ export class EdgeEngine {
   private passTimer = 1.1;
   private turnoverTimer = 17;
   private eventSeq = 0;
+  private passSeq = 0;
   private insightSeq = 0;
+  private teamStats: Record<Team, TeamStats> = {
+    NLA: {
+      ...EDGE_STAT_BASELINE.NLA, pass_accuracy: 0, shot_accuracy: 0,
+      possession_pct: 0, distance_km: 0, sprint_distance_km: 0, goals: 1,
+    },
+    MCS: {
+      ...EDGE_STAT_BASELINE.MCS, pass_accuracy: 0, shot_accuracy: 0,
+      possession_pct: 0, distance_km: 0, sprint_distance_km: 0, goals: 1,
+    },
+  };
+  private playerStats: Record<string, {
+    passes: number; passes_completed: number; shots: number;
+    shots_on_target: number; tackles: number;
+  }> = {};
+  private possessionS: Record<Team, number> = { NLA: 3720 * 0.54, MCS: 3720 * 0.46 };
   private chaos = 0.52;
   private lastChaos = 0.52;
   private chaosHistory: number[] = [];
@@ -131,6 +184,7 @@ export class EdgeEngine {
     for (const squad of SQUADS) {
       for (const [number, name, role, bx, by, maxSpeed] of squad.rows) {
         const baseX = squad.team === "NLA" ? bx * PITCH_L : PITCH_L - bx * PITCH_L;
+        const distanceM = role === "GK" ? 3100 : role === "DEF" ? 6700 : role === "MID" ? 7800 : 7200;
         const player: EdgePlayer = {
           id: `${squad.team}_${number}`,
           team: squad.team,
@@ -147,8 +201,17 @@ export class EdgeEngine {
           heading: squad.team === "NLA" ? 0 : Math.PI,
           speedKmh: 0,
           stamina: 88 + rand() * 10,
+          distanceM: distanceM + (rand() - 0.5) * 700,
+          sprintDistanceM: distanceM * 0.13,
+          topSpeedKmh: 28.5 + rand() * 6.0,
+          nextDistanceAlertM: distanceM + 250,
           pose: "IDLE",
           badge: null,
+        };
+        const baseline = role === "GK" ? [20, 17, 0, 0] : role === "DEF" ? [36, 30, 0, 2] : role === "MID" ? [48, 41, 1, 1] : [28, 22, 2, 0];
+        this.playerStats[player.id] = {
+          passes: baseline[0], passes_completed: baseline[1],
+          shots: baseline[2], shots_on_target: Math.min(baseline[2], 1), tackles: baseline[3],
         };
         this.players.push(player);
         this.byId.set(player.id, player);
@@ -193,6 +256,7 @@ export class EdgeEngine {
   step(dt = 0.1): { tick: MatchTick; metrics: Metrics; events: MatchEvent[] } {
     this.pending = [];
     this.t += dt;
+    this.possessionS[this.possession] += dt;
     if (this.scenarioLeft > 0) {
       this.scenarioLeft -= dt;
       if (this.scenarioLeft <= 0) {
@@ -277,6 +341,7 @@ export class EdgeEngine {
     const team = event.team ?? "NLA";
     const player = event.player_name ?? "the carrier";
     const opponent = team === "NLA" ? "MCS" : "NLA";
+    const teamRow = metrics.team_stats?.[team];
     const headline = archetype === "counter_overload"
       ? "High-Chaos Counter Rips Through the Broken Line"
       : archetype === "pressing_trap"
@@ -341,7 +406,7 @@ export class EdgeEngine {
       },
       stage_e_personalization: {
         analyst_mode: {
-          metrics_summary: `PPDA ${metrics.ppda.NLA.toFixed(1)}/${metrics.ppda.MCS.toFixed(1)} | ΔxT ${dxt.toFixed(3)} | Pass Diff ${pdr.toFixed(1)}% | Chaos ${metrics.chaos_index.toFixed(2)}`,
+          metrics_summary: `PPDA ${metrics.ppda.NLA.toFixed(1)}/${metrics.ppda.MCS.toFixed(1)} | ΔxT ${dxt.toFixed(3)} | Pass Diff ${pdr.toFixed(1)}% | Pass Acc ${(teamRow?.pass_accuracy ?? 0).toFixed(1)}% | Shots ${teamRow?.shots ?? 0} | Chaos ${metrics.chaos_index.toFixed(2)}`,
           tactical_note: ghost
             ? `Optimal alternative was ${ghost.target_id ?? "a free man"} (+${ghost.delta_xt.toFixed(2)} xT, ${(ghost.openness_m ?? 0).toFixed(0)}m of space) vs ${dxt.toFixed(2)} on the actual ball.`
             : `No higher-value option available — the executed ball was already the spatial optimum.`,
@@ -397,6 +462,7 @@ export class EdgeEngine {
       clock: clockOf(this.t),
       score: { ...this.score },
       possession: this.possession,
+      match_metadata: EDGE_MATCH_METADATA,
       players: this.players.map((p) => ({
         id: p.id,
         team: p.team,
@@ -411,6 +477,9 @@ export class EdgeEngine {
         speed_kmh: Number(p.speedKmh.toFixed(1)),
         stamina: Number(p.stamina.toFixed(1)),
         heading_rad: Number(p.heading.toFixed(3)),
+        distance_m: Number(p.distanceM.toFixed(1)),
+        sprint_distance_m: Number(p.sprintDistanceM.toFixed(1)),
+        top_speed_kmh: Number(p.topSpeedKmh.toFixed(1)),
         pose_state: p.pose,
         playstyle_badge: p.badge,
       })),
@@ -465,6 +534,8 @@ export class EdgeEngine {
   }
 
   private seek(p: EdgePlayer, tx: number, ty: number, urgency: number, dt: number): void {
+    const prevX = p.x;
+    const prevY = p.y;
     const dx = tx - p.x;
     const dy = ty - p.y;
     const dist = Math.hypot(dx, dy);
@@ -481,6 +552,30 @@ export class EdgeEngine {
     if (v > 0.25) p.heading = Math.atan2(p.vy, p.vx);
     p.stamina = clamp(p.stamina - v * dt * 0.013, 42, 100);
     p.pose = p.speedKmh >= 27 ? "SPRINT" : p.speedKmh >= 8 ? "JOG" : "IDLE";
+    const moved = Math.hypot(p.x - prevX, p.y - prevY);
+    p.distanceM += moved;
+    if (p.speedKmh >= 30) p.sprintDistanceM += moved;
+    p.topSpeedKmh = Math.max(p.topSpeedKmh, p.speedKmh);
+    if (p.role !== "GK" && p.distanceM >= p.nextDistanceAlertM) {
+      p.nextDistanceAlertM += 250;
+      this.eventSeq += 1;
+      this.pending.push({
+        id: makeEventId(this.eventSeq),
+        type: "AUTO_DISTANCE_ALERT",
+        clock: clockOf(this.t),
+        t_match: Number(this.t.toFixed(2)),
+        team: p.team,
+        player_id: p.id,
+        player_name: p.name,
+        distance_m: Number(p.distanceM.toFixed(1)),
+        distance_km: Number((p.distanceM / 1000).toFixed(2)),
+        threshold_km: Number((p.distanceM / 1000).toFixed(2)),
+        speed_kmh: Number(p.speedKmh.toFixed(1)),
+        x: Number(p.x.toFixed(2)),
+        y: Number(p.y.toFixed(2)),
+        ai_gate: { should_explain: false, reasons: ["Distance threshold"] },
+      });
+    }
   }
 
   private autoPass(dt: number): void {
@@ -550,6 +645,10 @@ export class EdgeEngine {
         }
       : null;
     this.eventSeq += 1;
+    this.passSeq += 1;
+    this.teamStats[carrier.team].passes += 1;
+    const passerStats = this.playerStats[carrier.id];
+    if (passerStats) passerStats.passes += 1;
     const event: MatchEvent = {
       id: makeEventId(this.eventSeq),
       type: "PASS",
@@ -558,6 +657,7 @@ export class EdgeEngine {
       team: carrier.team,
       player_id: carrier.id,
       player_name: carrier.name,
+      pass_seq: this.passSeq,
       start: [Number(start[0].toFixed(2)), Number(start[1].toFixed(2))],
       end: [Number(end[0].toFixed(2)), Number(end[1].toFixed(2))],
       distance_m: Number(distance.toFixed(1)),
@@ -570,6 +670,8 @@ export class EdgeEngine {
       speed_kmh: Number(carrier.speedKmh.toFixed(1)),
       delta_chaos: Number((Math.random() - 0.45).toFixed(3)),
       scenario: this.scenarioName,
+      scenario_signature: this.scenarioName === "chaos_counter" && dxt > 0.06,
+      line_breaking: dxt > 0.06,
       leverage: Number((Math.abs(dxt) * 3.2 + pdr / 45).toFixed(2)),
       ai_gate: {
         should_explain: pdr > 80 || dxt > 0.08 || !!this.scenarioName,
@@ -587,9 +689,12 @@ export class EdgeEngine {
       to: end,
       fromId: carrier.id,
       toId: target.id,
+      fromName: carrier.name,
+      passSeq: this.passSeq,
       elapsed: 0,
       duration,
       speedKmh,
+      distance,
       lofted: distance > 28,
     };
     this.carrierId = target.id;
@@ -618,6 +723,27 @@ export class EdgeEngine {
     this.ball.y = opponent.y;
     this.passStreak = 0;
     this.turnoverTimer = 11 + Math.random() * 9;
+    this.teamStats[opponent.team].tackles += 1;
+    this.teamStats[opponent.team].turnovers_won += 1;
+    const tacklerStats = this.playerStats[opponent.id];
+    if (tacklerStats) tacklerStats.tackles += 1;
+    this.eventSeq += 1;
+    this.pending.push({
+      id: makeEventId(this.eventSeq),
+      type: "TACKLE",
+      clock: clockOf(this.t),
+      t_match: Number(this.t.toFixed(2)),
+      team: opponent.team,
+      player_id: opponent.id,
+      player_name: opponent.name,
+      opponent_id: current.id,
+      opponent_name: current.name,
+      x: Number(opponent.x.toFixed(2)),
+      y: Number(opponent.y.toFixed(2)),
+      outcome: "WON",
+      detail: "Edge fallback pressing tackle wins possession",
+      ai_gate: { should_explain: false, reasons: ["Change of possession"] },
+    });
     this.eventSeq += 1;
     this.pending.push({
       id: makeEventId(this.eventSeq),
@@ -643,7 +769,29 @@ export class EdgeEngine {
   private updateFlight(dt: number): void {
     if (!this.flight) return;
     this.flight.elapsed += dt;
-    if (this.flight.elapsed >= this.flight.duration) this.flight = null;
+    if (this.flight.elapsed < this.flight.duration) return;
+    const f = this.flight;
+    const target = this.byId.get(f.toId);
+    const team = target?.team ?? this.possession;
+    this.teamStats[team].passes_completed += 1;
+    const passerStats = this.playerStats[f.fromId];
+    if (passerStats) passerStats.passes_completed += 1;
+    this.eventSeq += 1;
+    this.pending.push({
+      id: makeEventId(this.eventSeq),
+      type: "PASS_COMPLETE",
+      clock: clockOf(this.t),
+      t_match: Number(this.t.toFixed(2)),
+      team,
+      player_id: f.fromId,
+      player_name: f.fromName,
+      target_id: f.toId,
+      target_name: target?.name ?? null,
+      pass_seq: f.passSeq,
+      distance_m: Number(f.distance.toFixed(1)),
+      ai_gate: { should_explain: false, reasons: [] },
+    });
+    this.flight = null;
   }
 
   private updateBallFlight(): void {
@@ -678,6 +826,55 @@ export class EdgeEngine {
         p.stamina = clamp(p.stamina - 0.004, 42, 100);
       }
     }
+  }
+
+  private buildStats(tick: MatchTick): Pick<Metrics, "team_stats" | "player_stats" | "leaders"> {
+    const totalPoss = this.possessionS.NLA + this.possessionS.MCS || 1;
+    const teamStats = {} as Record<Team, TeamStats>;
+    for (const team of ["NLA", "MCS"] as Team[]) {
+      const squad = tick.players.filter((p) => p.team === team);
+      const raw = this.teamStats[team];
+      const distance = squad.reduce((sum, p) => sum + p.distance_m, 0) / 1000;
+      const sprint = squad.reduce((sum, p) => sum + p.sprint_distance_m, 0) / 1000;
+      teamStats[team] = {
+        ...raw,
+        pass_accuracy: raw.passes ? Number((100 * raw.passes_completed / raw.passes).toFixed(1)) : 0,
+        shot_accuracy: raw.shots ? Number((100 * raw.shots_on_target / raw.shots).toFixed(1)) : 0,
+        possession_pct: Number((100 * this.possessionS[team] / totalPoss).toFixed(1)),
+        distance_km: Number(distance.toFixed(2)),
+        sprint_distance_km: Number(sprint.toFixed(2)),
+        goals: tick.score[team],
+      };
+    }
+    const playerStats: Record<string, PlayerStats> = {};
+    for (const p of tick.players) {
+      const raw = this.playerStats[p.id];
+      if (!raw) continue;
+      playerStats[p.id] = {
+        ...raw,
+        pass_accuracy: raw.passes
+          ? Number((100 * raw.passes_completed / raw.passes).toFixed(1))
+          : 0,
+        distance_km: Number((p.distance_m / 1000).toFixed(2)),
+        top_speed_kmh: p.top_speed_kmh,
+      };
+    }
+    const fastest = [...tick.players].sort((a, b) => b.top_speed_kmh - a.top_speed_kmh)[0];
+    const farthest = [...tick.players].sort((a, b) => b.distance_m - a.distance_m)[0];
+    return {
+      team_stats: teamStats,
+      player_stats: playerStats,
+      leaders: {
+        fastest: fastest ? {
+          player_id: fastest.id, player_name: fastest.name,
+          team: fastest.team, top_speed_kmh: fastest.top_speed_kmh,
+        } : undefined,
+        farthest: farthest ? {
+          player_id: farthest.id, player_name: farthest.name,
+          team: farthest.team, distance_km: Number((farthest.distance_m / 1000).toFixed(2)),
+        } : undefined,
+      },
+    };
   }
 
   private buildMetrics(tick: MatchTick): Metrics {
@@ -725,6 +922,7 @@ export class EdgeEngine {
       ball_speed_var: Number(variance.toFixed(1)),
       stretch_m: Number(stretch.toFixed(1)),
       possession: tick.possession,
+      ...this.buildStats(tick),
     };
   }
 }

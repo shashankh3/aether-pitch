@@ -53,8 +53,14 @@ export default function VisionAutoEventerHUD({ events, expandedOverride = null }
     let line: string | null = null;
     if (newest.type === "AUTO_SPRINT_ALERT" && newest.speed_kmh) {
       line = `⚡ [AUTO-TAG] SPRINT THRESHOLD >30km/h: #${newest.player_id?.split("_")[1]} (${newest.speed_kmh} km/h)`;
+    } else if (newest.type === "AUTO_DISTANCE_ALERT") {
+      line = `📏 [AUTO-TAG] DISTANCE THRESHOLD: ${newest.player_name} reached ${newest.distance_km?.toFixed(2)} km`;
     } else if (newest.type === "PASS") {
       line = `🎯 [AUTO-TAG] PASS VECTOR DETECTED: ${newest.distance_m?.toFixed(1)}m | Ball Speed: ${newest.ball_speed_kmh?.toFixed(0)} km/h | PDR: ${newest.pdr?.toFixed(0)}%`;
+    } else if (newest.type === "PASS_COMPLETE") {
+      line = `✅ [AUTO-TAG] PASS COMPLETE: #${newest.player_id?.split("_")[1]} → ${newest.target_name ?? "target"} (${newest.distance_m?.toFixed(1)}m)`;
+    } else if (newest.type === "TACKLE") {
+      line = `🦶 [AUTO-TAG] TACKLE WON: ${newest.player_name} vs ${newest.opponent_name ?? "carrier"}`;
     } else if (newest.type === "PRESSURE_TRAP") {
       line = `🛡️ [AUTO-TAG] HIGH-PRESSURE CLOSURE: ${newest.players?.length ?? 3} Defenders within 5.2m`;
     }
@@ -176,7 +182,7 @@ export default function VisionAutoEventerHUD({ events, expandedOverride = null }
         ctx.fillStyle = boxColor;
         ctx.font = "700 8px 'JetBrains Mono', monospace";
         ctx.fillText(
-          `ID:${p.id} | conf:0.98 | ${p.speed_kmh.toFixed(1)}km/h`,
+          `ID:${p.id} | conf:0.98 | ${p.speed_kmh.toFixed(1)}km/h | ${(p.distance_m / 1000).toFixed(2)}km`,
           bx, by - 3
         );
         // skeletal keypoints (head, shoulders, hips, knees, ankles)

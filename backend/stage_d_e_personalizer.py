@@ -11,6 +11,7 @@ Stage (e): forks every insight into `analyst_view` vs `casual_fan_view`,
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import Dict, Optional
 
 import requests
@@ -218,6 +219,8 @@ def build_camera_directive(ev: dict, metrics: dict, archetype: str) -> dict:
 class Personalizer:
     def __init__(self, cfg=settings):
         self.s = cfg
+        self.last_d_ms = 0.0
+        self.last_e_ms = 0.0
 
     @staticmethod
     def normalize_preferences(pref: Optional[dict]) -> dict:
@@ -238,6 +241,7 @@ class Personalizer:
     # ------------------------------------------------------------- Stage (d)+(e)
     def build(self, stage_c: dict, ev: dict, metrics: dict, score: dict,
               pref: Optional[dict] = None, state: Optional[dict] = None) -> dict:
+        t0 = time.perf_counter()
         arch = stage_c.get("archetype") or pick_archetype(ev, metrics)
         chaos = metrics.get("chaos_index", 0.5)
         pdr = ev.get("pdr")
@@ -279,9 +283,13 @@ class Personalizer:
             "lower_third_subtitle": " • ".join(subtitle_parts),
         }
 
+        self.last_d_ms = round((time.perf_counter() - t0) * 1000.0, 3)
+
         # ---- Stage (e): dual-persona fork + localization ----
+        t_e = time.perf_counter()
         ppda = metrics.get("ppda", {})
         def_line = metrics.get("def_lines", {}).get(team, 40.0)
+        team_row = (metrics.get("team_stats") or {}).get(team, {})
         ghost = ev.get("ghost_pass") or {}
         if ghost:
             tactical_note = (
@@ -295,6 +303,8 @@ class Personalizer:
             "metrics_summary": (
                 f"PPDA {ppda.get('NLA', 0):.1f}/{ppda.get('MCS', 0):.1f} | "
                 f"ΔxT {dxt:+.3f} | Pass Diff {(pdr if pdr is not None else 0):.1f}% | "
+                f"Pass Acc {team_row.get('pass_accuracy', 0):.1f}% | "
+                f"Shots {team_row.get('shots', 0)} | "
                 f"Def. Line {def_line:.1f} m | Chaos {chaos:.2f}"),
             "tactical_note": tactical_note,
         }
@@ -326,7 +336,9 @@ class Personalizer:
             "stage_e_personalization": personalization,
             "camera_directive": build_camera_directive(ev, metrics, arch),
         }
-        return self.apply_personalization(packet, ev, metrics, pref)
+        out = self.apply_personalization(packet, ev, metrics, pref)
+        self.last_e_ms = round((time.perf_counter() - t_e) * 1000.0, 3)
+        return out
 
     def apply_personalization(self, packet: dict, ev: dict, metrics: dict,
                               pref: Optional[dict] = None) -> dict:

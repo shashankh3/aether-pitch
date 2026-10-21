@@ -102,6 +102,7 @@ pipeline: Dict[str, Any] = {
 }
 insight_counter = 0
 last_insight_real_ts = 0.0
+last_insight_priority = 0.0
 
 
 def _stamp_pipeline(stage: str, latency_ms: float, payload: Any) -> None:
@@ -118,7 +119,7 @@ def _archive_event(ev: dict, state: dict, metrics: dict) -> None:
     if not state or not state.get("players"):
         return
     if ev.get("type") not in (
-        "PASS", "SHOT", "GOAL", "PRESSURE_TRAP", "TURNOVER",
+        "PASS", "SHOT", "GOAL", "PRESSURE_TRAP", "TURNOVER", "TACKLE",
         "TACTICAL_INVERSION", "SCENARIO_END",
     ):
         return
@@ -296,6 +297,7 @@ async def make_insight(ev: dict, metrics: dict, state: dict) -> None:
         "possession": state["possession"],
         "recent_events": [e for e in list(math.stream) if e[1] not in ("_tick",)][-8:],
         "top_inflections": top_inflections,
+        "match_metadata": state.get("match_metadata"),
         "personalization": active_personalization,
     }
     stage_c = await foundry.explain(ctx)
@@ -315,9 +317,14 @@ async def make_insight(ev: dict, metrics: dict, state: dict) -> None:
     ghost = data["stage_d_broadcast_overlay"].get("draw_ghost_pass") and ev.get("ghost_pass")
     if ghost:
         last_ghost = (state["t_match"] + 4.0, [ghost["x"], ghost["y"]], ghost.get("delta_xt", 0.0))
-    _stamp_pipeline("c", stage_c.get("latency_ms", 0.0), stage_c.get("stage_c_explainability"))
-    _stamp_pipeline("d", 0.4, data["stage_d_broadcast_overlay"])
-    _stamp_pipeline("e", 0.6, data["stage_e_personalization"])
+    _stamp_pipeline("c", stage_c.get("latency_ms", 0.0), {
+        **(stage_c.get("stage_c_explainability") or {}),
+        "mode": stage_c.get("mode", "fallback"),
+        "model": stage_c.get("model"),
+        "usage": foundry.status().get("usage"),
+    })
+    _stamp_pipeline("d", personalizer.last_d_ms, data["stage_d_broadcast_overlay"])
+    _stamp_pipeline("e", personalizer.last_e_ms, data["stage_e_personalization"])
     await hub.broadcast({"type": "insight", "data": data})
 
 
@@ -332,8 +339,20 @@ async def make_recap(state: dict) -> dict:
     return packet
 
 
+def _insight_priority(ev: dict) -> float:
+    """Rank simultaneous gated events so a signature scenario moment wins."""
+    kind = ev.get("type")
+    type_rank = {
+        "GOAL": 100, "PRESSURE_TRAP": 88, "TACKLE": 72, "TURNOVER": 68,
+        "TACTICAL_INVERSION": 80, "SHOT": 64, "PASS_COMPLETE": 26, "PASS": 30,
+    }.get(kind, 18)
+    scenario = 70.0 if ev.get("scenario_signature") else (12.0 if ev.get("scenario") else 0.0)
+    return type_rank + scenario + min(20.0, max(0.0, (ev.get("leverage") or 0.0) * 6.0))
+
+
 def _record_inflection(ev: dict) -> None:
-    if (ev.get("leverage") or 0) < 1.0:
+    score = _insight_priority(ev)
+    if (ev.get("leverage") or 0) < 1.0 and not ev.get("scenario_signature"):
         return
     top_inflections.append({
         "clock": ev.get("clock", "—"),
@@ -341,7 +360,8 @@ def _record_inflection(ev: dict) -> None:
                     f"{ev.get('player_name') or ev.get('team', '')}".strip(),
         "detail": (f"PDR {ev.get('pdr') or 0:.0f}% • ΔxT {(ev.get('delta_xt') or 0):+.2f} • "
                    f"ΔChaos {(ev.get('delta_chaos') or 0):+.2f}"),
-        "leverage": ev.get("leverage", 0.0),
+        "leverage": max(ev.get("leverage", 0.0), round(score / 100.0, 2)),
+        "scenario_signature": bool(ev.get("scenario_signature")),
     })
     top_inflections.sort(key=lambda i: -i["leverage"])
     del top_inflections[3:]
@@ -349,10 +369,11 @@ def _record_inflection(ev: dict) -> None:
 
 async def match_loop() -> None:
     """The heartbeat: 10Hz Stage (a) ticks; 2Hz metrics/pipeline packets."""
-    global last_state, last_metrics, last_insight_real_ts, last_ghost
+    global last_state, last_metrics, last_insight_real_ts, last_insight_priority, last_ghost
     next_real_metrics = time.perf_counter()
     math.scenario_active = None
     event_seq = 0
+    insight_candidates: List[dict] = []
     while True:
         loop_t0 = time.perf_counter()
 
@@ -414,14 +435,34 @@ async def match_loop() -> None:
             await hub.broadcast({"type": "metrics", "data": metrics})
             await hub.broadcast({"type": "pipeline", "data": pipeline})
 
+        now_real = time.perf_counter()
         for ev in enriched:
             await hub.broadcast({"type": "event", "data": ev})
             _record_inflection(ev)
             gate = ev.get("ai_gate", {})
             if gate.get("should_explain"):
-                if (time.perf_counter() - last_insight_real_ts) > settings.min_seconds_between_insights:
-                    last_insight_real_ts = time.perf_counter()
-                    asyncio.create_task(make_insight(ev, metrics, state))
+                insight_candidates.append({
+                    "ev": ev, "metrics": metrics, "state": state,
+                    "at": now_real, "priority": _insight_priority(ev),
+                })
+
+        # Short priority window: if a scenario signature and a normal pass land
+        # in the same beat, explain the signature moment, not the pass.
+        insight_candidates = [c for c in insight_candidates if now_real - c["at"] < 2.0]
+        if insight_candidates:
+            best = max(insight_candidates, key=lambda c: c["priority"])
+            since = now_real - last_insight_real_ts
+            signature = best["priority"] >= 110.0
+            ready = (now_real - best["at"]) >= 0.8 or signature
+            cooldown_ok = (
+                since > 1.2 if signature and last_insight_priority < 100.0
+                else since > (3.5 if signature else settings.min_seconds_between_insights)
+            )
+            if ready and cooldown_ok:
+                last_insight_real_ts = now_real
+                last_insight_priority = best["priority"]
+                insight_candidates.clear()
+                asyncio.create_task(make_insight(best["ev"], best["metrics"], best["state"]))
 
         # ---- hold the 10Hz cadence ---------------------------------------
         elapsed = time.perf_counter() - loop_t0
@@ -493,6 +534,7 @@ async def _studio_query_handler(body: dict) -> dict:
         "metrics": last_metrics,
         "recent_events": [e for e in list(math.stream) if e[1] not in ("_tick",)][-8:],
         "top_inflections": top_inflections,
+        "match_metadata": (last_state or {}).get("match_metadata"),
         "personalization": active_personalization,
     }
     result = await foundry.studio_query(ctx)
@@ -547,10 +589,9 @@ async def pipeline_audit() -> dict:
             "player_name": "J. Ardaiz", "clock": st["clock"],
             "pdr": 84.0, "delta_xt": 0.11, "ghost_pass": None, "speed_kmh": 31.0,
             "ai_gate": {"should_explain": False, "reasons": ["no gated event in audit window"]}})
-        t0 = time.perf_counter()
         packet = personalizer.build(stage_c, ev, mets, st["score"])
-        t_d += (time.perf_counter() - t0) * 1000.0
-        t_e += 0.05  # personalization fork + localization atlas lookup (sub-ms)
+        t_d += personalizer.last_d_ms
+        t_e += personalizer.last_e_ms
         sample_event, sample_c, sample_packet = ev, stage_c, packet
 
     return {
@@ -561,8 +602,17 @@ async def pipeline_audit() -> dict:
             "stage_b_interpret_ms": round(t_b / reps, 3),
             "stage_c_explain_ms": round(max(0.05, t_c / reps), 3),
             "stage_d_render_ms": round(t_d / reps, 3),
-            "stage_e_personalize_ms": round(max(0.05, t_e / reps), 3),
+            "stage_e_personalize_ms": round(max(0.01, t_e / reps), 3),
         },
+        "stage_modes": {
+            "a": "local_live",
+            "b": "local_live",
+            "c": "azure_ready" if settings.azure_enabled else "local_fallback",
+            "d": "local_live",
+            "e": "azure_translator" if settings.translator_enabled else "local_atlas",
+        },
+        "stage_c_audit_mode": "deterministic_fallback",
+        "azure": foundry.status(),
         "live_pipeline": {
             k: v.get("latency_ms") for k, v in pipeline["stages"].items()
         },
@@ -572,8 +622,11 @@ async def pipeline_audit() -> dict:
             "stage_b_metrics": {"chaos_index": mets["chaos_index"],
                                 "chaos_state": mets["chaos_state"],
                                 "pdr_sample": sample_event.get("pdr"),
-                                "delta_xt_sample": sample_event.get("delta_xt")},
+                                "delta_xt_sample": sample_event.get("delta_xt"),
+                                "team_stats_sample": mets.get("team_stats"),
+                                "leaders": mets.get("leaders")},
             "stage_c_explain": sample_c.get("stage_c_explainability"),
+            "stage_c_mode": sample_c.get("mode", "fallback"),
             "stage_d_e_packet_keys": list(sample_packet.keys()),
         },
         "event_gate": {"rule": "PDR>80 OR |dChaos|>0.20 OR dxT>0.08 OR scenario",
@@ -592,14 +645,36 @@ async def health() -> dict:
             "d": "local-websocket",
             "e": "azure-translator" if settings.translator_enabled else "deterministic-atlas",
         },
+        "stage_c": foundry.status(),
         "clients": len(hub.clients),
         "clock": last_state.get("clock"), "score": last_state.get("score"),
+        "match": {
+            "id": (last_state.get("match_metadata") or {}).get("match_id"),
+            "competition": (last_state.get("match_metadata") or {}).get("competition"),
+            "venue": (last_state.get("match_metadata") or {}).get("venue"),
+            "synthetic": True,
+        },
+        "team_stats": (last_metrics or {}).get("team_stats", {}),
     }
 
 
 @app.get("/api/state")
 async def state() -> dict:
     return {"state": last_state, "metrics": last_metrics, "pipeline": pipeline}
+
+
+@app.get("/api/match-stats")
+async def match_stats() -> dict:
+    """Machine-readable synthetic match metadata, team stats and player leaders."""
+    return {
+        "match": (last_state or {}).get("match_metadata"),
+        "team_stats": (last_metrics or {}).get("team_stats", {}),
+        "player_stats": (last_metrics or {}).get("player_stats", {}),
+        "leaders": (last_metrics or {}).get("leaders", {}),
+        "clock": (last_state or {}).get("clock"),
+        "score": (last_state or {}).get("score"),
+        "synthetic": True,
+    }
 
 
 @app.get("/api/insights")

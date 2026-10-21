@@ -18,9 +18,13 @@ Per-player telemetry (10Hz):
 Ball telemetry: x, y, z, vx, vy, vz, speed_kmh, pass_start, pass_end,
                 is_lofted (long balls / shots arc at 6.5 m, passes at 1.2 m)
 
-Auto-eventing (unchanged): AUTO_SPRINT_ALERT, PASS (15deg cone), SHOT, SAVE,
-GOAL, PRESSURE_TRAP (3+ defenders < 6 m), TURNOVER (middle-third flag),
-TACTICAL_INVERSION, SCENARIO_END.
+Auto-eventing: AUTO_SPRINT_ALERT, AUTO_DISTANCE_ALERT, PASS (15deg cone),
+PASS_COMPLETE, TACKLE, SHOT, SHOT_OFF_TARGET, SAVE, GOAL, PRESSURE_TRAP (3+ defenders < 6 m),
+TURNOVER (middle-third flag), TACTICAL_INVERSION, SCENARIO_END.
+
+Each tick includes synthetic match metadata (competition, venue, teams) and a
+per-player cumulative distance + top speed so the overlay can tag every player
+with speed and distance thresholds without manual tagging.
 
 "God Mode" injection: chaos_counter | high_press_turnover | tactical_inversion.
 
@@ -76,6 +80,10 @@ class Player:
     max_speed: float = 8.2      # m/s
     inverted: bool = False
     heading: float = 0.0        # radians, smoothed facing direction
+    distance_m: float = 0.0     # cumulative distance covered this match
+    sprint_distance_m: float = 0.0
+    top_speed_kmh: float = 0.0
+    next_distance_alert_m: float = 0.0
 
     @property
     def speed(self) -> float:
@@ -118,6 +126,29 @@ SCENARIO_DESCRIPTIONS = {
     "chaos_counter": "3v2 high-chaos counter-attack: sprint burst >31.5 km/h + line-breaking pass",
     "high_press_turnover": "High defensive line forced + pressing trap turnover outside the box",
     "tactical_inversion": "Home right-back inverts into central defensive midfield for 60s",
+}
+
+# Ingested at kickoff by the pipeline so every render packet can carry the
+# broadcast metadata a studio graphics system needs. 100% synthetic.
+MATCH_METADATA = {
+    "match_id": "SYN-PL-2026-1019-NLA-MCS",
+    "competition": "Synthetic Premier League",
+    "season": "2026/27",
+    "matchday": 9,
+    "venue": "Aether Arena",
+    "city": "Synthetic City",
+    "kickoff_utc": "2026-10-19T19:45:00Z",
+    "home_team": {
+        "id": "NLA", "name": "North Larchmont Athletic",
+        "short_name": "NLA", "kit": "crimson/gold",
+    },
+    "away_team": {
+        "id": "MCS", "name": "Meridian City SC",
+        "short_name": "MCS", "kit": "cyan/navy",
+    },
+    "data_source": "PitchForge synthetic 10Hz engine",
+    "synthetic": True,
+    "disclaimer": "All clubs, players, crests and tracking samples are fictional.",
 }
 
 
@@ -278,17 +309,29 @@ class PitchForgeEngine:
         self._pending_events: List[dict] = []
         self._pending_kickoff: Optional[str] = None
         self._in_tick = False
+        self.pass_seq = 0
         self.milestones = MilestoneTracker()
         self.kickoff("NLA", quiet=True)
 
     # ------------------------------------------------------------------ setup
     def _build_squads(self) -> None:
+        # Synthetic match-to-date baselines at the 62nd minute: distances are
+        # realistic per role, and every 250 m becomes a tagged threshold.
+        baseline_km = {"GK": 3.1, "DEF": 6.7, "MID": 7.8, "FWD": 7.2}
         for team, squad in (("NLA", SQUAD_NLA), ("MCS", SQUAD_MCS)):
             for num, name, role, bx, by, ms in squad:
-                self.players.append(
-                    Player(pid=f"{team}_{num}", team=team, number=num, name=name,
-                           role=role, base=(bx, by), max_speed=ms)
+                baseline = (baseline_km[role] + self.rng.uniform(-0.35, 0.35)) * 1000.0
+                player = Player(
+                    pid=f"{team}_{num}", team=team, number=num, name=name,
+                    role=role, base=(bx, by), max_speed=ms,
+                    distance_m=round(baseline, 1),
+                    sprint_distance_m=round(baseline * 0.14, 1),
+                    top_speed_kmh=round(self.rng.uniform(28.5, 34.5), 1),
+                    next_distance_alert_m=float(
+                        (int(baseline // 250.0) + 1) * 250
+                    ),
                 )
+                self.players.append(player)
         self.by_id: Dict[str, Player] = {p.pid: p for p in self.players}
 
     def _world_base(self, p: Player) -> Tuple[float, float]:
@@ -383,8 +426,23 @@ class PitchForgeEngine:
     def _emit(self, ev: dict) -> None:
         ev.setdefault("t_match", round(self.t_match, 2))
         ev.setdefault("clock", self.clock())
+        if self.scenario:
+            ev.setdefault("scenario", self.scenario["name"])
+            ev.setdefault("scenario_signature", self._is_scenario_signature(ev))
         target = self.events if self._in_tick else self._pending_events
         target.append(ev)
+
+    @staticmethod
+    def _is_scenario_signature(ev: dict) -> bool:
+        """Flag the one event that best proves a God-Mode scenario landed."""
+        sc, kind = ev.get("scenario"), ev.get("type")
+        if sc == "chaos_counter":
+            return kind == "PASS" and bool(ev.get("line_breaking"))
+        if sc == "high_press_turnover":
+            return kind in ("TACKLE", "PRESSURE_TRAP")
+        if sc == "tactical_inversion":
+            return kind == "TACTICAL_INVERSION"
+        return False
 
     # --------------------------------------------- Signature-trait badge registry
     def set_badge(self, pids: List[str], name: str, duration_s: float) -> None:
@@ -501,6 +559,14 @@ class PitchForgeEngine:
         pressers = [p for p in self._opponents(self.possession) if p.role != "GK"]
         pressers.sort(key=lambda p: math.hypot(p.x - ball_xy[0], p.y - ball_xy[1]))
         thief = pressers[0]
+        carrier = self.owner
+        self._emit({"type": "TACKLE", "team": thief.team,
+                    "player_id": thief.pid, "player_name": thief.name,
+                    "opponent_id": carrier.pid if carrier else None,
+                    "opponent_name": carrier.name if carrier else None,
+                    "x": round(ball_xy[0], 2), "y": round(ball_xy[1], 2),
+                    "outcome": "WON",
+                    "detail": "Pressing trap tackle wins possession"})
         self._emit({"type": "PRESSURE_TRAP", "team": thief.team,
                     "player_id": thief.pid, "player_name": thief.name,
                     "players": [p.pid for p in pressers[:3]],
@@ -561,10 +627,13 @@ class PitchForgeEngine:
         flight_t = dist / speed_ms
         aim = (target.x + target.vx * flight_t, target.y + target.vy * flight_t)
         start = (carrier.x, carrier.y)
+        self.pass_seq += 1
         self.flight = {
             "from": start, "to": aim, "speed": speed_ms, "travelled": 0.0,
             "dist": dist, "target_pid": target.pid, "is_shot": False,
             "line_breaking": reason == "line_breaking", "prev_z": 0.0, "vz": 0.0,
+            "pass_seq": self.pass_seq, "passer_pid": carrier.pid,
+            "passer_name": carrier.name, "team": carrier.team,
         }
         self.owner = None
         self._kick = (carrier.pid, self.t_match + KICK_POSE_S)
@@ -583,6 +652,7 @@ class PitchForgeEngine:
             "nearest_defender_m": round(nearest, 2),
             "target_id": target.pid, "reason": reason,
             "line_breaking": reason == "line_breaking",
+            "pass_seq": self.pass_seq,
             "scenario": self.scenario["name"] if self.scenario else None,
         })
 
@@ -609,6 +679,7 @@ class PitchForgeEngine:
             "distance_m": round(dist, 1), "defenders_in_cone": cone,
             "nearest_defender_m": round(min(
                 (math.hypot(o.x - start[0], o.y - start[1]) for o in opponents), default=20.0), 2),
+            "on_target": abs(aim_y - 34.0) <= GOAL_HALF_WIDTH,
             "scenario": self.scenario["name"] if self.scenario else None,
         })
 
@@ -638,8 +709,18 @@ class PitchForgeEngine:
             for o in self._opponents(self.possession):
                 if math.hypot(o.x - bx, o.y - by) < 1.2 and self.rng.random() < 0.8:
                     middle = MIDDLE_THIRD[0] <= bx <= MIDDLE_THIRD[1]
+                    self._emit({"type": "TACKLE", "team": o.team,
+                                "player_id": o.pid, "player_name": o.name,
+                                "opponent_id": f.get("passer_pid"),
+                                "opponent_name": f.get("passer_name"),
+                                "x": round(bx, 2), "y": round(by, 2),
+                                "outcome": "WON",
+                                "detail": "Intercepted a ground pass"})
                     self._emit({"type": "INTERCEPTION", "team": o.team,
                                 "player_id": o.pid, "player_name": o.name,
+                                "pass_seq": f.get("pass_seq"),
+                                "passer_id": f.get("passer_pid"),
+                                "passer_name": f.get("passer_name"),
                                 "x": round(bx, 2), "y": round(by, 2)})
                     self._set_possession(o, middle_third=middle)
                     return
@@ -666,22 +747,43 @@ class PitchForgeEngine:
                 # Defer the restart so the GOAL tick still snapshots the goalmouth.
                 self._pending_kickoff = "MCS" if shooter_team == "NLA" else "NLA"
             else:
-                self._emit({"type": "SAVE", "team": gk.team,
-                            "player_id": gk.pid, "player_name": gk.name,
-                            "shooter_team": shooter_team,
-                            "shooter_pid": f.get("shooter_pid"),
-                            "shooter_name": f.get("shooter_name"),
-                            "x": round(bx, 2), "y": round(by, 2), "outcome": "SAVE"})
+                # Only a ball inside the frame can be a save. Off-target strikes
+                # are recorded separately so shot / save stats stay honest.
+                if in_mouth:
+                    self._emit({"type": "SAVE", "team": gk.team,
+                                "player_id": gk.pid, "player_name": gk.name,
+                                "shooter_team": shooter_team,
+                                "shooter_pid": f.get("shooter_pid"),
+                                "shooter_name": f.get("shooter_name"),
+                                "x": round(bx, 2), "y": round(by, 2), "outcome": "SAVE"})
+                else:
+                    self._emit({"type": "SHOT_OFF_TARGET", "team": shooter_team,
+                                "player_id": f.get("shooter_pid"),
+                                "player_name": f.get("shooter_name"),
+                                "x": round(bx, 2), "y": round(by, 2),
+                                "detail": "Strike outside the goal frame"})
                 self._set_possession(gk, middle_third=False, quiet=True)
             return
         target = self.by_id.get(f.get("target_pid") or "")
         if target is None:
             target = min(self._team(self.possession),
                          key=lambda p: math.hypot(p.x - bx, p.y - by))
+        self._emit({
+            "type": "PASS_COMPLETE",
+            "team": f.get("team") or target.team,
+            "player_id": f.get("passer_pid"),
+            "player_name": f.get("passer_name"),
+            "target_id": target.pid,
+            "target_name": target.name,
+            "pass_seq": f.get("pass_seq"),
+            "distance_m": round(float(f.get("dist", 0.0)), 1),
+            "line_breaking": bool(f.get("line_breaking")),
+        })
         self._set_possession(target, middle_third=False, quiet=True)
 
     # ------------------------------------------------------------- motion
     def _steer(self, p: Player, tx: float, ty: float, spd: float, dt: float) -> None:
+        prev_x, prev_y = p.x, p.y
         dx, dy = tx - p.x, ty - p.y
         d = math.hypot(dx, dy) or 1e-6
         wx, wy = dx / d * spd, dy / d * spd
@@ -694,6 +796,11 @@ class PitchForgeEngine:
             p.vx, p.vy = p.vx / sp * cap, p.vy / sp * cap
         p.x = _clamp(p.x + p.vx * dt, 0.5, PITCH_L - 0.5)
         p.y = _clamp(p.y + p.vy * dt, 0.5, PITCH_W - 0.5)
+        moved = math.hypot(p.x - prev_x, p.y - prev_y)
+        p.distance_m += moved
+        if p.speed_kmh >= SPRINT_THRESHOLD_KMH:
+            p.sprint_distance_m += moved
+        p.top_speed_kmh = max(p.top_speed_kmh, p.speed_kmh)
         p.stamina = _clamp(
             p.stamina - dt * (0.008 + 0.05 * (sp / p.max_speed) ** 2) + dt * 0.02, 40.0, 100.0
         )
@@ -790,7 +897,17 @@ class PitchForgeEngine:
                     self._emit({"type": "AUTO_SPRINT_ALERT", "team": p.team,
                                 "player_id": p.pid, "player_name": p.name,
                                 "speed_kmh": round(p.speed_kmh, 1),
+                                "distance_m": round(p.distance_m, 1),
                                 "x": round(p.x, 2), "y": round(p.y, 2)})
+            if p.role != "GK" and p.distance_m >= p.next_distance_alert_m:
+                p.next_distance_alert_m += 250.0
+                self._emit({"type": "AUTO_DISTANCE_ALERT", "team": p.team,
+                            "player_id": p.pid, "player_name": p.name,
+                            "distance_m": round(p.distance_m, 1),
+                            "distance_km": round(p.distance_m / 1000.0, 2),
+                            "threshold_km": round(p.distance_m / 1000.0, 2),
+                            "speed_kmh": round(p.speed_kmh, 1),
+                            "x": round(p.x, 2), "y": round(p.y, 2)})
         if self._trap_cd <= 0:
             pressing = [o for o in self._opponents(poss)
                         if o.role != "GK" and math.hypot(o.x - ball_xy[0], o.y - ball_xy[1]) < PRESSURE_RADIUS_M]
@@ -838,6 +955,7 @@ class PitchForgeEngine:
             "clock": self.clock(),
             "score": dict(self.score),
             "possession": self.possession,
+            "match_metadata": dict(MATCH_METADATA),
             "players": [
                 {"id": p.pid, "team": p.team, "number": p.number,
                  "shirt_number": p.number, "name": p.name, "role": p.role,
@@ -845,6 +963,9 @@ class PitchForgeEngine:
                  "vx": round(p.vx, 2), "vy": round(p.vy, 2),
                  "speed_kmh": round(p.speed_kmh, 1), "stamina": round(p.stamina, 1),
                  "heading_rad": round(p.heading, 3),
+                 "distance_m": round(p.distance_m, 1),
+                 "sprint_distance_m": round(p.sprint_distance_m, 1),
+                 "top_speed_kmh": round(p.top_speed_kmh, 1),
                  "pose_state": self._pose_state(p),
                  "playstyle_badge": self._playstyle_badge(p)}
                 for p in self.players

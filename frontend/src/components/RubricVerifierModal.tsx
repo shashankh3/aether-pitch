@@ -14,13 +14,26 @@ interface Props {
   onClose: () => void;
 }
 
-const REQUIREMENTS: { label: string; key: keyof PipelineAudit["audit"] | null; note: string }[] = [
-  { label: "Stage (a) Ingest & CV Auto-Eventing (10Hz Stream + Homography)", key: "stage_a_ingest_ms", note: "PitchForge physics sim + auto-eventer + synthetic CV PiP" },
-  { label: "Stage (b) Real-Time Math (Control vs Chaos Entropy, Pass Difficulty PDR, 16x12 xT)", key: "stage_b_interpret_ms", note: "Deterministic NumPy — zero LLM guessing" },
-  { label: "Stage (c) Causal Explainability (Azure AI Foundry Triage + Narrative Router + Bi-Directional Co-Pilot)", key: "stage_c_explain_ms", note: "Ask The 12th Man + scene directives" },
-  { label: "Stage (d) Synchronized Broadcast Render (3D WebGL AR + SMPTE Alpha Overlay JSON)", key: "stage_d_render_ms", note: "AETHER_RENDER_PARTNER_V2 machine packets" },
-  { label: "Stage (e) Dual-Persona & Multi-Language (Analyst vs Casual + PlayerLock 360 + EN/ES/AR/HI Voice)", key: "stage_e_personalize_ms", note: "Deterministic atlas + Azure Translator-ready" },
+const REQUIREMENTS: {
+  label: string;
+  key: keyof PipelineAudit["audit"] | null;
+  note: string;
+  stage: string;
+}[] = [
+  { label: "Stage (a) Ingest & CV Auto-Eventing (10Hz Stream + Homography)", key: "stage_a_ingest_ms", note: "PitchForge physics sim + auto-eventer + synthetic CV PiP", stage: "a" },
+  { label: "Stage (b) Real-Time Math (Control vs Chaos Entropy, Pass Difficulty PDR, 16x12 xT)", key: "stage_b_interpret_ms", note: "Deterministic NumPy — zero LLM guessing", stage: "b" },
+  { label: "Stage (c) Causal Explainability (Azure AI Foundry Triage + Narrative Router + Bi-Directional Co-Pilot)", key: "stage_c_explain_ms", note: "Ask The 12th Man + scene directives; deterministic local fallback keeps judging online", stage: "c" },
+  { label: "Stage (d) Synchronized Broadcast Render (3D WebGL AR + SMPTE Alpha Overlay JSON)", key: "stage_d_render_ms", note: "AETHER_RENDER_PARTNER_V2 machine packets", stage: "d" },
+  { label: "Stage (e) Dual-Persona & Multi-Language (Analyst vs Casual + PlayerLock 360 + EN/ES/AR/HI Voice)", key: "stage_e_personalize_ms", note: "Deterministic atlas, Azure Translator-ready", stage: "e" },
 ];
+
+const MODE_META: Record<string, { label: string; tone: string }> = {
+  local_live: { label: "LOCAL VERIFIED", tone: "bg-pitch/15 text-pitch" },
+  azure_ready: { label: "AZURE READY", tone: "bg-tactical/15 text-tactical" },
+  azure_translator: { label: "AZURE TRANSLATOR", tone: "bg-tactical/15 text-tactical" },
+  local_fallback: { label: "LOCAL FALLBACK", tone: "bg-gold/15 text-gold" },
+  local_atlas: { label: "LOCAL ATLAS", tone: "bg-gold/15 text-gold" },
+};
 
 export default function RubricVerifierModal({ open, onClose }: Props) {
   const [audit, setAudit] = useState<PipelineAudit | null>(null);
@@ -107,15 +120,19 @@ export default function RubricVerifierModal({ open, onClose }: Props) {
             <div className="space-y-1.5">
               {REQUIREMENTS.map((req, i) => {
                 const ms = req.key ? audit.audit[req.key] : null;
+                const mode = audit.stage_modes?.[req.stage];
+                const meta = (mode ? MODE_META[mode] : undefined)
+                  ?? { label: "LOCAL VERIFIED", tone: "bg-pitch/15 text-pitch" };
+                const fallback = mode?.includes("fallback") || mode?.includes("atlas");
                 return (
                   <div key={i} className="clip-chamfer flex items-center gap-3 border border-white/10 bg-white/[0.03] px-3 py-2">
-                    <CheckCircle2 size={16} className="shrink-0 text-pitch" />
+                    <CheckCircle2 size={16} className={fallback ? "shrink-0 text-gold" : "shrink-0 text-pitch"} />
                     <div className="min-w-0 flex-1">
                       <div className="text-[12px] font-bold text-slate-100">{req.label}</div>
                       <div className="font-tech text-[9.5px] uppercase tracking-wider text-slate-500">{req.note}</div>
                     </div>
-                    <span className="clip-skew bg-pitch/15 px-2 py-0.5 font-tech text-[11px] font-bold text-pitch">
-                      VERIFIED
+                    <span className={`clip-skew px-2 py-0.5 font-tech text-[11px] font-bold ${meta.tone}`}>
+                      {meta.label}
                     </span>
                     {ms != null && (
                       <span className="w-[72px] text-right font-tech text-[12px] font-bold text-gold">
@@ -125,6 +142,27 @@ export default function RubricVerifierModal({ open, onClose }: Props) {
                   </div>
                 );
               })}
+            </div>
+
+            <div className="clip-chamfer mt-3 border border-white/10 bg-white/[0.03] px-3 py-2">
+              <div className="flex items-center justify-between">
+                <div className="font-display text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+                  Azure AI Foundry Posture
+                </div>
+                <span className={`clip-skew px-2 py-0.5 font-tech text-[10px] font-bold ${audit.azure?.configured ? "bg-tactical/15 text-tactical" : "bg-gold/15 text-gold"}`}>
+                  {audit.azure?.configured ? "CREDENTIALS CONFIGURED" : "LOCAL FALLBACK"}
+                </span>
+              </div>
+              <div className="mt-1 font-tech text-[10px] leading-relaxed text-slate-400">
+                {audit.azure?.configured
+                  ? `Deployments: ${audit.azure.triage_deployment} triage → ${audit.azure.narrative_deployment} narrative. Audit itself uses the deterministic fallback so verification never depends on network access.`
+                  : "No Azure keys in this environment. Every insight still receives a valid Stage C schema from the deterministic router; add AZURE_OPENAI_* keys to activate Foundry live."}
+              </div>
+              {audit.azure?.last_error && (
+                <div className="mt-1 truncate font-tech text-[9.5px] text-gold" title={audit.azure.last_error}>
+                  Last live call: {audit.azure.last_error}
+                </div>
+              )}
             </div>
 
             <div className="clip-chamfer mt-3 border border-white/10 bg-white/[0.03] px-3 py-2">

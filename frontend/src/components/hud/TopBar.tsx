@@ -7,6 +7,7 @@
 import { Clapperboard, Eye, EyeOff, HelpCircle, Maximize2, Minimize2, Play, PanelRightOpen, Radio, Square, Trophy } from "lucide-react";
 import type { LangCode } from "@/lib/types";
 import { LANG_LABELS } from "@/lib/types";
+import { AUTOPILOT_TOTAL_SECONDS } from "@/components/JudgeAutopilotTour";
 import { useHud, type HudMode } from "@/lib/hudContext";
 import { cn } from "@/lib/utils";
 
@@ -108,11 +109,13 @@ export default function TopBar({
               ? "border-crimson/60 bg-crimson/15 text-crimson"
               : "animate-breathe border-gold/60 bg-gold/15 text-gold hover:bg-gold/25",
           )}
-          title="Run the 60-second, 6-step judge autopilot demo"
+          title={`Run the ${AUTOPILOT_TOTAL_SECONDS}-second, 6-step judge autopilot demo`}
         >
           {autopilotActive ? <Square size={12} /> : <Play size={12} />}
           <span className="hidden lg:inline">
-            {autopilotActive ? `Autopilot ${Math.max(1, autopilotStep + 1)}/6 · ${Math.ceil(60 - autopilotElapsed)}s` : "60s Autopilot"}
+            {autopilotActive
+              ? `Autopilot ${Math.max(1, autopilotStep + 1)}/6 · ${Math.ceil(AUTOPILOT_TOTAL_SECONDS - autopilotElapsed)}s`
+              : `${AUTOPILOT_TOTAL_SECONDS}s Autopilot`}
           </span>
           <Trophy size={12} className="hidden lg:inline" />
         </button>

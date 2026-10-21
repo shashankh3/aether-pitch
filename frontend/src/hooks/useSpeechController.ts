@@ -20,6 +20,7 @@ let state: SpeechState = {
   isVoiceMuted: false,
   lang: "en",
 };
+let autoNarrationSuppressed = false;
 const listeners = new Set<() => void>();
 
 function emit(next: Partial<SpeechState>) {
@@ -87,6 +88,15 @@ function stopSpeaking() {
   emit({ isSpeaking: false, activeText: "" });
 }
 
+function speakAuto(text: string, lang: LangCode) {
+  if (autoNarrationSuppressed) return;
+  speakInsight(text, lang);
+}
+
+function setAutoNarrationSuppressed(next: boolean) {
+  autoNarrationSuppressed = next;
+}
+
 function toggleMute() {
   const next = !state.isVoiceMuted;
   emit({ isVoiceMuted: next });
@@ -102,6 +112,8 @@ export function useSpeechController() {
     isVoiceMuted: snap.isVoiceMuted,
     lang: snap.lang,
     speakInsight: speak,
+    speakAuto,
+    setAutoNarrationSuppressed,
     stopSpeaking,
     toggleMute,
   };

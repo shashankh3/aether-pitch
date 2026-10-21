@@ -3,13 +3,13 @@
 **Tagline:** *AETHER PITCH — the championship finale, rendered live in 3D and personalized for every fan.*
 
 **Premier League × Microsoft Azure “Inside the Game” Hackathon submission.**
-A real-time React Three Fiber broadcast studio fed by a synthetic 10 Hz football telemetry engine, a deterministic five-stage AI pipeline with optional Azure AI Foundry reasoning, a three-act cinematic recap, and a 60-second self-driving judge tour.
+A real-time React Three Fiber broadcast studio fed by a synthetic 10 Hz football telemetry engine, a deterministic five-stage AI pipeline with optional Azure AI Foundry reasoning, a three-act cinematic recap, and an 80-second self-driving judge tour.
 
 NLA (North Larchmont Athletic) vs MCS (Meridian City SC). **All clubs, players, crests, and tracking data are synthetic.**
 
 ---
 
-## 1. The 60-Second Pitch
+## 1. The 80-Second Pitch
 
 Judges usually see a highlight reel. AETHER PITCH lets them **drive the broadcast**:
 
@@ -17,7 +17,7 @@ Judges usually see a highlight reel. AETHER PITCH lets them **drive the broadcas
 2. **A deterministic AI pipeline** — every pass gets a Pass Difficulty Rating, a ΔxT value, and a counterfactual ghost lane from transparent math, not a black box.
 3. **A personalized fan runtime** — persona, single-metric lock, club bias, locked player, and EN/ES/AR/HI commentary adapt live, without restarting the stream.
 4. **A three-act finale** — the milestone engine detects sprint records, five-pass mastery, and 30-second press sieges, then freezes full 22-player snapshots into a downloadable storyboard.
-5. **A judge autopilot** — one click runs a 60-second, six-step rubric tour with synchronized voiceover.
+5. **A judge autopilot** — one click runs an 80-second, six-step rubric tour with synchronized voiceover, then hands off from the recap to the rubric proof without overlapping dialogs.
 6. **A resilient engine** — if Azure or the backend drops, a 10 Hz browser-native synthetic engine takes over immediately and hot-swaps back when the WebSocket returns.
 
 ---
@@ -29,9 +29,11 @@ Judges usually see a highlight reel. AETHER PITCH lets them **drive the broadcas
 | 1 | Fan Personalization Engine | `backend/stage_d_e_personalizer.py`, `frontend/src/components/FanPersonalizationTuner.tsx`, `frontend/src/components/TwinCastHUD.tsx` | Persona fork, metric badge, club lens, locked-player context, localized commentary |
 | 2 | Milestone Engine + 3-Act Recap | `MilestoneTracker` in `backend/stage_a_synthetic_engine.py`, `backend/stage_c_foundry_agents.py`, `frontend/src/components/MatchRecapStudioModal.tsx` | Sprint/pass/press milestones, full snapshots, ghost lanes, `LOAD ACT` time travel, teleprompter export |
 | 3 | Spatial Control Surface + Passing Network | `frontend/src/components/three/SpatialControlSurface3D.tsx` | 21×14 Gaussian pitch-control heat surface and elevated 3D pass network |
-| 4 | Judge Autopilot Tour | `frontend/src/components/JudgeAutopilotTour.tsx` | 60-second, six-step demo with rubric callouts and voiceover |
+| 4 | Judge Autopilot Tour | `frontend/src/components/JudgeAutopilotTour.tsx` | 80-second, six-step demo with rubric callouts, voiceover, and a sequenced recap-to-rubric finale |
 | 5 | Resilient Match Engine | `frontend/src/hooks/useResilientMatchEngine.ts`, `frontend/src/lib/edgeEngine.ts` | 10 Hz edge fallback, seamless WebSocket hot-swap, live/edge status pill |
 | 6 | Submission Package | this guide + `frontend/src/components/three/RecapPassTubes.tsx`, `PipelineInspector` status | Complete architecture, math appendix, and sub-two-minute demo script |
+
+The live HUD also exposes an always-visible A–E **PipelineRibbon** and a **MatchIntelPanel** beneath the scorebug, so judges can see stage latency and match intelligence without opening a modal.
 
 ---
 
@@ -58,10 +60,10 @@ Judges usually see a highlight reel. AETHER PITCH lets them **drive the broadcas
 │                    AZURE-READY BACKEND PIPELINE (CLOUD-OPTIONAL)             │
 │                                                                              │
 │  STAGE A  Synthetic ingest / physics / pose / milestones                     │
-│           10 Hz · 22 players · 3D ball · milestone tracker                   │
+│           10 Hz · 22 players · match metadata · distance/speed · pass/tackle │
 │                                      │                                       │
 │  STAGE B  Deterministic NumPy math                                            │
-│           chaos · PDR · xT · ghost pass · AI gate · leverage                  │
+│           chaos · PDR · xT · ghost pass · AI gate · leverage · team stats     │
 │                                      │                                       │
 │  STAGE C  Azure AI Foundry-hosted Azure OpenAI (triage → narrative)           │
 │           causal narrative · studio co-pilot · recap storyboard              │
@@ -97,13 +99,25 @@ Judges usually see a highlight reel. AETHER PITCH lets them **drive the broadcas
 
 | Stage | File | Input | Output | Blocking? |
 |-------|------|-------|--------|-----------|
-| **A — Ingest** | `backend/stage_a_synthetic_engine.py` | 10 Hz simulation clock | 22 players, ball, pose state, raw events, milestones | Yes — 10 Hz heartbeat |
-| **B — Interpret** | `backend/stage_b_math_engine.py` | Tick + raw events | Chaos, PDR, xT, ghost pass, gate, leverage | Yes — deterministic, sub-ms |
+| **A — Ingest** | `backend/stage_a_synthetic_engine.py` | 10 Hz simulation clock | Match metadata, 22 players, ball, pose, distance/speed, pass/tackle events, milestones | Yes — 10 Hz heartbeat |
+| **B — Interpret** | `backend/stage_b_math_engine.py` | Tick + raw events | Chaos, PDR, xT, ghost pass, gate, leverage, team/player stats | Yes — deterministic, sub-ms |
 | **C — Explain** | `backend/stage_c_foundry_agents.py` | Gated event + spatial context | Narrative, studio answer, recap acts | **No — async task** |
 | **D — Render** | `backend/stage_d_e_personalizer.py` | Stage C packet + metrics | Overlay, camera directive, highlight zone | Yes — cheap |
 | **E — Personalize** | `backend/stage_d_e_personalizer.py` | Preferences + packet | Persona fork, metric lock, club lens, translations | Yes — cheap |
 
 The 10 Hz tick loop **never awaits Stage C**. Cloud reasoning is dispatched with `asyncio.create_task`, so a slow model cannot stall the match.
+
+### 4.1 Match intelligence data contract
+
+Every `tick` carries `match_metadata` (fictional competition, season, matchday, venue, home/away club, synthetic disclaimer) plus per-player `distance_m`, `sprint_distance_m`, and `top_speed_kmh`. Stage A auto-emits `PASS_COMPLETE`, `TACKLE`, `AUTO_SPRINT_ALERT`, and `AUTO_DISTANCE_ALERT` (every 250 m) alongside `PASS`, `SHOT`, `SHOT_OFF_TARGET`, `SAVE`, `INTERCEPTION`, and `TURNOVER`.
+
+God-Mode events are tagged at the source with `scenario` and `scenario_signature`, so downstream reasoning never has to guess which event actually proves the injection. The orchestrator buffers simultaneous gated events for a short priority window and explains the signature moment first (for example, the pressing-trap tackle rather than a routine pass). Only shots inside the frame emit `SAVE`; off-target strikes emit `SHOT_OFF_TARGET` so shot and save statistics stay consistent.
+
+Stage B exposes cumulative `team_stats` and `player_stats`: passes and completion rate, shot accuracy, tackles, turnovers won, possession %, distance/sprint distance, and fastest/farthest leaders. The same payload is available at `GET /api/match-stats`.
+
+### 4.2 Audit truthfulness
+
+`GET /api/health/pipeline-audit` returns `stage_modes`, `stage_c_audit_mode`, measured Stage D/E timings, and Azure connection status. The audit's Stage C path is deterministic by design and labels itself `local_fallback`; when Azure credentials are configured, stage modes report `azure_ready` rather than claiming that a live model call completed. The rubric modal renders those labels directly.
 
 ---
 
@@ -265,13 +279,13 @@ The two layers are independent toggles (`pitchControl`, `passingNetwork`) in `Ca
 | Step | Time | Action | Rubric |
 |------|------|--------|--------|
 | 1 | 0–10 s | Force CV Auto-Eventer open, Tele camera | 10 Hz ingest · 22 players |
-| 2 | 10–20 s | Enable control surface + passing network + lasers; inject `chaos_counter` | God Mode + AI camera |
-| 3 | 20–32 s | Pause DVR, drone orbit, spotlight, offside wall, ghost lane | Freeze + telestrate |
-| 4 | 32–44 s | Resume, enter broadcast alpha for ~6.5 s | Transparent AR compositing |
-| 5 | 44–54 s | Alpha off, Player Lock 3rd person, TwinCast split, `PASS_QUALITY`, ES → HI → AR | Stage E personalization |
-| 6 | 54–60 s | Open 3-act recap, reveal rubric modal after 4 s | Milestones + proof |
+| 2 | 10–24 s | Enable control surface + passing network + lasers; inject `chaos_counter` | God Mode + AI camera |
+| 3 | 24–36 s | Pause DVR, drone orbit, spotlight, offside wall, ghost lane | Freeze + telestrate |
+| 4 | 36–48 s | Resume, enter broadcast alpha for ~6.5 s | Transparent AR compositing |
+| 5 | 48–62 s | Alpha off, Player Lock 3rd person, TwinCast split, `PASS_QUALITY`, ES → HI → AR | Stage E personalization |
+| 6 | 62–80 s | Open 3-act recap; swap to rubric proof at 70 s | Milestones + proof |
 
-Voiceover uses the same zero-overlap speech controller as the broadcast. The callout above the pitch shows the current rubric, action, and 60-second progress bar. Pressing the button again stops the tour and clears timers, alpha, and CV override.
+Voiceover uses the same zero-overlap speech controller as the broadcast, which suppresses automatic commentary so the tour never talks over itself. The callout above the pitch shows the current rubric, action, and 80-second progress bar. Pressing the button again stops the tour, clears timers/alpha/CV override, and restores automatic commentary.
 
 ---
 
@@ -409,19 +423,19 @@ No credentials? Everything still runs through deterministic fallbacks. Add `AZUR
 
 ## 8. Demo Video Script (must be under 2:00)
 
-Official Rules §4.4 requires the demo video to be **less than two minutes**. Record at 1080p, use no third-party logos or unlicensed music, and upload it publicly to YouTube, Vimeo, Facebook Video, or Youku. The 60-second autopilot makes a sub-two-minute cut straightforward.
+Official Rules §4.4 requires the demo video to be **less than two minutes**. Record at 1080p, use no third-party logos or unlicensed music, and upload it publicly to YouTube, Vimeo, Facebook Video, or Youku. The 80-second autopilot plus a short proof pass makes a sub-two-minute cut straightforward.
 
 | Time | On screen | Say |
 |------|-----------|-----|
 | **0:00–0:08** | Studio opens on Tele Cam | “This is AETHER PITCH: a live 3D football broadcast running on 100% synthetic 10 Hz telemetry.” |
-| **0:08–0:12** | Click **Run 60s Judge Autopilot** | “One click runs a 60-second guided tour of the whole stack.” |
-| **0:12–0:28** | Steps 1–2: CV viewport, control surface, lasers, Chaos Counter | “Every overlay comes from the five-stage pipeline: ingest, interpret, explain, render, personalize.” |
-| **0:28–0:40** | Step 3: DVR freeze, drone orbit, spotlight, offside wall, ghost lane | “Freeze live play, scrub 15 seconds, and telestrate the full 22-player snapshot in 3D.” |
-| **0:40–0:52** | Step 4: broadcast alpha | “Alpha mode strips every opaque surface, leaving a transparent AR layer for any broadcast compositor.” |
-| **0:52–1:08** | Steps 5–6: Fan Tuner, Pass Quality, NLA lens, ES → HI → AR, recap opens | “The same moment becomes a different story per fan: persona, metric lock, club lens, and language.” |
-| **1:08–1:30** | Inspect milestones; click **Load Act** on Act 2; export teleprompter | “The milestone engine builds a three-act recap; Load Act restores the exact moment and draws actual versus ghost.” |
-| **1:30–1:45** | Click **Verify**; toggle the backend offline, then back | “A one-click five-stage audit, plus a 10 Hz edge engine that keeps the picture alive if the backend drops.” |
-| **1:45–1:55** | Close on the live pitch | “AETHER PITCH — synthetic football, real mathematics, broadcast-grade 3D.” |
+| **0:08–0:12** | Click **Run 80s Judge Autopilot** | “One click runs an 80-second guided tour of the whole stack.” |
+| **0:12–0:34** | Steps 1–2: CV viewport, control surface, lasers, Chaos Counter | “Every overlay comes from the five-stage pipeline: ingest, interpret, explain, render, personalize.” |
+| **0:34–0:50** | Step 3: DVR freeze, drone orbit, spotlight, offside wall, ghost lane | “Freeze live play, scrub 15 seconds, and telestrate the full 22-player snapshot in 3D.” |
+| **0:50–1:04** | Step 4: broadcast alpha | “Alpha mode strips every opaque surface, leaving a transparent AR layer for any broadcast compositor.” |
+| **1:04–1:22** | Steps 5–6: Fan Tuner, Pass Quality, NLA lens, ES → HI → AR, recap then rubric | “The same moment becomes a different story per fan: persona, metric lock, club lens, and language.” |
+| **1:22–1:38** | Inspect milestones; click **Load Act** on Act 2; export teleprompter | “The milestone engine builds a three-act recap; Load Act restores the exact moment and draws actual versus ghost.” |
+| **1:38–1:50** | Click **Verify**; toggle the backend offline, then back | “A one-click five-stage audit, plus a 10 Hz edge engine that keeps the picture alive if the backend drops.” |
+| **1:50–1:58** | Close on the live pitch | “AETHER PITCH — synthetic football, real mathematics, broadcast-grade 3D.” |
 
 **Fallback 20-second version:** open the studio → Run Autopilot → skip to the recap and press **Verify**.
 
@@ -432,8 +446,8 @@ Official Rules §4.4 requires the demo video to be **less than two minutes**. Re
 | Criterion | Where to look | Proof |
 |-----------|---------------|-------|
 | **Real-time 3D / broadcast quality** | Full-bleed R3F stadium, 22 avatars, 60 FPS interpolation | Tele cam, drone orbit, player lock, GOAL slam |
-| **Azure AI integration** | Pipeline Inspector + `/api/health/pipeline-audit` | Stage A→E latency, raw payloads, deterministic fallbacks |
-| **Football intelligence** | Tactical Pulse, xT grid, PDR, ghost pass, defensive lasers | Stage B math appendix |
+| **Azure AI integration** | Pipeline Inspector + `/api/health/pipeline-audit` | Stage A→E latency, `stage_modes`, Azure posture, raw payloads, deterministic fallbacks |
+| **Football intelligence** | Tactical Pulse, xT grid, PDR, ghost pass, defensive lasers, pass accuracy/distance leaders | Stage B math appendix |
 | **Personalization** | Fan Tuner + TwinCast badges + localized speech | Persona, metric lock, club bias, ES/AR/HI |
 | **Storytelling** | Milestones + three-act recap + teleprompter | Sprint/pass/press records, `LOAD ACT` time travel |
 | **Reliability** | Pipeline status pill + backend-off demo | Edge fallback and hot-swap |
@@ -498,7 +512,7 @@ frontend/src/
   components/
     FanPersonalizationTuner.tsx    # persona / metric / club / language
     MatchRecapStudioModal.tsx      # 3-act recap + time travel + export
-    JudgeAutopilotTour.tsx         # 60 s / 6-step rubric tour
+    JudgeAutopilotTour.tsx         # 80 s / 6-step rubric tour
     TwinCastHUD.tsx                # metric-lock + club-lens badges
     PipelineInspector.tsx          # live/edge status pill
     VisionAutoEventerHUD.tsx       # external expanded override
@@ -527,7 +541,7 @@ frontend/src/
 |---|---|---|
 | New project created after September 29, 2026 | Git history starts October 19, 2026 | Done |
 | Five-stage pipeline: ingest, interpret, explain, render, personalize | README pipeline contract; Stage A–E in `backend/`; `/api/health/pipeline-audit` | Done |
-| Player ID, pass quality, speed, ball/shot speed metrics | Stage A events + Stage B PDR/xT; HUD player pills and scorebug | Done |
+| Player ID, pass quality/accuracy, speed, distance, ball/shot speed metrics | Stage A distance/top-speed telemetry + Stage B `team_stats`/`player_stats`; HUD pills, PlayerLock 360, scorebug, MatchIntelPanel | Done |
 | Auto-eventing (synthetic CV feed) | `VisionAutoEventerHUD` + Stage A auto-eventer; clearly labelled synthetic | Done |
 | Narrative generation and match recap | Stage C insights + three-act storyboard | Done |
 | Explainability (control vs chaos, pressure, rhythm) | Chaos Index, PDR, xT, Ghost Pass, causal “why” narratives | Done |
@@ -537,13 +551,13 @@ frontend/src/
 | Public GitHub repository | https://github.com/shashankh3/aether-pitch (public) | Done |
 | Project pitch/description | README intro + §1 of this guide | Done |
 | English submission materials | README, guide, UI default | Done |
-| Demo video **under 2:00**, public URL, shows the project running, no third-party marks or unlicensed music | §8 script (1:55); record and upload to YouTube/Vimeo/Facebook/Youku | **Action needed** |
+| Demo video **under 2:00**, public URL, shows the project running, no third-party marks or unlicensed music | §8 script (1:58); record and upload to YouTube/Vimeo/Facebook/Youku | **Action needed** |
 | Working demo/test access for judges, free of charge until judging ends | Provide a hosted URL and credentials; local/Docker steps are in §7 | **Action needed** |
 | Original work, owned by the entrant; third-party SDK/API licenses respected | Original code; OSS dependencies under their licences; no bundled third-party assets | Done |
 | Team representative, eligibility, ownership, not a prior winner, no Sponsor financial support | Complete the submission-form attestations; keep registration details current | **Action needed** |
 | Video does not include third-party trademarks | UI and script use AETHER PITCH branding only; no real clubs, leagues, or brands | Done |
 
-**Note on Azure:** the app is fully functional without cloud credentials. Stage C uses Azure AI Foundry-hosted Azure OpenAI deployments and Stage E uses Azure AI Translator when configured; otherwise both use deterministic local fallbacks. This is intentional, so judges can test offline and the demo never blocks on a model call. `azure.yaml` is a service manifest, not a turnkey infrastructure template; use Docker Compose for a zero-setup local demo, or provide your own `azd` infrastructure for a hosted URL.
+**Note on Azure:** the app is fully functional without cloud credentials. Stage C uses Azure AI Foundry-hosted Azure OpenAI deployments and Stage E uses Azure AI Translator when configured; otherwise both use deterministic local fallbacks. The audit and rubric modal label which mode actually ran, so no deterministic result is presented as a live cloud call. This is intentional, so judges can test offline and the demo never blocks on a model call. `azure.yaml` is a service manifest, not a turnkey infrastructure template; use Docker Compose for a zero-setup local demo, or provide your own `azd` infrastructure for a hosted URL.
 
 ---
 
