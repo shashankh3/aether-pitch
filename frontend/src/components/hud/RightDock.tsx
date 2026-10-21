@@ -85,6 +85,8 @@ interface Props {
   pipeline: Parameters<typeof PipelineRibbon>[0]["pipeline"];
   connected: boolean;
   status: Parameters<typeof PipelineRibbon>[0]["status"];
+  drill?: Parameters<typeof PipelineRibbon>[0]["drill"];
+  onTriggerDrill?: (durationMs?: number) => void;
 }
 
 const CONTROL_TABS: { id: ControlTab; label: string; icon: LucideIcon }[] = [
@@ -109,12 +111,12 @@ export default function RightDock(props: Props) {
     toggleTelestrator, autoSpotlight,
     alphaMode, alphaBackdrop, onToggleAlpha, onToggleBackdrop,
     onShowAlphaModal, onShowRubric, onShowRecap,
-    pipeline, connected, status,
+    pipeline, connected, status, drill, onTriggerDrill,
   } = props;
 
   const {
     controlCenterOpen, setControlCenterOpen, controlTab, setControlTab, openControlCenter,
-    setShortcutsOpen,
+    setShortcutsOpen, colorblindSafe, setColorblindSafe, palette,
   } = useHud();
   const panelRef = useRef<HTMLElement>(null);
   useModalA11y(controlCenterOpen && !alphaMode, () => setControlCenterOpen(false), panelRef);
@@ -140,6 +142,7 @@ export default function RightDock(props: Props) {
       latestEvent={latestEvent}
       metricFocus={metricFocus}
       clubBias={clubBias}
+      cognitiveDensity={personalization.cognitive_density}
     />
   );
 
@@ -276,7 +279,12 @@ export default function RightDock(props: Props) {
                   ))}
                 </div>
               </div>
-              <FanPersonalizationPanel state={personalization} onChange={applyPreferences} />
+              <FanPersonalizationPanel
+                state={personalization}
+                onChange={applyPreferences}
+                colorblindSafe={colorblindSafe}
+                onToggleColorblind={setColorblindSafe}
+              />
             </div>
           )}
 
@@ -309,8 +317,19 @@ export default function RightDock(props: Props) {
 
           {controlTab === "data" && (
             <div className="space-y-2">
-              <PipelineRibbon pipeline={pipeline} connected={connected} status={status} />
-              <PipelinePanel pipeline={pipeline} />
+              <PipelineRibbon
+                pipeline={pipeline}
+                connected={connected}
+                status={status}
+                drill={drill}
+              />
+              <PipelinePanel
+                pipeline={pipeline}
+                drill={drill}
+                connected={connected}
+                status={status}
+                onTriggerDrill={onTriggerDrill}
+              />
             </div>
           )}
 

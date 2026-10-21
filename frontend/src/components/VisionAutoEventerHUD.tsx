@@ -326,7 +326,7 @@ export default function VisionAutoEventerHUD({
             </span>
           </div>
           <div className="mt-0.5 font-tech text-[9px] font-bold uppercase tracking-wider text-slate-200">
-            105×68m FIFA Standard Locked
+            105×68m Regulation Standard Locked
           </div>
           <p className="mt-0.5 font-tech text-[7.5px] leading-relaxed text-slate-500">
             Plane-projective ground mapping · 3-point calibration · 0.004m residual

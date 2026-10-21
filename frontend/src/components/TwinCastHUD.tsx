@@ -6,9 +6,10 @@
 import { useEffect, useRef } from "react";
 import { Volume2, VolumeX, Gauge, BrainCircuit, Sparkles, Users, Heart, Layers } from "lucide-react";
 import type {
-  ClubBias, Insight, LangCode, MatchEvent, MatchTick, MetricFocus, Metrics, PersonaMode,
+  ClubBias, CognitiveDensity, Insight, LangCode, MatchEvent, MatchTick, MetricFocus,
+  Metrics, PersonaMode,
 } from "@/lib/types";
-import { LANG_LABELS } from "@/lib/types";
+import { COGNITIVE_DENSITY_META, LANG_LABELS } from "@/lib/types";
 import { useSpeechController } from "@/hooks/useSpeechController";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +23,7 @@ interface Props {
   latestEvent: MatchEvent | null;
   metricFocus: MetricFocus;
   clubBias: ClubBias;
+  cognitiveDensity?: CognitiveDensity;
 }
 
 const METRIC_LABELS: Record<MetricFocus, string> = {
@@ -33,17 +35,19 @@ const METRIC_LABELS: Record<MetricFocus, string> = {
 };
 
 function AnalystCard({
-  metrics, tick, latestEvent, focus,
+  metrics, tick, latestEvent, focus, showRawNumbers = true,
 }: {
   metrics: Metrics | null;
   tick: MatchTick | null;
   latestEvent: MatchEvent | null;
   focus: MetricFocus;
+  showRawNumbers?: boolean;
 }) {
   const fastest = tick?.players.reduce((best, p) => p.speed_kmh > best ? p.speed_kmh : best, 0) ?? 0;
   const sprinters = tick?.players.filter((p) => p.speed_kmh >= 30).length ?? 0;
   const teamStats = latestEvent?.team ? metrics?.team_stats?.[latestEvent.team] : undefined;
   const isShot = latestEvent?.type === "SHOT" || latestEvent?.type === "GOAL";
+  const bioSummary = metrics?.bio_load_summary;
   const rows: [string, string, string][] = focus === "SPEED_VELOCITY"
     ? [
         ["TOP SPEED", `${fastest.toFixed(1)} km/h`, "text-crimson"],
@@ -80,10 +84,18 @@ function AnalystCard({
               ["Δ CHAOS 10s", (metrics?.delta_chaos ?? 0).toFixed(2), "text-gold"],
               ["LINE", `${metrics?.def_lines.NLA ?? 0}m / ${metrics?.def_lines.MCS ?? 0}m`, "text-slate-300"],
             ];
+  // Casual Storyteller replaces raw grid numbers with plain-language reads.
+  const casualRows: [string, string, string][] = [
+    ["MATCH TEMPO", (metrics?.chaos_index ?? 0) > 0.68 ? "CHAOTIC" : (metrics?.chaos_index ?? 0) < 0.4 ? "CONTROLLED" : "BALANCED", "text-tactical"],
+    ["FASTEST PLAYER", `${fastest.toFixed(1)} km/h`, "text-crimson"],
+    ["SPRINTERS NOW", `${sprinters} of 22`, "text-pitch"],
+    ["TEAM ENERGY", bioSummary ? `${bioSummary.mean_projected_stamina_10m.toFixed(0)}%` : "—", "text-gold"],
+  ];
+  const visibleRows = showRawNumbers ? rows : casualRows;
   return (
     <div className="space-y-2.5">
       <div className="grid grid-cols-2 gap-1.5">
-        {rows.map(([k, v, c]) => (
+        {visibleRows.map(([k, v, c]) => (
           <div key={k} className="clip-chamfer border border-white/10 bg-white/[0.03] px-2 py-1.5">
             <div className="font-display text-[9px] font-semibold uppercase tracking-[0.2em] text-slate-500">{k}</div>
             <div className={`font-tech text-[14px] font-bold ${c}`}>{v}</div>
@@ -145,10 +157,13 @@ const PERSONAS: { id: PersonaMode; label: string; icon: React.ReactNode }[] = [
 
 export default function TwinCastHUD({
   insights, persona, onPersona, lang, metrics, tick, latestEvent, metricFocus, clubBias,
+  cognitiveDensity = "PRO_TACTICAL_DIRECTOR",
 }: Props) {
   const { isSpeaking, isVoiceMuted, speakAuto, toggleMute } = useSpeechController();
   const spokenRef = useRef<string>("");
   const latest = insights[0];
+  const densityMeta = COGNITIVE_DENSITY_META[cognitiveDensity];
+  const showRawNumbers = densityMeta.rawNumbers;
 
   useEffect(() => {
     if (!latest || spokenRef.current === latest.id) return;
@@ -182,7 +197,7 @@ export default function TwinCastHUD({
             {isSpeaking && !isVoiceMuted && <span className="animate-breathe">LIVE</span>}
           </button>
         </div>
-        {(metricFocus !== "ALL" || clubBias !== "NEUTRAL") && (
+        {(metricFocus !== "ALL" || clubBias !== "NEUTRAL" || cognitiveDensity !== "PRO_TACTICAL_DIRECTOR") && (
           <div className="mt-1 flex flex-wrap gap-1">
             {metricFocus !== "ALL" && (
               <span className="clip-skew bg-pitch/15 px-1.5 py-0.5 font-tech text-[8.5px] font-bold uppercase tracking-wider text-pitch">
@@ -192,6 +207,11 @@ export default function TwinCastHUD({
             {clubBias !== "NEUTRAL" && (
               <span className="clip-skew bg-crimson/15 px-1.5 py-0.5 font-tech text-[8.5px] font-bold uppercase tracking-wider text-crimson">
                 {clubBias === "NLA_LOYALIST" ? "NLA LENS" : "MCS LENS"}
+              </span>
+            )}
+            {cognitiveDensity !== "PRO_TACTICAL_DIRECTOR" && (
+              <span className="clip-skew bg-violet-400/15 px-1.5 py-0.5 font-tech text-[8.5px] font-bold uppercase tracking-wider text-violet-300">
+                DENSITY · {densityMeta.label}
               </span>
             )}
           </div>
@@ -251,14 +271,22 @@ export default function TwinCastHUD({
               </p>
             </div>
             <div className="mt-2.5">
-              <AnalystCard metrics={metrics} tick={tick} latestEvent={latestEvent} focus={metricFocus} />
+              <AnalystCard
+                metrics={metrics}
+                tick={tick}
+                latestEvent={latestEvent}
+                focus={metricFocus}
+                showRawNumbers={showRawNumbers}
+              />
             </div>
             <div className="clip-chamfer mt-2.5 border border-white/10 bg-white/[0.03] px-2.5 py-2">
               <div className="mb-0.5 font-display text-[9px] font-bold uppercase tracking-[0.2em] text-slate-500">
-                Stage (E) Summary
+                {densityMeta.jargon ? "Stage (E) Summary" : "What It Means"}
               </div>
               <div className="font-tech text-[10.5px] leading-relaxed text-slate-300">
-                {latest.stage_e_personalization.analyst_mode.metrics_summary}
+                {densityMeta.jargon
+                  ? latest.stage_e_personalization.analyst_mode.metrics_summary
+                  : latest.stage_e_personalization.analyst_mode.metric_focus_note}
               </div>
             </div>
           </div>

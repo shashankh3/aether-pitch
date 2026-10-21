@@ -105,6 +105,9 @@ METRIC_FOCUS_OPTIONS = (
     "ALL", "SPEED_VELOCITY", "PASS_QUALITY", "EXPECTED_THREAT_XT", "CHAOS_PRESSING",
 )
 CLUB_BIAS_OPTIONS = ("NEUTRAL", "NLA_LOYALIST", "MCS_LOYALIST")
+COGNITIVE_DENSITY_OPTIONS = (
+    "CASUAL_STORYTELLER", "FANTASY_HUNTER", "PRO_TACTICAL_DIRECTOR",
+)
 
 METRIC_FOCUS_META = {
     "ALL": {
@@ -177,6 +180,8 @@ DEFAULT_PERSONALIZATION = {
     "favorite_club_bias": "NEUTRAL",
     "locked_player_id": None,
     "market_language": "en",
+    "cognitive_density": "PRO_TACTICAL_DIRECTOR",
+    "colorblind_safe": False,
 }
 
 
@@ -229,6 +234,8 @@ class Personalizer:
         focus = str(pref.get("metric_focus") or "ALL").upper()
         bias = str(pref.get("favorite_club_bias") or "NEUTRAL").upper()
         lang = str(pref.get("market_language") or "en").lower()
+        density = str(pref.get("cognitive_density") or "PRO_TACTICAL_DIRECTOR").upper()
+        colorblind = bool(pref.get("colorblind_safe", False))
         locked = pref.get("locked_player_id") or None
         return {
             "persona_mode": persona if persona in PERSONA_MODES else "TWINCAST_SPLIT",
@@ -236,6 +243,10 @@ class Personalizer:
             "favorite_club_bias": bias if bias in CLUB_BIAS_OPTIONS else "NEUTRAL",
             "locked_player_id": str(locked) if locked else None,
             "market_language": lang if lang in ("en", "es", "ar", "hi") else "en",
+            "cognitive_density": (
+                density if density in COGNITIVE_DENSITY_OPTIONS else "PRO_TACTICAL_DIRECTOR"
+            ),
+            "colorblind_safe": colorblind,
         }
 
     # ------------------------------------------------------------- Stage (d)+(e)

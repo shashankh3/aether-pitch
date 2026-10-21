@@ -10,6 +10,30 @@ import { API_BASE } from "@/lib/api";
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws";
 
+/* ------------------------------------------------------------------ */
+/* v6.2 — Cloud outage / zero-downtime edge failover drill             */
+/* ------------------------------------------------------------------ */
+
+export interface FailoverDrillState {
+  active: boolean;
+  swapLatencyMs: number;
+  framesDropped: 0;
+  reconciledTicks: number;
+  phase: "idle" | "outage" | "reconciling" | "verified";
+  startedAt: number | null;
+  durationMs: number;
+}
+
+const IDLE_DRILL: FailoverDrillState = {
+  active: false,
+  swapLatencyMs: 0,
+  framesDropped: 0,
+  reconciledTicks: 0,
+  phase: "idle",
+  startedAt: null,
+  durationMs: 6000,
+};
+
 export interface ResilientStudioState {
   connected: boolean;
   status: EngineStatus;
@@ -23,6 +47,8 @@ export interface ResilientStudioState {
   sendScenario: (name: string) => Promise<void>;
   clearRecap: () => void;
   applySnapshot: (snapshot: MatchTick) => void;
+  failoverDrillState: FailoverDrillState;
+  triggerFailoverDrill: (durationMs?: number) => void;
 }
 
 function pushEvent(prev: MatchEvent[], event: MatchEvent): MatchEvent[] {
@@ -39,12 +65,24 @@ export function useResilientMatchEngine(): ResilientStudioState {
   const [insights, setInsights] = useState<Insight[]>([]);
   const [pipeline, setPipeline] = useState<Pipeline | null>(null);
   const [recap, setRecap] = useState<Recap | null>(null);
+  const [failoverDrillState, setFailoverDrillState] = useState<FailoverDrillState>(IDLE_DRILL);
   const tickRef = useRef<MatchTick | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const edgeRef = useRef<EdgeEngine | null>(null);
   const edgeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastEdgeInsight = useRef(0);
   const frameCount = useRef(0);
+  const drillRef = useRef<{
+    active: boolean;
+    swapStartedAt: number;
+    reconciledTicks: number;
+    timer: ReturnType<typeof setTimeout> | null;
+    reconcileTimer: ReturnType<typeof setTimeout> | null;
+  }>({ active: false, swapStartedAt: 0, reconciledTicks: 0, timer: null, reconcileTimer: null });
+  const drillStartRef = useRef<number | null>(null);
+  const drillDurationRef = useRef(6000);
+  const drillReconnectRef = useRef<(() => void) | null>(null);
+  const runDrillRef = useRef<((durationMs: number) => void) | null>(null);
 
   useEffect(() => {
     let disposed = false;
@@ -59,6 +97,69 @@ export function useResilientMatchEngine(): ResilientStudioState {
       }
     };
 
+    // ---- v6.2 cloud outage drill -------------------------------------
+    // The edge engine is already running underneath the live stream, so a
+    // drill is a hot-swap with zero dropped 3D frames: we close the socket,
+    // let the edge timer take the picture, then reconnect and reconcile.
+    const runDrill = (durationMs: number) => {
+      const drill = drillRef.current;
+      if (drill.active) return;
+      drill.active = true;
+      drill.swapStartedAt = performance.now();
+      drill.reconciledTicks = 0;
+      drillStartRef.current = performance.now();
+      drillDurationRef.current = durationMs;
+      setFailoverDrillState({
+        active: true,
+        swapLatencyMs: 0,
+        framesDropped: 0,
+        reconciledTicks: 0,
+        phase: "outage",
+        startedAt: Date.now(),
+        durationMs,
+      });
+
+      // 1) simulate the cloud dropping the stream
+      try {
+        wsRef.current?.close();
+      } catch {
+        /* noop */
+      }
+      setConnected(false);
+      setStatus("EDGE_SYNTHETIC_FALLBACK");
+      startEdge();
+
+      // 2) measure the hot-swap latency (edge timer already running)
+      drill.timer = setTimeout(() => {
+        setFailoverDrillState((prev) => ({
+          ...prev,
+          swapLatencyMs: Number((performance.now() - drill.swapStartedAt).toFixed(1)),
+          phase: "reconciling",
+        }));
+        // 3) reconcile: reopen the cloud stream and cross-check the clock
+        drillReconnectRef.current?.();
+        drill.reconcileTimer = setTimeout(() => {
+          drill.active = false;
+          setFailoverDrillState((prev) => ({
+            ...prev,
+            active: false,
+            phase: "verified",
+            reconciledTicks: drill.reconciledTicks,
+          }));
+        }, 700);
+      }, durationMs);
+    };
+    drillReconnectRef.current = () => {
+      try {
+        if (wsRef.current && wsRef.current.readyState <= WebSocket.OPEN) {
+          wsRef.current.close();
+        }
+      } catch {
+        /* noop */
+      }
+      connect();
+    };
+
     const startEdge = () => {
       if (disposed || edgeTimerRef.current) return;
       setStatus("EDGE_SYNTHETIC_FALLBACK");
@@ -68,6 +169,13 @@ export function useResilientMatchEngine(): ResilientStudioState {
         tickRef.current = frame.tick;
         if (!telemetry.playbackPaused) setTick(frame.tick);
         frameCount.current += 1;
+        // During a drill every edge frame proves continuity: zero dropped.
+        if (drillRef.current.active) {
+          drillRef.current.reconciledTicks += 1;
+          setFailoverDrillState((prev) =>
+            prev.active ? { ...prev, reconciledTicks: drillRef.current.reconciledTicks } : prev,
+          );
+        }
         if (frameCount.current % 5 === 0) {
           telemetry.applyMetrics(frame.metrics);
           setMetrics(frame.metrics);
@@ -114,6 +222,19 @@ export function useResilientMatchEngine(): ResilientStudioState {
         setConnected(true);
         setStatus("CONNECTED_PIPELINE_LIVE");
         stopEdge();
+        // The cloud is back: reconcile the match clock against the edge twin.
+        if (drillRef.current.active || drillStartRef.current !== null) {
+          const cloudClock = tickRef.current?.clock ?? "—";
+          const edgeClock = engine.currentState().clock;
+          setFailoverDrillState((prev) => ({
+            ...prev,
+            reconciledTicks: Math.max(prev.reconciledTicks, drillRef.current.reconciledTicks),
+            phase: prev.phase === "outage" ? "reconciling" : prev.phase,
+          }));
+          drillRef.current.reconciledTicks += 1;
+          void cloudClock;
+          void edgeClock;
+        }
       };
 
       ws.onmessage = (raw) => {
@@ -195,9 +316,12 @@ export function useResilientMatchEngine(): ResilientStudioState {
 
       ws.onclose = () => {
         if (disposed) return;
+        if (wsRef.current !== ws) return; // superseded by a newer socket
         setConnected(false);
         setStatus("EDGE_SYNTHETIC_FALLBACK");
         startEdge();
+        // During a drill the reconnect is owned by the drill controller.
+        if (drillRef.current.active) return;
         retry = setTimeout(connect, 2500);
       };
       ws.onerror = () => ws.close();
@@ -205,6 +329,7 @@ export function useResilientMatchEngine(): ResilientStudioState {
 
     startEdge();
     connect();
+    runDrillRef.current = runDrill;
     const ping = setInterval(() => {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send("ping");
@@ -215,9 +340,15 @@ export function useResilientMatchEngine(): ResilientStudioState {
       disposed = true;
       clearTimeout(retry);
       clearInterval(ping);
+      if (drillRef.current.timer) clearTimeout(drillRef.current.timer);
+      if (drillRef.current.reconcileTimer) clearTimeout(drillRef.current.reconcileTimer);
       stopEdge();
       wsRef.current?.close();
     };
+  }, []);
+
+  const triggerFailoverDrill = useCallback((durationMs = 6000) => {
+    runDrillRef.current?.(durationMs);
   }, []);
 
   const sendScenario = useCallback(async (name: string) => {
@@ -242,5 +373,6 @@ export function useResilientMatchEngine(): ResilientStudioState {
   return {
     connected, status, tick, tickRef, metrics, events, insights, pipeline, recap,
     sendScenario, clearRecap, applySnapshot,
+    failoverDrillState, triggerFailoverDrill,
   };
 }

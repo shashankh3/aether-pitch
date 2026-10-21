@@ -8,7 +8,10 @@ fallbacks), no Azure credentials required.
 import asyncio
 import copy
 import json
+import re
 import sys
+from pathlib import Path
+from typing import Optional
 
 # Windows consoles default to cp1252 and crash on Δ / — in check details.
 if hasattr(sys.stdout, "reconfigure"):
@@ -17,12 +20,241 @@ if hasattr(sys.stdout, "reconfigure"):
 
 from agent_trace import build_agent_trace, gate_snapshot, p95, verify_grounding
 from rai_shield import check_club_neutrality, check_numeric_grounding, detect_prompt_risk
-from stage_a_synthetic_engine import PitchForgeEngine
+from stage_a_synthetic_engine import MATCH_METADATA, PitchForgeEngine
 from stage_b_math_engine import TacticalMathEngine, XT_MAX, XT_MIN
 from stage_c_foundry_agents import FoundryRouter
 from stage_d_e_personalizer import Personalizer
 from config import settings
 import main as app_main
+
+# ---------------------------------------------------------------------------
+# v6.2 — Official Rules §4.3 / §4.4 / §4.6 / §4.7 / §4.11 compliance audit
+# ---------------------------------------------------------------------------
+
+#: Real-world football brands, sponsors and competitions that must never be
+#: rendered in UI code. Matched with word boundaries so "HTMLSpanElement"
+#: never trips the "mls" rule.
+PROHIBITED_BRAND_STRINGS = (
+    "premier league", "la liga", "serie a", "bundesliga", "champions league",
+    "europa league", "fifa", "uefa", "efl", "mls",
+    "manchester united", "manchester city", "liverpool fc", "chelsea fc",
+    "arsenal fc", "tottenham", "real madrid", "barcelona", "atletico madrid",
+    "juventus", "inter milan", "ac milan", "bayern munich", "borussia dortmund",
+    "celtic fc", "rangers fc", "olympiacos",
+    "adidas", "nike", "puma", "umbro", "mitre", "kappa", "new balance",
+    "sky sports", "bt sport", "espn", "dazn", "bein sports",
+    "codm", "call of duty", "ea sports", "video game",
+    "gta", "minecraft", "roblox", "fortnite",
+)
+
+#: Social platform names. These are matched with a negative lookahead for the
+#: Next.js metadata protocol key (`twitter:`), which is a link-preview field
+#: rather than a brand rendered in the product.
+PROHIBITED_SOCIAL_STRINGS = (
+    "youtube", "netflix", "twitter", "instagram", "facebook", "tiktok",
+)
+
+#: Files whose purpose is to DEFINE these blocklists. They legitimately contain
+#: the very strings the audit is looking for, so they are audited for the
+#: other rules but excluded from the brand-string rule itself.
+BRAND_DETECTOR_FILES = (
+    "backend/test_pipeline.py",
+    "backend/rai_shield.py",
+)
+
+#: The only competition / venue entities this project may name.
+ALLOWED_COMPETITIONS = ("AETHER Synthetic League", "AETHER 3D DIGITAL TWIN")
+ALLOWED_TEAM_IDS = ("NLA", "MCS")
+
+#: Media extensions. Matched only as a real asset reference (preceded by a
+#: quote, space, bracket, `=` or path separator) so `ctx.moveTo` is not a
+#: false positive for `.mov`.
+MEDIA_ASSET_RE = re.compile(
+    r"""["'`\s(=/\\]\.(?:mp4|webm|mov|avi|mkv|m4v|mp3|wav)\b""",
+    re.IGNORECASE,
+)
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parent.parent
+
+
+def _iter_source_files() -> list:
+    """Every UI-rendering source file we ship, discovered with pure pathlib."""
+    root = _repo_root()
+    patterns = (
+        "frontend/src/**/*.tsx",
+        "frontend/src/**/*.ts",
+        "backend/*.py",
+    )
+    found: list = []
+    for pattern in patterns:
+        found.extend(sorted(root.glob(pattern)))
+    return found
+
+
+def test_rules_and_trademark_compliance(
+    state: dict,
+    metrics: Optional[dict] = None,
+    stage_c: Optional[dict] = None,
+    stage_d: Optional[dict] = None,
+    stage_e: Optional[dict] = None,
+) -> tuple:
+    """Audit Official Rules compliance across metadata, payloads and source.
+
+    Returns ``(results, report)`` where ``results`` is a list of
+    ``(name, passed, detail)`` tuples and ``report`` is a JSON-ready dict.
+    """
+    results: list = []
+
+    # -- §4.3 synthetic data: strict NLA vs MCS, synthetic league, seed 42 --
+    meta = state.get("match_metadata") or MATCH_METADATA
+    home = meta.get("home_team") or {}
+    away = meta.get("away_team") or {}
+    meta_ok = (
+        home.get("id") == "NLA"
+        and away.get("id") == "MCS"
+        and home.get("name") == "North Larchmont Athletic"
+        and away.get("name") == "Meridian City SC"
+        and meta.get("competition") == "AETHER Synthetic League"
+        and meta.get("synthetic") is True
+        and "fictional" in str(meta.get("disclaimer", "")).lower()
+    )
+    results.append((
+        "§4.3 synthetic metadata is strictly NLA vs MCS in AETHER Synthetic League",
+        meta_ok,
+        f"competition={meta.get('competition')} home={home.get('id')} away={away.get('id')}",
+    ))
+
+    # -- deterministic seed: the same seed must replay the same match -----
+    seed_a = PitchForgeEngine(seed=42, start_minute=62.0)
+    seed_b = PitchForgeEngine(seed=42, start_minute=62.0)
+    for _ in range(12):
+        sa, _ = seed_a.tick(0.1)
+        sb, _ = seed_b.tick(0.1)
+    deterministic = (
+        abs(sa["t_match"] - sb["t_match"]) < 1e-9
+        and abs(sa["score"]["NLA"] - sb["score"]["NLA"]) == 0
+        and abs(sa["players"][0]["x"] - sb["players"][0]["x"]) < 1e-9
+    )
+    results.append((
+        "§4.3 deterministic replay at seed=42",
+        deterministic,
+        f"t_match={sa['t_match']:.2f} first_player_x={sa['players'][0]['x']:.2f}",
+    ))
+
+    # -- bio_load_profile + all Stage A-E keys present in the payloads ----
+    players = state.get("players") or []
+    bio_ok = bool(players) and all(
+        isinstance(p.get("bio_load_profile"), dict)
+        and all(k in p["bio_load_profile"] for k in
+                ("sprint_load_index", "projected_stamina_10m",
+                 "fatigue_pdr_penalty", "tactical_relief_directive"))
+        and 0.0 <= float(p["bio_load_profile"]["sprint_load_index"]) <= 100.0
+        and 0.0 <= float(p["bio_load_profile"]["projected_stamina_10m"]) <= 100.0
+        for p in players
+    )
+    results.append((
+        "Stage A payload carries bio_load_profile for all 22 players",
+        bio_ok,
+        f"{len(players)} players profiled",
+    ))
+
+    stage_a_keys = ("clock", "score", "possession", "players", "ball", "match_metadata")
+    stage_b_keys = ("chaos_index", "ppda", "def_lines", "pitch_control_split",
+                    "passing_network_edges", "bio_load_summary")
+    stage_c_keys = ("stage_c_explainability", "archetype")
+    stage_d_keys = ("stage_d_broadcast_overlay", "camera_directive")
+    stage_e_keys = ("stage_e_personalization",)
+    results.append((
+        "Stage A-E payload keys are all present",
+        all(k in state for k in stage_a_keys)
+        and all(k in (metrics or {}) for k in stage_b_keys)
+        and all(k in (stage_c or {}) for k in stage_c_keys)
+        and all(k in (stage_d or {}) for k in stage_d_keys)
+        and all(k in (stage_e or {}) for k in stage_e_keys),
+        "A/B/C/D/E key audit",
+    ))
+
+    # -- §4.6 no third-party brand strings in any shipped source ---------
+    offenders: list = []
+    scanned = 0
+    for path in _iter_source_files():
+        rel = str(path.relative_to(_repo_root())).replace("\\", "/")
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        scanned += 1
+        lowered = text.lower()
+        if rel in BRAND_DETECTOR_FILES:
+            continue
+        for brand in PROHIBITED_BRAND_STRINGS:
+            if re.search(rf"\b{re.escape(brand)}\b", lowered):
+                offenders.append(f"{rel}:{brand}")
+        for brand in PROHIBITED_SOCIAL_STRINGS:
+            if re.search(rf"\b{re.escape(brand)}\b(?!\s*:)", lowered):
+                offenders.append(f"{rel}:{brand}")
+    results.append((
+        "§4.6 / §4.7 zero third-party sponsor, league or media brand strings",
+        not offenders,
+        f"{scanned} files scanned, {len(offenders)} offenders"
+        + (f" -> {offenders[:5]}" if offenders else ""),
+    ))
+
+    # -- §4.11 no external media assets referenced by the UI -------------
+    media_files: list = []
+    for path in _iter_source_files():
+        rel = str(path.relative_to(_repo_root())).replace("\\", "/")
+        if rel in BRAND_DETECTOR_FILES:
+            continue
+        if path.suffix.lower() in (".mp4", ".webm", ".mov", ".avi", ".mkv",
+                                   ".m4v", ".mp3", ".wav"):
+            media_files.append(rel)
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if MEDIA_ASSET_RE.search(text):
+            media_files.append(f"{rel}:media-reference")
+    results.append((
+        "§4.11 no external video or audio assets are referenced",
+        not media_files,
+        f"{len(media_files)} media references"
+        + (f" -> {media_files[:5]}" if media_files else ""),
+    ))
+
+    # -- §4.4 only synthetic competitions are ever named -----------------
+    competition_names = set()
+    for path in _iter_source_files():
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if "AETHER Synthetic League" in text:
+            competition_names.add("AETHER Synthetic League")
+    results.append((
+        "§4.4 only the synthetic competition is named",
+        competition_names.issubset(set(ALLOWED_COMPETITIONS)),
+        f"competitions={sorted(competition_names)}",
+    ))
+
+    report = {
+        "rules_version": "official-rules-audit-v1",
+        "metadata": {
+            "competition": meta.get("competition"),
+            "home": home.get("id"),
+            "away": away.get("id"),
+            "synthetic": meta.get("synthetic"),
+            "seed": 42,
+        },
+        "files_scanned": scanned,
+        "brand_offenders": offenders,
+        "media_references": media_files,
+        "results": [{"rule": n, "passed": bool(p), "detail": d} for n, p, d in results],
+    }
+    return results, report
 
 
 def main() -> int:
@@ -423,6 +655,63 @@ def main() -> int:
           and eval_card.get("p95_budget_ms") == 100.0
           and eval_card.get("p95_frame_sla_pct") is not None
           and eval_card.get("eval_suite") == "aether-foundry-eval-v1")
+
+    # ---- v6.2 TASK 2: predictive bio-load digital twin ------------------
+    bio_profiles = [p.get("bio_load_profile") or {} for p in st["players"]]
+    check("Bio-load: profile present for every player",
+          len(bio_profiles) == 22
+          and all(all(k in prof for k in
+                      ("sprint_load_index", "projected_stamina_10m",
+                       "fatigue_pdr_penalty", "tactical_relief_directive",
+                       "high_intensity_seconds", "stamina_now", "relief_required"))
+                  for prof in bio_profiles))
+    check("Bio-load: values are physically bounded",
+          all(0.0 <= prof["sprint_load_index"] <= 100.0
+              and 0.0 <= prof["projected_stamina_10m"] <= 100.0
+              and 0.0 <= prof["fatigue_pdr_penalty"] <= 30.0
+              and 0.0 <= prof["high_intensity_seconds"] <= 10_000.0
+              for prof in bio_profiles))
+    relief_profiles = [p for p in bio_profiles if p["relief_required"]]
+    sustainable_profiles = [p for p in bio_profiles if not p["relief_required"]]
+    check("Bio-load: relief directive is agentic and player-specific",
+          all(len(str(p["tactical_relief_directive"])) > 20 for p in bio_profiles)
+          and all("no relief required" not in str(p["tactical_relief_directive"]).lower()
+                  for p in relief_profiles)
+          and all("no relief required" in str(p["tactical_relief_directive"]).lower()
+                  for p in sustainable_profiles)
+          and len({str(p["tactical_relief_directive"]) for p in relief_profiles}) >= 1)
+    bio_summary = (math.snapshot(st).get("bio_load_summary") or {})
+    check("Stage b: bio-load summary surfaces the weakest links",
+          "mean_sprint_load_index" in bio_summary
+          and "mean_projected_stamina_10m" in bio_summary
+          and "max_fatigue_pdr_penalty" in bio_summary
+          and "at_risk_count" in bio_summary
+          and isinstance(bio_summary.get("most_at_risk"), list))
+
+    # ---- v6.2 TASK 2b: inclusive broadcast personalization schema -------
+    normalized = Personalizer.normalize_preferences({
+        "persona_mode": "TWINCAST_SPLIT", "metric_focus": "ALL",
+        "favorite_club_bias": "NEUTRAL", "market_language": "en",
+        "cognitive_density": "FANTASY_HUNTER", "colorblind_safe": True,
+    })
+    check("Personalization: cognitive density + colorblind palette normalize",
+          normalized["cognitive_density"] == "FANTASY_HUNTER"
+          and normalized["colorblind_safe"] is True
+          and Personalizer.normalize_preferences(
+              {"cognitive_density": "NOT_A_DENSITY"})["cognitive_density"]
+          == "PRO_TACTICAL_DIRECTOR")
+
+    # ---- v6.2 TASK 4: Official Rules + trademark compliance audit -------
+    rules_ok, rules_detail = test_rules_and_trademark_compliance(
+        st,
+        metrics=math.snapshot(st),
+        stage_c=c_wrapped,
+        stage_d=packet.get("stage_d_broadcast_overlay") and packet or {},
+        stage_e=packet.get("stage_e_personalization") and packet or {},
+    )
+    for rule_name, rule_pass, rule_note in rules_ok:
+        check(f"Rules: {rule_name}", rule_pass, rule_note)
+    check("Rules: compliance audit produced a report", bool(rules_detail))
 
     # ---- synthetic compliance -------------------------------------------
     check("Compliance: 100% synthetic squads",

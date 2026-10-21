@@ -478,6 +478,52 @@ class TacticalMathEngine:
         merged.sort(key=lambda e: (-e["xt_weight"], e["from_id"], e["to_id"]))
         return merged[:limit]
 
+    def bio_load_summary(self, state: dict) -> dict:
+        """Team-level fatigue read-out derived from the Stage A bio profiles.
+
+        Stage A produces the per-player projection; Stage B interprets it:
+        which players are the weakest links right now, and how much collective
+        execution capacity the match has left.
+        """
+        players = state.get("players", [])
+        profiles = []
+        for p in players:
+            profile = p.get("bio_load_profile") or {}
+            if not profile:
+                continue
+            profiles.append({
+                "player_id": p.get("id"),
+                "player_name": p.get("name"),
+                "team": p.get("team"),
+                "role": p.get("role"),
+                "sprint_load_index": profile.get("sprint_load_index", 0.0),
+                "projected_stamina_10m": profile.get("projected_stamina_10m", 100.0),
+                "fatigue_pdr_penalty": profile.get("fatigue_pdr_penalty", 0.0),
+                "relief_required": bool(profile.get("relief_required")),
+            })
+        if not profiles:
+            return {
+                "mean_sprint_load_index": 0.0,
+                "mean_projected_stamina_10m": 100.0,
+                "max_fatigue_pdr_penalty": 0.0,
+                "at_risk_count": 0,
+                "most_at_risk": [],
+            }
+        loads = [row["sprint_load_index"] for row in profiles]
+        projections = [row["projected_stamina_10m"] for row in profiles]
+        penalties = [row["fatigue_pdr_penalty"] for row in profiles]
+        at_risk = sorted(
+            (row for row in profiles if row["relief_required"]),
+            key=lambda row: (row["projected_stamina_10m"], -row["sprint_load_index"]),
+        )
+        return {
+            "mean_sprint_load_index": round(sum(loads) / len(loads), 1),
+            "mean_projected_stamina_10m": round(sum(projections) / len(projections), 1),
+            "max_fatigue_pdr_penalty": round(max(penalties), 1),
+            "at_risk_count": len(at_risk),
+            "most_at_risk": at_risk[:3],
+        }
+
     def snapshot(self, state: dict, t: Optional[float] = None) -> dict:
         t = t if t is not None else state["t_match"]
         window = [s for s in self.stream if s[0] >= t - self.window_s]
@@ -499,6 +545,7 @@ class TacticalMathEngine:
             "possession": state["possession"],
             "pitch_control_split": self.pitch_control_split(state),
             "passing_network_edges": self.passing_network_edges(state),
+            "bio_load_summary": self.bio_load_summary(state),
             **self._match_stats_snapshot(state),
         }
 

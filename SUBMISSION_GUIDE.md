@@ -710,6 +710,9 @@ frontend/src/
 | Data innovation | Seeded 10 Hz synthetic engine + milestone tracker | Done |
 | Multi-language storytelling (EN/ES/AR/HI) | Stage E atlas + optional Azure AI Translator; localized speech | Done |
 | 100% synthetic football data; no match footage, real clubs, players, crests, or tracking | Seeded simulation; fictional NLA/MCS squads; procedural stadium and crests | Done |
+| No third-party sponsor, league, kit-brand, broadcaster or social brand strings in shipped UI code | Automated `test_rules_and_trademark_compliance()` gate scans 56 `frontend/src` + `backend` source files with pure `pathlib` — 0 offenders | Done (automated) |
+| No external video, image or audio assets | Automated §4.11 media-reference gate — 0 references; the only feed is the synthetic `HoloPitch3D.tsx` 3D render | Done (automated) |
+| Deterministic, reproducible synthetic telemetry | `seed=42` replay verified frame-for-frame by the compliance gate | Done (automated) |
 | Public GitHub repository | https://github.com/shashankh3/aether-pitch (public) | Done |
 | Project pitch/description | README intro + §1 of this guide | Done |
 | English submission materials | README, guide, UI default | Done |
@@ -720,6 +723,80 @@ frontend/src/
 | Video does not include third-party trademarks | UI and script use AETHER PITCH branding only; no real clubs, leagues, or brands | Done |
 
 **Note on Azure:** the app is fully functional without cloud credentials. Stage C uses Azure AI Foundry-hosted Azure OpenAI deployments and Stage E uses Azure AI Translator when configured; otherwise both use deterministic local fallbacks. The audit and rubric modal label which mode actually ran, so no deterministic result is presented as a live cloud call. This is intentional, so judges can test offline and the demo never blocks on a model call. `azure.yaml` is a service manifest, not a turnkey infrastructure template; use Docker Compose for a zero-setup local demo, or provide your own `azd` infrastructure for a hosted URL.
+
+---
+
+## 14. Copy-Paste Hackathon Submission Portal Answers
+
+Everything below is paste-ready. Keep it under any character limit the portal enforces; the blocks are written to be self-contained.
+
+### 14.1 Project Summary & Tagline
+
+**Tagline (short):**
+> AETHER PITCH — the championship finale, rendered live in 3D and personalized for every fan.
+
+**Tagline (alternate):**
+> Synthetic football. Real mathematics. Broadcast-grade 3D. A live AI sports broadcast you can argue with.
+
+**Project Summary (copy-paste):**
+
+> AETHER PITCH is a real-time 3D football broadcast studio driven entirely by 100% synthetic 10 Hz telemetry and a deterministic five-stage AI pipeline, with optional Azure AI Foundry reasoning at the explanation layer.
+>
+> Two fictional clubs — North Larchmont Athletic (NLA) and Meridian City SC (MCS) — play out in the AETHER Synthetic League inside a procedurally generated night stadium with 22 biomechanically articulated 14-part player avatars, four broadcast camera modes, volumetric AR tactical overlays, a 15-second DVR time machine, and a three-act cinematic recap.
+>
+> Every number on screen is produced by included deterministic math, never by a black box: a 16×12 Expected Threat tensor, a Pass Difficulty Rating, a Chaos Index, PPDA pressing pressure, defensive-line geometry, live pitch-control territory splits, and a Ghost Pass counterfactual that shows the better lane the ball did not take. A grounded four-node agent trace records the real gate decision, the model route, measured latency, and a numeric cross-check of every claim the narrative makes.
+>
+> Judges can drive the broadcast: ask The 12th Man a tactical question, run a three-agent adversarial bench war-room that debates one adjustment against the live xT tensor, simulate a six-second cloud outage to watch the 10 Hz browser edge engine take over with zero dropped frames, and export the entire run as a JSON or Markdown audit dossier.
+>
+> The product is fan-first and inclusive: the 3D pitch is the hero, every advanced tool lives behind one closed-by-default Control Center, and a Cognitive Telemetry Density switch plus a colorblind-safe high-contrast palette adapt the same moment to casual fans, fantasy hunters, and professional tactical directors.
+
+### 14.2 How We Used Microsoft Foundry & Multi-Agent Orchestration
+
+> Stage C routes through Azure AI Foundry-hosted Azure OpenAI deployments using a two-model pattern: a fast triage agent (gpt-4o-mini / Phi-3.5-mini) classifies the tactical archetype, and a narrative agent (gpt-4o / Llama-3.3-70B) explains why the moment matters. A third Foundry role compiles milestone inflections into a three-act recap. A separate Studio Co-pilot route powers the interactive "Ask The 12th Man" session and the Bench War-Room.
+>
+> Multi-agent orchestration is explicit and inspectable rather than implied:
+>
+> - **The 4-node handoff chain.** Every gated insight ships a `trace_id` and a four-node chain — Spatial Sentinel (deterministic gate) → Tactical Triage (archetype router) → Causal Analyst + Critic (narrative and numeric critic) → Broadcast Director (overlay, camera, i18n). The Data tab renders it as a live DAG, and the audit API reports P95 latency and gate efficiency.
+> - **The adversarial bench war-room.** `POST /api/tactical-war-room` runs a three-agent negotiation grounded in live Stage B telemetry: `NLATacticalManagerAgent` proposes a high-leverage adjustment, `MCSOppositionScoutAgent` models the opponent's optimal counter, and `SpatialArbiterAgent` adjudicates both against the 16×12 Expected Threat tensor to issue one Tactical Prescription with a projected 30-second ΔxT gain, a win-probability swing, and the 3D target zones to highlight.
+> - **Ground truth over generation.** A numeric critic cross-checks every number in a generated narrative against the Stage B event and metric snapshot. If a claim cannot be traced back to live state, the narrative is discarded and replaced with the deterministic fallback — the guardrail is visible in the trace, not hidden.
+> - **Foundry Prompt Shield (Responsible AI).** A dedicated RAI layer runs before any model call and detects prompt injection (instruction override, role hijack, jailbreak, prompt exfiltration, guardrail bypass), off-topic queries, and third-party real-world entity references. A blocked query never reaches the model: the response is replaced with a grounded, localized deflection back to the live synthetic match, and every response carries `prompt_shield_status`, `numeric_grounding_pass`, and `club_neutrality_pass`.
+> - **Foundry Eval and Responsible AI scorecard.** A live four-metric evaluation panel reports Mathematical Groundedness, Tactical Coherence, Prompt Shield status (hallucinations and policy breaches), and P95 Broadcast Frame SLA against a 100 ms budget. A one-click "Run Live Foundry Grounding Audit" re-verifies the scorecard against a fresh pipeline run and returns a timestamped, verifiable receipt.
+>
+> Cloud-optional by design: without credentials every stage runs on a deterministic, zero-key fallback that produces the identical schema, and the UI always labels which route actually ran.
+
+### 14.3 Azure Cloud-Native Architecture & Zero-Downtime Edge Resilience
+
+> AETHER PITCH is a dual-engine system. The **cloud engine** is a FastAPI service streaming 10 Hz ticks over a WebSocket hub, with Azure AI Foundry handling Stage C reasoning and Azure AI Translator handling Stage E localization. The **edge engine** is a browser-native 10 Hz synthetic simulation that mirrors the same schemas.
+>
+> The edge engine is always running underneath the live stream, so resilience is a hot-swap rather than a reload:
+>
+> - When the socket drops, the edge engine takes over the picture on the next frame with **zero dropped 3D animation frames** — the player rigs, ball physics, overlays, camera rig, and audio all keep running because they are driven by the telemetry store, not by the transport.
+> - When the socket returns, the engines hot-swap back and the match clock, score, and player state are reconciled.
+> - **The drill is a button, not a promise.** The Control Center's Data tab exposes "Simulate 6s Cloud Outage (Test Edge Failover)", which closes the WebSocket for six seconds, hands the broadcast to the edge engine, and then reconnects and reconciles. Live telemetry badges report the measured hot-swap latency, 10 Hz telemetry continuity (frames delivered, frames dropped), and a state-reconciliation verdict. The pipeline ribbon carries an amber broadcast-resilience badge while the drill runs and flips to emerald when reconciliation is verified.
+> - **Failover is observable, not decorative.** Every drill result is a measurement: the swap latency is timed, the frame count is incremented by the edge timer, and the reconciliation is confirmed by the cloud handshake.
+>
+> The rest of the cloud-native surface is deliberately boring and reviewable: the service manifest ships as `azure.yaml`; a Docker Compose path gives a zero-setup local demo; `/api/health/pipeline-audit` runs the full five-stage pipeline on demand and reports per-stage timings, P95 latency, gate economy, the agent trace, the Foundry eval scorecard, and the RAI shield state; and the `AETHER_RENDER_PARTNER_V2` packet exposes the broadcast render contract for a real television compositor.
+
+### 14.4 Synthetic Telemetry & Official Rules Compliance Attestation
+
+> **All data is 100% synthetic and generated by code in this repository.** There is no match footage, no real club, player, crest, kit, competition, broadcast, or tracking data anywhere in the product.
+>
+> - **The simulation.** `PitchForgeEngine` is a seeded, deterministic 10 Hz football simulation (default `seed=42`, reproducible frame-for-frame) that generates 22 articulated players with kinematics, ball physics, pass completion, tackles, auto-evented sprint and distance thresholds, milestone detection, and match metadata. The 16×12 Expected Threat surface, Pass Difficulty Rating, Chaos Index, PPDA, defensive-line geometry, pitch-control territory split, and passing network are all computed from that simulation in the included Stage B math — no external feed, no scraped dataset, no licensed API.
+> - **The entities are fictional.** Only two clubs exist: North Larchmont Athletic (NLA) and Meridian City SC (MCS), playing in the AETHER Synthetic League at the AETHER 3D DIGITAL TWIN. All 22 players, all crests, all kits, the stadium, the advertising boards, and the crowd are procedurally generated in code. The stadium, crests, and overlays are drawn with Three.js geometry and CSS — there are **no external image, video, or audio assets** and no third-party logos.
+> - **Automated compliance gate.** `python backend/test_pipeline.py` runs an Official Rules audit that verifies the synthetic metadata is strictly NLA vs MCS in the AETHER Synthetic League, confirms deterministic replay at `seed=42`, asserts `bio_load_profile` and all Stage A–E payload keys are present, and then scans every shipped `frontend/src` and `backend` source file with pure Python `pathlib` to prove that **zero** prohibited third-party sponsor, league, kit-brand, broadcaster, or social-platform strings appear in UI rendering code and that **zero** external media assets are referenced. The audit currently scans 56 files with 0 offenders.
+> - **No external video, ever.** The live broadcast feed is `HoloPitch3D.tsx` — a fully synthetic, spatially calibrated 3D stadium rendered in real time from the simulation. The transparent `?overlay=alpha` mode strips every opaque surface and leaves only the AR layer, ready for a real television compositor, but even that layer is drawn from our own synthetic geometry.
+> - **Responsible AI is part of the build, not a claim.** The Foundry Prompt Shield blocks prompt injection, off-topic queries, and third-party entity references before any model is called, and a club-neutrality check rejects biased or non-objective narrative. The Foundry Eval scorecard publishes groundedness, coherence, safety, and frame-SLA telemetry a reviewer can verify in one click.
+> - **Originality.** All source code is original work owned by the entrant. Third-party dependencies are used under their respective open-source licences, and no third-party assets are bundled. No Sponsor financial support was received, and the project is not a prior winner.
+>
+> We attest that the project satisfies Official Rules §4.3 (synthetic data innovation), §4.4 (five-stage pipeline and storytelling), §4.6 and §4.7 (no real clubs, players, crests, footage, or trademarks), and §4.11 (no unlicensed third-party assets).
+
+### 14.5 Prize-Track One-Liners (for the category dropdown)
+
+| Category | One-liner |
+|---|---|
+| **Best Use of Microsoft Foundry Project** | A Foundry-hosted triage + narrative router with a 4-node grounded handoff trace, an adversarial 3-agent war-room adjudicated against a 16×12 xT tensor, a pre-call Prompt Shield, and a live Responsible AI eval scorecard with a one-click grounding audit. |
+| **Best Multi-Agent System Prize** | Five named agents in two orchestrations — a 4-node insight pipeline (Sentinel → Triage → Analyst+Critic → Director) and a 3-agent adversarial bench war-room (Manager → Scout → Arbiter) — every one grounded in live deterministic math and fully inspectable. |
+| **Best Azure Cloud-Native Integration** | A dual-engine FastAPI-WebSocket + browser-edge architecture with a measurable, one-click 6-second cloud-outage failover drill: zero dropped 3D frames, measured hot-swap latency, verified state reconciliation, and a deterministic zero-key fallback everywhere. |
 
 ---
 

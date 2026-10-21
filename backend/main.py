@@ -97,6 +97,8 @@ active_personalization: Dict[str, Any] = {
     "favorite_club_bias": "NEUTRAL",
     "locked_player_id": None,
     "market_language": "en",
+    "cognitive_density": "PRO_TACTICAL_DIRECTOR",
+    "colorblind_safe": False,
 }
 pipeline: Dict[str, Any] = {
     "stages": {k: {"latency_ms": 0.0} for k in "abcde"},

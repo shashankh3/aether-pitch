@@ -36,6 +36,7 @@ export interface PlayerTick {
   top_speed_kmh: number;
   pose_state: PoseState;
   playstyle_badge: PlayStyleBadge | null;
+  bio_load_profile?: BioLoadProfile;
 }
 
 export interface Vec2 {
@@ -146,6 +147,35 @@ export interface Metrics {
   leaders: { fastest?: StatsLeader; farthest?: StatsLeader };
   pitch_control_split?: PitchControlSplit;
   passing_network_edges?: PassingNetworkEdge[];
+  bio_load_summary?: BioLoadSummary;
+}
+
+/* ------------------------------------------- v6.2 bio-load / fatigue twin */
+export interface BioLoadProfile {
+  sprint_load_index: number;
+  projected_stamina_10m: number;
+  fatigue_pdr_penalty: number;
+  high_intensity_seconds: number;
+  stamina_now: number;
+  tactical_relief_directive: string;
+  relief_required: boolean;
+}
+
+export interface BioLoadSummary {
+  mean_sprint_load_index: number;
+  mean_projected_stamina_10m: number;
+  max_fatigue_pdr_penalty: number;
+  at_risk_count: number;
+  most_at_risk: {
+    player_id: string | null;
+    player_name: string | null;
+    team: Team | null;
+    role: string | null;
+    sprint_load_index: number;
+    projected_stamina_10m: number;
+    fatigue_pdr_penalty: number;
+    relief_required: boolean;
+  }[];
 }
 
 /* ------------------------------------------- v6.2 spatial ownership + network */
@@ -244,12 +274,41 @@ export type PersonaModeV5 = "ANALYST_HUD" | "CASUAL_STORY" | "TWINCAST_SPLIT";
 export type ClubBias = "NEUTRAL" | "NLA_LOYALIST" | "MCS_LOYALIST";
 export type EngineStatus = "CONNECTED_PIPELINE_LIVE" | "EDGE_SYNTHETIC_FALLBACK";
 
+/* ------------------------------------- v6.2 inclusive broadcast density */
+export type CognitiveDensity = "CASUAL_STORYTELLER" | "FANTASY_HUNTER" | "PRO_TACTICAL_DIRECTOR";
+
+export const COGNITIVE_DENSITY_META: Record<
+  CognitiveDensity,
+  { label: string; detail: string; rawNumbers: boolean; jargon: boolean }
+> = {
+  CASUAL_STORYTELLER: {
+    label: "Casual Storyteller",
+    detail: "Plain-language callouts · raw grid numbers hidden",
+    rawNumbers: false,
+    jargon: false,
+  },
+  FANTASY_HUNTER: {
+    label: "Fantasy Hunter",
+    detail: "Speed milestones · stamina burn · individual ΔxT",
+    rawNumbers: true,
+    jargon: false,
+  },
+  PRO_TACTICAL_DIRECTOR: {
+    label: "Pro Tactical Director",
+    detail: "Full Stage B density · xT · PDR · PPDA · ghost traps",
+    rawNumbers: true,
+    jargon: true,
+  },
+};
+
 export interface PersonalizationState {
   persona_mode: PersonaModeV5;
   metric_focus: MetricFocus;
   favorite_club_bias: ClubBias;
   locked_player_id: string | null;
   market_language: LangCode;
+  cognitive_density?: CognitiveDensity;
+  colorblind_safe?: boolean;
 }
 
 export interface MetricLock {

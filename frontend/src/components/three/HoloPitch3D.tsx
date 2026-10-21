@@ -22,6 +22,7 @@ import RecapPassTubes from "./RecapPassTubes";
 import { WarRoomProjection, XTPassingNetwork } from "./SpatialLayers3D";
 import { DefensiveLasers, XTGrid } from "./TacticalOverlays3D";
 import { telemetry, tickAlpha } from "@/lib/telemetry";
+import { STANDARD_PALETTE, type BroadcastPalette } from "@/lib/hudContext";
 import type {
   CameraDirective, CameraMode, HighlightZone, Metrics, RecapPassArc, TelestratorState,
   WarRoomVector, WarRoomZone,
@@ -65,6 +66,7 @@ interface Props {
   alphaMode: boolean;
   recapPass: RecapPassArc | null;
   warRoomShift: { zones: WarRoomZone[]; vectors: WarRoomVector[] } | null;
+  palette?: BroadcastPalette;
   onLock: (id: string | null) => void;
 }
 
@@ -230,7 +232,8 @@ const PostFX = memo(function PostFX({ alphaMode }: { alphaMode: boolean }) {
 /* ------------------------------------------------------------------ scene */
 function Scene({
   camMode, override, toggles, lockedId, keyIds, metrics,
-  telestrator, highlightZone, alphaMode, recapPass, warRoomShift, onLock,
+  telestrator, highlightZone, alphaMode, recapPass, warRoomShift, palette = STANDARD_PALETTE,
+  onLock,
 }: Props) {
   return (
     <>
@@ -266,7 +269,7 @@ function Scene({
 
       {/* volumetric AR layers */}
       <XTGrid visible={toggles.xtGrid} possession={metrics?.possession ?? "NLA"} />
-      <DefensiveLasers visible={toggles.lasers} metrics={metrics} />
+      <DefensiveLasers visible={toggles.lasers} metrics={metrics} palette={palette} />
       <PassVectors3D showGhost={toggles.ghost} />
       <SpatialControlSurface3D
         showControl={toggles.pitchControl}

@@ -5,7 +5,9 @@
 // overdrive zone, stamina / PDR / ΔxT chips and localized live voice synthesis.
 
 import { useMemo } from "react";
-import { Crosshair, Lock, Unlock, Volume2, Flame } from "lucide-react";
+import {
+  Crosshair, Lock, Unlock, Volume2, Flame, HeartPulse, Activity, ShieldAlert,
+} from "lucide-react";
 import type { LangCode, MatchEvent, MatchTick, PlayerTick, Team } from "@/lib/types";
 import { SPEECH_LOCALES } from "@/lib/types";
 import { CRESTS } from "@/components/Crests";
@@ -108,6 +110,98 @@ interface Props {
   insightLine: string | null;
 }
 
+/* ------------------------------------------- v6.2 bio-load / fatigue twin */
+
+function BioLoadMeter({ player }: { player: PlayerTick }) {
+  const profile = player.bio_load_profile;
+  if (!profile) return null;
+
+  const load = clamp(profile.sprint_load_index, 0, 100);
+  const projected = clamp(profile.projected_stamina_10m, 0, 100);
+  const penalty = clamp(profile.fatigue_pdr_penalty, 0, 30);
+  const relief = profile.relief_required;
+  const loadColor = load >= 70 ? "#FF1E56" : load >= 45 ? "#FFC24D" : "#00F0FF";
+  const projColor = projected < 65 ? "#FF1E56" : projected < 80 ? "#FFC24D" : "#00FF85";
+
+  const bars = Array.from({ length: 12 }, (_, i) => {
+    const active = (load / 100) * 12 > i;
+    return (
+      <span
+        key={i}
+        className="h-[9px] flex-1"
+        style={{
+          background: active ? loadColor : "rgba(148,163,184,0.16)",
+          boxShadow: active ? `0 0 6px ${loadColor}` : "none",
+        }}
+      />
+    );
+  });
+
+  return (
+    <div className="clip-chamfer mt-2 border border-white/10 bg-black/30 p-2">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <span className="flex items-center gap-1 font-display text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400">
+          <HeartPulse size={11} className="text-crimson" /> Bio-Load &amp; +10m Stamina
+        </span>
+        <span
+          className="clip-skew px-1.5 py-0.5 font-tech text-[8px] font-bold uppercase tracking-wider"
+          style={{
+            background: relief ? "rgba(255,30,86,0.18)" : "rgba(0,255,133,0.14)",
+            color: relief ? "#FF1E56" : "#00FF85",
+          }}
+        >
+          {relief ? "Relief Required" : "Sustainable"}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <div className="flex items-center justify-between font-tech text-[8px] uppercase tracking-wider text-slate-500">
+            <span>Sprint load</span>
+            <span className="font-bold" style={{ color: loadColor }}>
+              {load.toFixed(0)}
+            </span>
+          </div>
+          <div className="mt-0.5 flex gap-[2px]">{bars}</div>
+        </div>
+        <div>
+          <div className="flex items-center justify-between font-tech text-[8px] uppercase tracking-wider text-slate-500">
+            <span>+10m stamina</span>
+            <span className="font-bold" style={{ color: projColor }}>
+              {projected.toFixed(0)}%
+            </span>
+          </div>
+          <div className="mt-[3px] h-[9px] overflow-hidden bg-white/10">
+            <div
+              className="h-full transition-all duration-500"
+              style={{
+                width: `${projected}%`,
+                background: `linear-gradient(90deg, ${projColor}, #00F0FF)`,
+                boxShadow: `0 0 8px ${projColor}`,
+              }}
+            />
+          </div>
+          <div className="mt-0.5 flex items-center justify-between font-tech text-[8px] uppercase tracking-wider text-slate-500">
+            <span>PDR penalty</span>
+            <span className="font-bold text-amber-300">−{penalty.toFixed(1)}%</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-1.5 flex items-start gap-1.5 border-t border-white/10 pt-1.5">
+        <ShieldAlert size={10} className="mt-[2px] shrink-0 text-amber-300" />
+        <p className="font-tech text-[9px] leading-relaxed text-slate-300">
+          {profile.tactical_relief_directive}
+        </p>
+      </div>
+      <p className="mt-1 flex items-center gap-1 font-tech text-[7.5px] uppercase tracking-wider text-slate-600">
+        <Activity size={8} /> {profile.high_intensity_seconds.toFixed(0)}s high-intensity ·
+        {" "}{profile.stamina_now.toFixed(0)}% now
+      </p>
+    </div>
+  );
+}
+
 export default function PlayerLock360({ tick, lockedId, onLock, events, lang, insightLine }: Props) {
   const player = tick?.players.find((p) => p.id === lockedId) ?? null;
   const lastPass = events.find((e) => e.type === "PASS" && e.player_id === lockedId && e.pdr != null);
@@ -123,10 +217,11 @@ export default function PlayerLock360({ tick, lockedId, onLock, events, lang, in
 
   const speak = () => {
     if (!player) return;
+    const bio = player.bio_load_profile;
     const text =
       relevantInsight && relevantInsight.length > 0
         ? relevantInsight
-        : `${player.name}, ${player.team} ${player.role}, currently at ${player.speed_kmh.toFixed(1)} kilometres per hour, ${(player.distance_m / 1000).toFixed(2)} kilometres covered, top speed ${player.top_speed_kmh.toFixed(1)}, stamina ${Math.round(player.stamina)} percent.`;
+        : `${player.name}, ${player.team} ${player.role}, currently at ${player.speed_kmh.toFixed(1)} kilometres per hour, ${(player.distance_m / 1000).toFixed(2)} kilometres covered, top speed ${player.top_speed_kmh.toFixed(1)}, stamina ${Math.round(player.stamina)} percent.${bio ? ` Sprint load index ${bio.sprint_load_index.toFixed(0)}, projected stamina in ten minutes ${bio.projected_stamina_10m.toFixed(0)} percent, fatigue penalty on pass difficulty ${bio.fatigue_pdr_penalty.toFixed(1)} points. ${bio.tactical_relief_directive}` : ""}`;
     speakInsight(text, lang);
   };
 
@@ -240,6 +335,8 @@ export default function PlayerLock360({ tick, lockedId, onLock, events, lang, in
                 />
               </div>
             </div>
+
+            <BioLoadMeter player={player} />
           </div>
         )}
       </div>

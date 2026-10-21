@@ -84,6 +84,9 @@ class Player:
     sprint_distance_m: float = 0.0
     top_speed_kmh: float = 0.0
     next_distance_alert_m: float = 0.0
+    bio_load: float = 0.0       # rolling high-intensity metabolic load (0..100)
+    high_intensity_seconds: float = 0.0
+    press_events: int = 0
 
     @property
     def speed(self) -> float:
@@ -804,6 +807,15 @@ class PitchForgeEngine:
         p.stamina = _clamp(
             p.stamina - dt * (0.008 + 0.05 * (sp / p.max_speed) ** 2) + dt * 0.02, 40.0, 100.0
         )
+        # ---- v6.2 bio-mechanical load accumulation --------------------
+        # High-intensity work is everything above 55% of max speed; the
+        # metabolic load is a rolling decay so recent efforts dominate.
+        intensity = sp / p.max_speed if p.max_speed > 0 else 0.0
+        if intensity >= 0.55:
+            p.high_intensity_seconds += dt
+            p.bio_load = _clamp(p.bio_load + dt * 9.0 * intensity, 0.0, 100.0)
+        else:
+            p.bio_load = _clamp(p.bio_load - dt * 1.15, 0.0, 100.0)
 
     def _team_motion(self, dt: float) -> None:
         poss = self.possession
@@ -948,6 +960,49 @@ class PitchForgeEngine:
             return "90:00+"
         return f"{m:02d}:{s:02d}"
 
+    @staticmethod
+    def _relief_directive(p: Player, projected: float, load: float) -> str:
+        """Agentic relief recommendation when the projection turns negative."""
+        number = p.number
+        if p.role == "DEF":
+            return (f"Shift #{number} to a compact mid-block; delegate the wide pressing "
+                    f"trigger to the inverted fullback and preserve the cover shadow.")
+        if p.role == "MID":
+            return (f"Pull #{number} into a lower tempo; let the 8 hold the wide half-space "
+                    f"and keep the counter-press outlet short.")
+        if p.role == "FWD":
+            return (f"Rotate #{number} off the press line; keep the far post runner isolated "
+                    f"and reduce the recovery sprint to one transition.")
+        if p.role == "GK":
+            return (f"Hold #{number} on a conservative starting line; delay the sweeper "
+                    f"activation while the load recovers.")
+        return (f"Rotate #{number} out of the high-intensity band and re-enter once the "
+                f"projected load drops below the threshold.")
+
+    def _bio_load_profile(self, p: Player) -> dict:
+        """Deterministic predictive bio-load / fatigue profile for one player."""
+        load = round(_clamp(p.bio_load, 0.0, 100.0), 1)
+        stamina = round(p.stamina, 1)
+        # +10 match minutes of projection: the current drain rate continues,
+        # softened slightly by the natural recovery the model already applies.
+        drain_per_minute = 0.008 * 60 + 0.05 * 0.62 * 60 - 0.02 * 60
+        projected = round(_clamp(stamina - drain_per_minute * 10.0, 30.0, 100.0), 1)
+        # Fatigue penalty on pass difficulty: heavy load erodes execution quality.
+        penalty = round(min(24.0, load * 0.24 + max(0.0, (70.0 - projected)) * 0.18), 1)
+        needs_relief = projected < 65.0 or load >= 70.0
+        return {
+            "sprint_load_index": load,
+            "projected_stamina_10m": projected,
+            "fatigue_pdr_penalty": penalty,
+            "high_intensity_seconds": round(p.high_intensity_seconds, 1),
+            "stamina_now": stamina,
+            "tactical_relief_directive": (
+                self._relief_directive(p, projected, load) if needs_relief
+                else f"#{p.number} is within the sustainable band; no relief required."
+            ),
+            "relief_required": needs_relief,
+        }
+
     def state(self) -> dict:
         return {
             "type": "tick",
@@ -967,7 +1022,8 @@ class PitchForgeEngine:
                  "sprint_distance_m": round(p.sprint_distance_m, 1),
                  "top_speed_kmh": round(p.top_speed_kmh, 1),
                  "pose_state": self._pose_state(p),
-                 "playstyle_badge": self._playstyle_badge(p)}
+                 "playstyle_badge": self._playstyle_badge(p),
+                 "bio_load_profile": self._bio_load_profile(p)}
                 for p in self.players
             ],
             "ball": {

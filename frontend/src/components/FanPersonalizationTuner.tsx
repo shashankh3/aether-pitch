@@ -1,12 +1,14 @@
 "use client";
-// AETHER PITCH v6.1 — Fan Personalization panel. Rendered in the Control
+// AETHER PITCH v6.2 — Fan Personalization panel. Rendered in the Control
 // Center's Fan tab: persona mode, single-metric focus, favorite club lens.
-// The market-language selector sits directly above it in the same tab.
+// v6.2 adds the inclusive-broadcast controls: cognitive telemetry density
+// presets and the colorblind-safe high-contrast palette.
 
-import { Target, Users, Heart } from "lucide-react";
+import { Target, Users, Heart, Brain, Eye, Sparkles } from "lucide-react";
 import type {
-  ClubBias, MetricFocus, PersonaModeV5, PersonalizationState,
+  ClubBias, CognitiveDensity, MetricFocus, PersonaModeV5, PersonalizationState,
 } from "@/lib/types";
+import { COGNITIVE_DENSITY_META } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const FAN_PERSONAS: { id: PersonaModeV5; label: string }[] = [
@@ -29,15 +31,26 @@ export const FAN_CLUBS: { id: ClubBias; label: string }[] = [
   { id: "MCS_LOYALIST", label: "MCS Lens" },
 ];
 
+export const FAN_DENSITIES: CognitiveDensity[] = [
+  "CASUAL_STORYTELLER",
+  "FANTASY_HUNTER",
+  "PRO_TACTICAL_DIRECTOR",
+];
+
 interface Props {
   state: PersonalizationState;
   onChange: (next: PersonalizationState) => void;
+  colorblindSafe?: boolean;
+  onToggleColorblind?: (next: boolean) => void;
 }
 
-export default function FanPersonalizationPanel({ state, onChange }: Props) {
+export default function FanPersonalizationPanel({
+  state, onChange, colorblindSafe = false, onToggleColorblind,
+}: Props) {
   const update = <K extends keyof PersonalizationState>(key: K, value: PersonalizationState[K]) => {
     onChange({ ...state, [key]: value });
   };
+  const density = state.cognitive_density ?? "PRO_TACTICAL_DIRECTOR";
 
   return (
     <div className="panel-enter p-3">
@@ -102,6 +115,103 @@ export default function FanPersonalizationPanel({ state, onChange }: Props) {
         </div>
       </div>
 
+      <div className="mb-2" role="group" aria-label="Cognitive telemetry density">
+        <div className="mb-1 flex items-center gap-1 font-display text-[9px] font-bold uppercase tracking-[0.22em] text-slate-500">
+          <Brain size={10} /> Cognitive Telemetry Density
+        </div>
+        <div className="space-y-1">
+          {FAN_DENSITIES.map((id) => {
+            const meta = COGNITIVE_DENSITY_META[id];
+            return (
+              <button
+                key={id}
+                onClick={() => update("cognitive_density", id)}
+                aria-pressed={density === id}
+                className={cn(
+                  "flex w-full items-center justify-between border px-2 py-1 text-left transition",
+                  density === id
+                    ? "border-pitch/50 bg-pitch/10"
+                    : "border-white/10 bg-white/[0.02] hover:bg-white/[0.05]"
+                )}
+              >
+                <span>
+                  <span className={cn(
+                    "block font-tech text-[10px] font-bold uppercase tracking-wider",
+                    density === id ? "text-pitch" : "text-slate-300"
+                  )}>
+                    {meta.label}
+                  </span>
+                  <span className="block font-tech text-[8.5px] text-slate-500">{meta.detail}</span>
+                </span>
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "h-2 w-2 shrink-0 rounded-full",
+                    density === id ? "animate-breathe bg-pitch" : "bg-slate-700"
+                  )}
+                />
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-1 font-tech text-[8px] leading-relaxed text-slate-600">
+          {COGNITIVE_DENSITY_META[density].jargon
+            ? "Full analyst telemetry: xT, PDR, PPDA, ghost-pass deltas and Voronoi traps."
+            : COGNITIVE_DENSITY_META[density].rawNumbers
+              ? "Player-first numbers: speed milestones, stamina burn and individual ΔxT."
+              : "Plain-language callouts. Complex grid numbers are hidden."}
+        </p>
+      </div>
+
+      {onToggleColorblind && (
+        <div className="mb-2" role="group" aria-label="Accessibility palette">
+          <button
+            onClick={() => onToggleColorblind(!colorblindSafe)}
+            aria-pressed={colorblindSafe}
+            className={cn(
+              "flex w-full items-center justify-between border px-2 py-1.5 text-left transition",
+              colorblindSafe
+                ? "border-cyan-300/50 bg-cyan-300/10"
+                : "border-white/10 bg-white/[0.02] hover:bg-white/[0.05]"
+            )}
+            title="Shift the 3D tactical overlays and HUD status pills to a high-contrast deuteranopia/protanopia-safe palette"
+          >
+            <span className="flex items-center gap-2">
+              <Eye size={12} className={colorblindSafe ? "text-cyan-300" : "text-slate-500"} />
+              <span>
+                <span className={cn(
+                  "block font-tech text-[9.5px] font-bold uppercase tracking-wider",
+                  colorblindSafe ? "text-cyan-300" : "text-slate-300"
+                )}>
+                  Colorblind-Safe Palette
+                </span>
+                <span className="block font-tech text-[8.5px] text-slate-500">
+                  Deuteranopia / Protanopia · cyan vs amber vs magenta
+                </span>
+              </span>
+            </span>
+            <span className="flex shrink-0 items-center gap-1">
+              <span
+                className="h-3 w-3 border border-white/20"
+                style={{ background: colorblindSafe ? "#00E5FF" : "#FF1E56" }}
+              />
+              <span
+                className="h-3 w-3 border border-white/20"
+                style={{ background: colorblindSafe ? "#FFB300" : "#00FF85" }}
+              />
+              <span
+                className={cn(
+                  "clip-skew ml-1 px-1.5 py-0.5 font-tech text-[8px] font-bold uppercase tracking-wider",
+                  colorblindSafe ? "bg-cyan-300/20 text-cyan-300" : "bg-white/10 text-slate-500"
+                )}
+              >
+                {colorblindSafe ? "ON" : "OFF"}
+              </span>
+            </span>
+          </button>
+        </div>
+      )}
+
       <div role="group" aria-label="Favorite club bias">
         <div className="mb-1 flex items-center gap-1 font-display text-[9px] font-bold uppercase tracking-[0.22em] text-slate-500">
           <Heart size={10} /> Favorite Club Bias
@@ -126,6 +236,10 @@ export default function FanPersonalizationPanel({ state, onChange }: Props) {
       </div>
 
       <div className="mt-2 border-t border-white/10 pt-2 font-tech text-[8.5px] leading-relaxed text-slate-500">
+        <span className="flex items-center gap-1">
+          <Sparkles size={9} /> DENSITY: {COGNITIVE_DENSITY_META[density].label.toUpperCase()}
+        </span>
+        <br />
         LOCKED PLAYER: {state.locked_player_id ?? "NONE"} · server payloads adapt live.
       </div>
     </div>

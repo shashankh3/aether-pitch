@@ -21,6 +21,49 @@ export type ControlTab =
   | "prod";
 export type DockTool = "player" | "replay" | "moments" | null;
 
+/* ------------------------------------------- v6.2 accessible broadcast palette */
+
+export interface BroadcastPalette {
+  /** Primary / home-team / danger accent. */
+  primary: string;
+  /** Secondary / away-team accent. */
+  secondary: string;
+  /** Positive / verified accent. */
+  positive: string;
+  /** Warning / caution accent. */
+  warning: string;
+  /** Neutral readable text. */
+  neutral: string;
+  colorblindSafe: boolean;
+}
+
+export const STANDARD_PALETTE: BroadcastPalette = {
+  primary: "#FF1E56",
+  secondary: "#00F0FF",
+  positive: "#00FF85",
+  warning: "#FFC24D",
+  neutral: "#E2E8F0",
+  colorblindSafe: false,
+};
+
+/**
+ * Deuteranopia / protanopia-safe broadcast palette.
+ * Electric cyan vs warm amber vs magenta keeps every semantic distinction
+ * separable when red and green are hard to tell apart.
+ */
+export const ACCESSIBLE_PALETTE: BroadcastPalette = {
+  primary: "#00E5FF",
+  secondary: "#FFB300",
+  positive: "#FF00D4",
+  warning: "#FFB300",
+  neutral: "#F1F5F9",
+  colorblindSafe: true,
+};
+
+export function resolvePalette(colorblindSafe: boolean): BroadcastPalette {
+  return colorblindSafe ? ACCESSIBLE_PALETTE : STANDARD_PALETTE;
+}
+
 interface HudContextValue {
   hudMode: HudMode;
   setHudMode: (m: HudMode) => void;
@@ -33,6 +76,9 @@ interface HudContextValue {
   setDockTool: Dispatch<SetStateAction<DockTool>>;
   shortcutsOpen: boolean;
   setShortcutsOpen: Dispatch<SetStateAction<boolean>>;
+  colorblindSafe: boolean;
+  setColorblindSafe: Dispatch<SetStateAction<boolean>>;
+  palette: BroadcastPalette;
 }
 
 const HudContext = createContext<HudContextValue | null>(null);
@@ -43,6 +89,8 @@ export function HudProvider({ children }: { children: ReactNode }) {
   const [controlTab, setControlTab] = useState<ControlTab>("cams");
   const [dockTool, setDockTool] = useState<DockTool>(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [colorblindSafe, setColorblindSafe] = useState(false);
+  const palette = useMemo(() => resolvePalette(colorblindSafe), [colorblindSafe]);
 
   const openControlCenter = useCallback((tab?: ControlTab) => {
     if (tab) setControlTab(tab);
@@ -70,10 +118,12 @@ export function HudProvider({ children }: { children: ReactNode }) {
       openControlCenter,
       dockTool, setDockTool,
       shortcutsOpen, setShortcutsOpen,
+      colorblindSafe, setColorblindSafe,
+      palette,
     }),
     [
       hudMode, controlCenterOpen, controlTab, openControlCenter, dockTool,
-      shortcutsOpen,
+      shortcutsOpen, colorblindSafe, palette,
     ],
   );
 

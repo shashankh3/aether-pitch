@@ -12,6 +12,7 @@ import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import { telemetry } from "@/lib/telemetry";
 import type { Metrics } from "@/lib/types";
+import { STANDARD_PALETTE, type BroadcastPalette } from "@/lib/hudContext";
 
 const PL = 105;
 const PW = 68;
@@ -124,7 +125,13 @@ function TeamLinks({ team, color }: { team: "NLA" | "MCS"; color: string }) {
   );
 }
 
-export function DefensiveLasers({ visible, metrics }: { visible: boolean; metrics: Metrics | null }) {
+export function DefensiveLasers({
+  visible, metrics, palette = STANDARD_PALETTE,
+}: {
+  visible: boolean;
+  metrics: Metrics | null;
+  palette?: BroadcastPalette;
+}) {
   // badge text refreshes via the `metrics` prop (2Hz from the WS stream)
   if (!visible) return null;
   const nla = metrics?.def_lines.NLA ?? 0;
@@ -132,8 +139,8 @@ export function DefensiveLasers({ visible, metrics }: { visible: boolean; metric
   const stretch = metrics?.stretch_m ?? 0;
   return (
     <group>
-      <TeamLinks team="NLA" color="#FF1E56" />
-      <TeamLinks team="MCS" color="#00F0FF" />
+      <TeamLinks team="NLA" color={palette.primary} />
+      <TeamLinks team="MCS" color={palette.secondary} />
       <Html position={[-44, 1.6, 0]} center distanceFactor={60} zIndexRange={[15, 0]}>
         <div className="clip-ea pointer-events-none whitespace-nowrap border border-crimson/50 bg-slate-950/80 px-2 py-0.5 font-tech text-[11px] font-bold tracking-wide text-crimson">
           NLA LINE {nla.toFixed(1)}m

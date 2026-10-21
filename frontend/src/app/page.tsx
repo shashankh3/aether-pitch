@@ -88,11 +88,12 @@ function StudioOrchestrator() {
   const studio = useResilientMatchEngine();
   const {
     tick, metrics, insights, events, pipeline, connected, status, sendScenario, tickRef, applySnapshot,
-    recap: studioRecap, clearRecap,
+    recap: studioRecap, clearRecap, failoverDrillState, triggerFailoverDrill,
   } = studio;
 
   const {
     setHudMode, setControlCenterOpen, setDockTool, openControlCenter, setShortcutsOpen,
+    colorblindSafe, setColorblindSafe, palette,
   } = useHud();
 
   const [lockedId, setLockedId] = useState<string | null>(null);
@@ -867,6 +868,7 @@ function StudioOrchestrator() {
         alphaMode={alphaMode}
         recapPass={recapPass}
         warRoomShift={warRoomShift}
+        palette={palette}
         onLock={handleLock}
       />
 
@@ -1055,6 +1057,8 @@ function StudioOrchestrator() {
           pipeline={pipeline}
           connected={connected}
           status={status}
+          drill={failoverDrillState}
+          onTriggerDrill={triggerFailoverDrill}
         />
       )}
 
