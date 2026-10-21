@@ -36,6 +36,7 @@ interface Props {
   lowerThird: Insight | null;
   sandboxActive: boolean;
   onToggleSandbox: () => void;
+  lineScrubber?: React.ReactNode;
 }
 
 const TOOLS: { id: Exclude<DockTool, null>; label: string; icon: typeof Crosshair }[] = [
@@ -48,7 +49,7 @@ export default function BottomDock(props: Props) {
   const {
     tick, busy, inject, isDvrPaused, dvrOffsetTicks, pausedClock, togglePause, scrub,
     telestrator, toggleTelestrator, autoSpotlight, lockedId, onLock, events, lang, insightLine,
-    lowerThird, sandboxActive, onToggleSandbox,
+    lowerThird, sandboxActive, onToggleSandbox, lineScrubber,
   } = props;
   const { dockTool, setDockTool, openControlCenter } = useHud();
 
@@ -179,6 +180,7 @@ export default function BottomDock(props: Props) {
               telestrator={telestrator}
               onToggleTelestrator={toggleTelestrator}
               onToggleSpotlight={autoSpotlight}
+              lineScrubber={lineScrubber}
             />
 
             {/* ---------- interactive what-if sandbox ---------- */}

@@ -33,7 +33,7 @@ from agent_trace import build_agent_trace, gate_snapshot, p95, verify_grounding
 from config import settings
 from content_safety import ContentSafetyClient, content_safety_status
 from rai_shield import build_safety_shield, detect_prompt_risk
-from stage_a_synthetic_engine import PitchForgeEngine
+from stage_a_synthetic_engine import PITCH_L, PitchForgeEngine
 from stage_b_math_engine import TacticalMathEngine
 from stage_c_foundry_agents import FoundryRouter
 from stage_d_e_personalizer import Personalizer
@@ -79,6 +79,18 @@ class CounterfactualDisplacement(BaseModel):
         description="Euclidean displacement in metres.", ge=0.0)
 
 
+class DefensiveLineOverride(BaseModel):
+    """A collective defensive line shift for one team."""
+
+    team: str = Field(description="NLA or MCS.")
+    original_height_m: float = Field(
+        description="The line height before the shift, in metres from the team's own goal line.",
+        ge=0.0, le=80.0)
+    target_height_m: float = Field(
+        description="The requested line height, clamped to [18.0, 52.0] metres.",
+        ge=0.0, le=80.0)
+
+
 class CounterfactualRequest(BaseModel):
     """A full sandbox scenario submitted for arbitration."""
 
@@ -92,6 +104,9 @@ class CounterfactualRequest(BaseModel):
         description="Client-side baseline territory split.")
     current_chaos_index: float = Field(
         description="Chaos Index at the moment of the scenario.", ge=0.0, le=1.0)
+    defensive_line_override: Optional[DefensiveLineOverride] = Field(
+        default=None,
+        description="Optional collective defensive line shift for one team.")
 
 
 class CounterfactualEvaluation(BaseModel):
@@ -746,8 +761,11 @@ def _evaluate_counterfactual(req: CounterfactualRequest) -> dict:
     metrics = last_metrics or {}
     if not st:
         raise HTTPException(503, "Match engine not started yet")
-    if not req.displacements:
-        raise HTTPException(400, "at least one displacement is required")
+    if not req.displacements and req.defensive_line_override is None:
+        raise HTTPException(
+            400,
+            "at least one displacement or a defensive line override is required",
+        )
 
     resolved: List[dict] = []
     overrides: List[dict] = []
@@ -809,6 +827,31 @@ def _evaluate_counterfactual(req: CounterfactualRequest) -> dict:
 
     compensation = _compensation_move(resolved, st)
 
+    # -- optional collective defensive line shift -----------------------
+    line_shift = None
+    if req.defensive_line_override is not None:
+        override = req.defensive_line_override
+        line_shift = math.evaluate_defensive_line_shift(
+            st, override.team, override.target_height_m)
+        line_shift["requested_original_height_m"] = round(
+            float(override.original_height_m), 1)
+        line_shift["line_delta_applied_m"] = line_shift["delta_m"]
+        # The shifted block changes the territory split, so it is folded into
+        # the same authoritative recomputation the single-player path uses.
+        shifted_overrides = _line_shift_overrides(
+            st, override.team, line_shift["delta_m"])
+        if shifted_overrides:
+            simulated_control = math.pitch_control_split(st, shifted_overrides)
+            control_shift = {
+                "nla_territory_pct": round(
+                    simulated_control["nla_territory_pct"]
+                    - baseline_control["nla_territory_pct"], 1),
+                "mcs_territory_pct": round(
+                    simulated_control["mcs_territory_pct"]
+                    - baseline_control["mcs_territory_pct"], 1),
+            }
+        compensation = _line_compensation_move(st, override.team, line_shift)
+
     scenario_id = "cf_" + hashlib.sha1(
         (
             f"{req.match_id}:{req.minute}:"
@@ -822,6 +865,7 @@ def _evaluate_counterfactual(req: CounterfactualRequest) -> dict:
         "minute": req.minute,
         "displacements": resolved,
         "displaced_team": resolved[0]["team"] if resolved else "NLA",
+        "defensive_line_shift": line_shift,
         "projected_xt_shift": projected_xt_shift,
         "pitch_control_shift_pct": control_shift,
         "baseline_pitch_control": baseline_control,
@@ -867,6 +911,66 @@ def _compensation_move(resolved: List[dict], state: dict) -> dict:
         "player_id": int(coverer.get("shirt_number", 0)),
         "target_xy": [float(vacated[0]), float(vacated[1])],
         "label": "COVER VACATED CHANNEL",
+    }
+
+
+def _line_shift_overrides(
+    state: dict,
+    team: str,
+    delta_m: float,
+) -> List[dict]:
+    """Player overrides that reproduce a collective defensive line shift.
+
+    The backline slides by `delta_m` and the midfield compresses by
+    0.45 * `delta_m` — the same topology the Stage B evaluator applies.
+    """
+    sign = 1.0 if team == "NLA" else -1.0
+    outfield = [p for p in state.get("players", [])
+                if p.get("team") == team and p.get("role") != "GK"]
+    if not outfield:
+        return []
+    depth = (lambda p: float(p.get("x", 0.0)) if team == "NLA"
+             else PITCH_L - float(p.get("x", 0.0)))
+    by_depth = sorted(outfield, key=depth)
+    backline = by_depth[:4]
+    midfield = by_depth[4:8]
+    backline_ids = {p.get("id") for p in backline}
+    midfield_ids = {p.get("id") for p in midfield}
+    overrides: List[dict] = []
+    for p in outfield:
+        if p.get("id") in backline_ids:
+            overrides.append({
+                "player_id": p.get("id"),
+                "x": float(p.get("x", 0.0)) + sign * delta_m,
+                "y": float(p.get("y", 34.0)),
+            })
+        elif p.get("id") in midfield_ids:
+            overrides.append({
+                "player_id": p.get("id"),
+                "x": float(p.get("x", 0.0)) + sign * delta_m * 0.45,
+                "y": float(p.get("y", 34.0)),
+            })
+    return overrides
+
+
+def _line_compensation_move(state: dict, team: str, line_shift: dict) -> dict:
+    """Compensation for a line shift: the most advanced midfielder drops back."""
+    outfield = [p for p in state.get("players", [])
+                if p.get("team") == team and p.get("role") not in ("GK", "DEF")]
+    if not outfield:
+        return {"player_id": 0, "target_xy": [0.0, 0.0],
+                "label": "HOLD THE SHAPE"}
+    sign = 1.0 if team == "NLA" else -1.0
+    target_depth = float(line_shift.get("target_line_height_m") or 0.0) - 6.0
+    dropper = max(
+        outfield,
+        key=lambda p: float(p.get("x", 0.0)) if team == "NLA" else PITCH_L - float(p.get("x", 0.0)),
+    )
+    x = float(dropper.get("x", 0.0)) - sign * 6.0
+    return {
+        "player_id": int(dropper.get("shirt_number", 0)),
+        "target_xy": [round(x, 1), round(float(dropper.get("y", 34.0)), 1)],
+        "label": "DROP THE MIDFIELD BLOCK",
     }
 
 
@@ -967,6 +1071,7 @@ async def counterfactual_query(payload: CounterfactualRequest) -> dict:
     payload_out["grounding"] = grounding
     payload_out["agent_call"] = result.get("agent_call")
     payload_out["displacements"] = evaluation["displacements"]
+    payload_out["defensive_line_shift"] = evaluation.get("defensive_line_shift")
     payload_out["mode"] = result.get("mode", "fallback")
     payload_out["model"] = result.get("model")
     return payload_out

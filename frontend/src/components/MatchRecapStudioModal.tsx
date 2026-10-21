@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useModalA11y } from "@/lib/useModalA11y";
 import { API_BASE } from "@/lib/api";
+import { counterfactualLedger } from "@/lib/ledgerStore";
 import type {
   LangCode, MatchEvent, MatchRecapStoryboard, MatchTick, PipelineAudit, RecapAct,
 } from "@/lib/types";
@@ -188,6 +189,7 @@ export default function MatchRecapStudioModal({
   const buildDossier = () => {
     if (!data) return null;
     const metadata = tick?.match_metadata;
+    const ledger = counterfactualLedger.slice();
     const sorted = [...data.acts].sort((a, b) => b.delta_xt - a.delta_xt);
     const topDelta = sorted.slice(0, 3).map((act) => ({
       clock: act.clock,
@@ -281,6 +283,13 @@ export default function MatchRecapStudioModal({
         stage_modes: audit?.stage_modes ?? {},
         azure: audit?.azure ?? null,
       },
+      counterfactual_lab: {
+        experiment_count: ledger.length,
+        player_drags: ledger.filter((e) => e.kind === "player_drag").length,
+        line_shifts: ledger.filter((e) => e.kind === "defensive_line_shift").length,
+        grounded_experiments: ledger.filter((e) => e.numericGroundingVerified === true).length,
+        experiments: ledger,
+      },
       compliance: {
         synthetic_data_compliance: audit?.synthetic_data_compliance ?? true,
         no_external_video: true,
@@ -362,7 +371,43 @@ export default function MatchRecapStudioModal({
       `- Handoff counts: ${JSON.stringify(foundry.handoff_counts)}`,
       `- Latency P95: ${JSON.stringify(foundry.latency_p95)}`,
       "",
-      "## 5 · Compliance & provenance",
+      "## 5 · Counterfactual experiment ledger",
+      dossier.counterfactual_lab.experiment_count === 0
+        ? "- No what-if experiments were run in this session."
+        : [
+            `- Experiments: ${dossier.counterfactual_lab.experiment_count} ` +
+              `(${dossier.counterfactual_lab.player_drags} player drags, ` +
+              `${dossier.counterfactual_lab.line_shifts} defensive-line shifts, ` +
+              `${dossier.counterfactual_lab.grounded_experiments} numerically grounded)`,
+            "",
+            ...dossier.counterfactual_lab.experiments.map((e) => {
+              const bits = [
+                `### ${e.id} · ${e.kind.replace(/_/g, " ")} · ${e.clock}`,
+                e.summary,
+                `- ΔxT ${e.deltaXT >= 0 ? "+" : ""}${e.deltaXT.toFixed(3)}`,
+              ];
+              if (e.deltaControlPct) bits.push(`- Δ pitch control ${e.deltaControlPct.toFixed(1)} pts`);
+              if (e.throughBallExposureXt != null) {
+                bits.push(`- Through-ball exposure ${e.throughBallExposureXt.toFixed(3)} xT`);
+              }
+              if (e.pressCompressionGainPct != null) {
+                bits.push(`- Press compression ${e.pressCompressionGainPct.toFixed(1)}%`);
+              }
+              if (e.offsideTrapCatchPct != null) {
+                bits.push(`- Offside trap catch ${e.offsideTrapCatchPct.toFixed(0)}%`);
+              }
+              if (e.vulnerabilityIndex != null) {
+                bits.push(`- Structural vulnerability ${e.vulnerabilityIndex.toFixed(2)}`);
+              }
+              if (e.traceId) bits.push(`- Trace \`${e.traceId}\``);
+              if (e.numericGroundingVerified != null) {
+                bits.push(`- Numeric grounding ${e.numericGroundingVerified ? "VERIFIED" : "REVIEW"}`);
+              }
+              return bits.join("\n");
+            }),
+          ].flat(),
+      "",
+      "## 6 · Compliance & provenance",
       ...Object.entries(dossier.compliance).map(([key, value]) => `- ${key}: ${String(value)}`),
       `- Data lineage: ${dossier.provenance.data_path}`,
       "",

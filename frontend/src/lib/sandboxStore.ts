@@ -9,7 +9,10 @@
 // a 60 fps pointer drag never triggers a React re-render — the avatars read
 // the override directly inside their own `useFrame`.
 
-import { calculateXTAtCoord, computePitchControlSplit, evaluateSimulatedPitchControl } from "./edgeEngine";
+import {
+  calculateXTAtCoord, computePitchControlSplit, evaluateSimulatedPitchControl,
+  type DefensiveLineShift,
+} from "./edgeEngine";
 import type { CounterfactualRequest, MatchTick, Team } from "./types";
 
 export interface SandboxDelta {
@@ -68,6 +71,7 @@ export function moveSandboxPlayer(x: number, y: number): void {
   sandbox.x = Math.max(1, Math.min(104, x));
   sandbox.y = Math.max(1, Math.min(67, y));
   sandbox.moved = true;
+  notifySandbox();
 }
 
 /* ------------------------------------------------------------------------
@@ -110,6 +114,61 @@ export function sandboxOverrideFor(
 ): { x: number; y: number } | null {
   if (!sandbox.active || sandbox.playerId !== playerId) return null;
   return { x: sandbox.x, y: sandbox.y };
+}
+
+/* ------------------------------------------------------------------ */
+/* Collective defensive line scrubber (shared by the HUD and the DVR)  */
+/* ------------------------------------------------------------------ */
+
+export interface LineScrubberState {
+  team: Team;
+  target: number;
+  shift: DefensiveLineShift | null;
+}
+
+export const lineScrubber: LineScrubberState = {
+  team: "NLA",
+  target: 40,
+  shift: null,
+};
+
+export function setLineTeam(team: Team): void {
+  lineScrubber.team = team;
+  notifySandbox();
+}
+
+export function setLineTarget(target: number): void {
+  lineScrubber.target = Math.max(18, Math.min(52, target));
+  notifySandbox();
+}
+
+export function setLineShift(shift: DefensiveLineShift | null): void {
+  lineScrubber.shift = shift;
+  notifySandbox();
+}
+
+/**
+ * The live player list with the collective defensive line shift applied.
+ *
+ * The 3D offside wall and the compactness hull read this, so dragging the
+ * scrubber physically moves the block on the pitch.
+ */
+export function lineShiftedPlayers<T extends { id: string; team: string; x: number; y: number }>(
+  players: T[],
+): T[] {
+  const shift = lineScrubber.shift;
+  if (!shift || !shift.delta_m) return players;
+  const sign = shift.team === "NLA" ? 1 : -1;
+  const backline = new Set(shift.backline_player_ids);
+  const midfield = new Set(shift.midfield_player_ids);
+  return players.map((p) => {
+    if (p.team !== shift.team) return p;
+    if (backline.has(p.id)) return { ...p, x: p.x + sign * shift.delta_m };
+    if (midfield.has(p.id)) {
+      return { ...p, x: p.x + sign * shift.delta_m * 0.45 };
+    }
+    return p;
+  });
 }
 
 /**

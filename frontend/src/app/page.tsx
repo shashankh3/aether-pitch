@@ -18,6 +18,7 @@ import LiveCaptionStrip from "@/components/LiveCaptionStrip";
 import StudioErrorBoundary from "@/components/StudioErrorBoundary";
 import JudgeFirstRunCard from "@/components/JudgeFirstRunCard";
 import CounterfactualDeltaHUD from "@/components/hud/CounterfactualDeltaHUD";
+import DefensiveLineScrubber from "@/components/hud/DefensiveLineScrubber";
 import {
   clearSandbox, type SandboxDelta,
 } from "@/lib/sandboxStore";
@@ -1059,6 +1060,7 @@ function StudioOrchestrator() {
                 lowerThird={lowerThird}
                 sandboxActive={sandboxActive}
                 onToggleSandbox={toggleSandbox}
+                lineScrubber={sandboxActive ? <DefensiveLineScrubber tick={tick} /> : null}
               />
             </div>
           </div>

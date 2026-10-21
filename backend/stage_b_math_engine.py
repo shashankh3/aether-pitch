@@ -53,6 +53,95 @@ def _clip(v: float, lo: float = 0.0, hi: float = 1.0) -> float:
     return max(lo, min(hi, v))
 
 
+#: Defensive line height bounds (metres from the team's own goal line).
+DEF_LINE_MIN_M = 18.0
+DEF_LINE_MAX_M = 52.0
+#: Midfield compression ratio relative to the backline slide.
+DEF_LINE_MIDFIELD_COMPRESSION = 0.45
+
+
+def _convex_hull_area(points: List[Tuple[float, float]]) -> float:
+    """Area of the convex hull of 2D points (Andrew's monotone chain).
+
+    Used for the compactness of a team's block: the area their outfield shape
+    occupies on the pitch.
+    """
+    pts = sorted({(float(x), float(y)) for x, y in points})
+    if len(pts) < 3:
+        return 0.0
+
+    def cross(o, a, b) -> float:
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    lower: List[Tuple[float, float]] = []
+    for p in pts:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], p) <= 0:
+            lower.pop()
+        lower.append(p)
+    upper: List[Tuple[float, float]] = []
+    for p in reversed(pts):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], p) <= 0:
+            upper.pop()
+        upper.append(p)
+    hull = lower[:-1] + upper[:-1]
+    if len(hull) < 3:
+        return 0.0
+    area = 0.0
+    for i in range(len(hull)):
+        x1, y1 = hull[i]
+        x2, y2 = hull[(i + 1) % len(hull)]
+        area += x1 * y2 - x2 * y1
+    return abs(area) / 2.0
+
+
+def _central_usable_cells(
+    state: dict,
+    defending_team: str,
+    override_players: Optional[List[dict]] = None,
+) -> int:
+    """How many central pitch-control cells the opposition can still use.
+
+    A cell is usable when the opposition influence clearly exceeds the
+    defending side's, measured on the same 16x12 grid the rest of Stage B uses.
+    """
+    moved = {
+        o.get("id"): (float(o.get("x", 0.0)), float(o.get("y", 0.0)))
+        for o in (override_players or [])
+    }
+    players = [p for p in state.get("players", []) if p.get("role") != "GK"]
+    if not players:
+        return 0
+    usable = 0
+    for row in range(XT_ROWS):
+        for col in range(XT_COLS):
+            cx = (col + 0.5) * PITCH_L / XT_COLS
+            cy = (row + 0.5) * PITCH_W / XT_ROWS
+            # Central third of the pitch only.
+            if not (PITCH_L * 0.33 <= cx <= PITCH_L * 0.67):
+                continue
+            att = 0.0
+            dfn = 0.0
+            for p in players:
+                ov = moved.get(p.get("id"))
+                base_x = ov[0] if ov else float(p.get("x", 0.0))
+                base_y = ov[1] if ov else float(p.get("y", 0.0))
+                px = base_x + float(p.get("vx", 0.0)) * 0.45
+                py = base_y + float(p.get("vy", 0.0)) * 0.45
+                d2 = (cx - px) ** 2 + (cy - py) ** 2
+                if d2 > 400.0:
+                    continue
+                weight = math.exp(-d2 / 144.0) * (
+                    0.55 + min(0.75, float(p.get("speed_kmh", 0.0)) / 45.0)
+                )
+                if p.get("team") == defending_team:
+                    dfn += weight
+                else:
+                    att += weight
+            if att > dfn * 1.02:
+                usable += 1
+    return usable
+
+
 class TacticalMathEngine:
     def __init__(self, window_s: float = 60.0):
         self.window_s = window_s
@@ -566,6 +655,126 @@ class TacticalMathEngine:
                 "mirror_attacking_team": "MCS",
             })
         return out
+
+    def evaluate_defensive_line_shift(
+        self,
+        state: dict,
+        team: str,
+        target_line_height_m: float,
+    ) -> dict:
+        """Evaluate a collective defensive line shift for one team.
+
+        The backline unit (four deepest outfield players) slides in unison to a
+        target height above their own goal line, and the midfield unit
+        compresses proportionally so the block keeps a realistic topology.
+        Everything returned is derived from the deterministic Stage B surfaces —
+        the 16x12 xT tensor, the pitch-control attribution and the geometric
+        block shape — so the browser twin can reproduce it exactly.
+        """
+        target = _clip(float(target_line_height_m), DEF_LINE_MIN_M, DEF_LINE_MAX_M)
+        players = [p for p in state.get("players", []) if p.get("team") == team
+                   and p.get("role") != "GK"]
+        if not players:
+            return {
+                "team": team,
+                "current_line_height_m": 0.0,
+                "target_line_height_m": target,
+                "delta_m": 0.0,
+                "compactness_area_m2": 0.0,
+                "compactness_area_after_m2": 0.0,
+                "through_ball_exposure_xt": 0.0,
+                "offside_trap_catch_prob_pct": 50.0,
+                "press_compression_gain_pct": 0.0,
+            }
+
+        sign = 1.0 if team == "NLA" else -1.0
+        outfield = list(players)
+
+        def depth(p: dict) -> float:
+            """Metres from this team's own goal line."""
+            return float(p.get("x", 0.0)) if team == "NLA" else PITCH_L - float(p.get("x", 0.0))
+
+        by_depth = sorted(outfield, key=depth)
+        # The backline unit is the four players CLOSEST to their own goal.
+        backline = by_depth[:4]
+        midfield = by_depth[4:8]
+        current_height = sum(depth(p) for p in backline) / len(backline)
+        delta = target - current_height
+
+        area_before = _convex_hull_area([(float(p.get("x", 0.0)), float(p.get("y", 0.0)))
+                                          for p in outfield])
+
+        shifted: List[dict] = []
+        for p in outfield:
+            x = float(p.get("x", 0.0))
+            if p in backline:
+                # The line slides as a unit.
+                x += sign * delta
+            elif p in midfield:
+                # The midfield compresses proportionally to keep the shape.
+                x += sign * delta * 0.45
+            shifted.append({**p, "x": x})
+
+        area_after = _convex_hull_area([(float(p.get("x", 0.0)), float(p.get("y", 0.0)))
+                                         for p in shifted])
+
+        # -- through-ball exposure behind the shifted line -----------------
+        # Expected Threat in the band the defence now vacates, weighted by how
+        # fast the opposition are running at it.
+        opponents = [p for p in state.get("players", [])
+                     if p.get("team") != team and p.get("role") != "GK"]
+        new_line_depth = target
+        exposure = 0.0
+        for p in opponents:
+            forward = float(p.get("vx", 0.0)) * (1.0 if team == "MCS" else -1.0)
+            if forward <= 0.2:
+                continue
+            px = float(p.get("x", 0.0))
+            # Depth of this attacker from the shifted team's goal line.
+            attacker_depth = px if team == "NLA" else PITCH_L - px
+            if attacker_depth >= new_line_depth:
+                continue
+            weight = min(1.6, forward / 5.0)
+            exposure += self.xt_value(team, px, float(p.get("y", 34.0))) * weight
+        through_ball_exposure = round(exposure, 4)
+
+        # -- offside trap catch probability --------------------------------
+        # Logistic on attacker proximity to the shifted offside line and the
+        # cohesion (spread) of the defensive unit.
+        depths = [depth(p) for p in backline]
+        cohesion = max(0.0, 1.0 - (max(depths) - min(depths)) / 12.0) if depths else 0.0
+        nearest_gap = 99.0
+        for p in opponents:
+            gap = abs(depth(p) - new_line_depth)
+            nearest_gap = min(nearest_gap, gap)
+        proximity = _clip(1.0 - nearest_gap / 9.0, 0.0, 1.0)
+        logit = 1.35 * proximity + 0.75 * cohesion - 0.9
+        catch_prob = round(_clip(5.0 + 90.0 / (1.0 + math.exp(-logit)), 5.0, 95.0), 1)
+
+        # -- press compression gain ----------------------------------------
+        # Share of central grid cells the opposition can use before and after.
+        central_before = _central_usable_cells(state, team, None)
+        central_after = _central_usable_cells(state, team, shifted)
+        if central_before <= 0:
+            press_gain = 0.0
+        else:
+            press_gain = round(
+                _clip((central_before - central_after) / central_before * 100.0, -100.0, 100.0), 1)
+
+        return {
+            "team": team,
+            "current_line_height_m": round(current_height, 1),
+            "target_line_height_m": round(target, 1),
+            "delta_m": round(delta, 1),
+            "compactness_area_m2": round(area_before, 1),
+            "compactness_area_after_m2": round(area_after, 1),
+            "through_ball_exposure_xt": through_ball_exposure,
+            "offside_trap_catch_prob_pct": catch_prob,
+            "press_compression_gain_pct": press_gain,
+            "line_cohesion": round(cohesion, 3),
+            "backline_player_ids": [p.get("id") for p in backline],
+            "midfield_player_ids": [p.get("id") for p in midfield],
+        }
 
     def snapshot(self, state: dict, t: Optional[float] = None) -> dict:
         t = t if t is not None else state["t_match"]

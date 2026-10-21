@@ -196,6 +196,18 @@ Prefer to be driven? **Controls → Autopilot** runs the full 80-second guided t
 - **Data tab card** "Cloud Resilience & Edge Failover Drill" shows live badges: `Hot-Swap Latency`, `10Hz Telemetry Continuity: 100% (0 Dropped Frames)`, and `State Reconciliation: VERIFIED`.
 - **PipelineRibbon** carries an amber `EDGE DRILL` badge during the outage and flips to an emerald `DRILL OK` once reconciliation is verified.
 
+### Collective Defensive Line Scrubber
+- **Slide a whole defensive line**, not just one player: a broadcast-style slider shifts the backline unit of either team between **18 m and 52 m from their own goal line**, in the Sandbox HUD *and* in the DVR dock.
+- **The whole block moves:** the four deepest own-goal players slide as a unit and the midfield compresses by 0.45 × the shift, preserving a realistic block topology.
+- **Live consequence read-out** computed by the Stage B twin: `through_ball_exposure_xt` (Expected Threat in the band the defence vacates, weighted by opposition forward velocity), `offside_trap_catch_prob_pct` (logistic on attacker proximity to the shifted line and line cohesion), `press_compression_gain_pct` (reduction in opposition-usable central cells) and the block's `compactness_area_m2` before and after.
+- **The 3D responds:** the offside wall and the compactness convex hull are rebuilt from the *shifted* players, so the block physically slides on the pitch as you drag.
+- **Byte-identical twins.** The browser and the server implement the same function over the same 16×12 xT grid — verified field-for-field across all eight scenarios. The browser's xT surface was also aligned to the backend's grid, so the delta a judge sees locally is the number the arbiter adjudicates.
+
+### Counterfactual Dossier & Rubric Integration
+- **Every experiment is logged.** A session ledger records each player drag and each line shift with its clock, displacement, ΔxT, Δ pitch control, exposure, vulnerability index, scenario id, trace id and grounding verdict.
+- **Serialized into the dossier.** The Recap Studio's **JSON** and **Markdown** exports now carry a `counterfactual_lab` section — experiment count, how many were numerically grounded, and every individual experiment with its evidence.
+- **A new rubric row.** The rubric verifier shows the sandbox as an exercised verification line: how many experiments were run, how many passed the numeric critic, and how many drags versus line shifts.
+
 ### Interactive Spatial "What-If" Counterfactual Sandbox
 - **The 3D stage is not an observer feed — it is a tactical sandbox.** Open the **Replay** popover on the bottom dock, arm the **What-If Sandbox**, then grab any avatar and drag it across the grass.
 - **Live Stage B recomputation:** the browser-native twin re-evaluates the *same* `xtValue` surface and the *same* 16×12 territory attribution used by the live pipeline, so the deltas are the pipeline's own numbers — not an approximation. Moving the NLA right-back 15 m inside shifts NLA territory −0.5 pts and hands MCS +3.2 pts, and the xT at that position drops 0.028 → 0.022.

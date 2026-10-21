@@ -2,21 +2,24 @@
 // AETHER PITCH — Interactive Spatial "What-If" Counterfactual Sandbox HUD.
 //
 // A broadcast-calibrated glass panel that floats above the pitch while a judge
-// relocates a player. It reports the live Stage B deltas, can hand the
-// counterfactual to the Stage C war-room, and can submit it to the
-// SpatialArbiterAgent via `POST /api/counterfactual-query`.
+// relocates a player or slides a defensive line. It reports the live Stage B
+// deltas, can hand the counterfactual to the Stage C war-room, and can submit
+// it to the SpatialArbiterAgent via `POST /api/counterfactual-query`.
 //
 // The panel subscribes to the sandbox store and re-renders on its own, so the
 // page and the 3D scene never re-render during a 60 fps drag.
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Crosshair, GitCompareArrows, Send, Undo2, X, TrendingUp, TrendingDown, Gavel,
-  ShieldCheck, Loader2,
+  ShieldCheck, Loader2, NotebookPen,
 } from "lucide-react";
 import {
-  buildCounterfactualRequest, evaluateSandbox, subscribeSandbox, type SandboxDelta,
+  buildCounterfactualRequest, evaluateSandbox, lineScrubber, sandbox,
+  subscribeSandbox, type SandboxDelta,
 } from "@/lib/sandboxStore";
+import DefensiveLineScrubber from "@/components/hud/DefensiveLineScrubber";
+import { logExperiment, annotateWithEvaluation } from "@/lib/ledgerStore";
 import { API_BASE } from "@/lib/api";
 import type { CounterfactualEvaluation, MatchTick } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -37,6 +40,7 @@ export default function CounterfactualDeltaHUD({
   const [evaluation, setEvaluation] = useState<CounterfactualEvaluation | null>(null);
   const [adjudicating, setAdjudicating] = useState(false);
   const [adjudicationError, setAdjudicationError] = useState<string | null>(null);
+  const lastLoggedRef = useRef<string>("");
 
   useEffect(() => {
     if (!active) {
@@ -45,7 +49,38 @@ export default function CounterfactualDeltaHUD({
       setAdjudicationError(null);
       return;
     }
-    const refresh = () => setDelta(evaluateSandbox(tick));
+    const refresh = () => {
+      const next = evaluateSandbox(tick);
+      setDelta(next);
+      // One ledger entry per completed drag, not per animation frame.
+      if (next && !sandbox.dragging) {
+        const key = `${next.playerId}@${next.x.toFixed(1)},${next.y.toFixed(1)}`;
+        if (key !== lastLoggedRef.current) {
+          lastLoggedRef.current = key;
+          logExperiment({
+            kind: "player_drag",
+            clock: tick?.clock ?? "—",
+            minute: Math.round((tick?.t_match ?? 0) / 60),
+            summary:
+              `${next.team} #${next.shirtNumber} ${next.playerName} moved ` +
+              `${next.displacementM.toFixed(1)}m ` +
+              `(${next.originX.toFixed(1)},${next.originY.toFixed(1)}) → ` +
+              `(${next.x.toFixed(1)},${next.y.toFixed(1)})`,
+            deltaXT: next.deltaXT,
+            deltaControlPct: next.deltaControlPct,
+            displacementM: next.displacementM,
+            vulnerabilityIndex: null,
+            throughBallExposureXt: null,
+            pressCompressionGainPct: null,
+            offsideTrapCatchPct: null,
+            scenarioId: null,
+            traceId: null,
+            numericGroundingVerified: null,
+            team: next.team,
+          });
+        }
+      }
+    };
     refresh();
     const unsub = subscribeSandbox(refresh);
     // The pitch-control rescan is throttled to ~12 Hz; the 3D position itself
@@ -57,10 +92,15 @@ export default function CounterfactualDeltaHUD({
     };
   }, [active, tick]);
 
-  const adjudicate = async () => {
+  const lineShift = useMemo(() => {
+    if (!tick || !active) return null;
+    return lineScrubber.shift;
+  }, [tick, active]);
+
+  const adjudicate = useCallback(async () => {
     const payload = buildCounterfactualRequest(tick, delta, metrics?.chaos_index ?? 0.5);
-    if (!payload) {
-      setAdjudicationError("Select a player before adjudicating.");
+    if (!payload && !lineShift) {
+      setAdjudicationError("Select a player or shift a defensive line first.");
       return;
     }
     setAdjudicating(true);
@@ -69,11 +109,33 @@ export default function CounterfactualDeltaHUD({
       const r = await fetch(`${API_BASE}/api/counterfactual-query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          ...(payload ?? {
+            match_id: "SYN-PL-2026-1019-NLA-MCS",
+            minute: Math.round((tick?.t_match ?? 0) / 60),
+            displacements: [],
+            baseline_xt: 0,
+            baseline_pitch_control: {},
+            current_chaos_index: metrics?.chaos_index ?? 0.5,
+          }),
+          defensive_line_override: lineShift
+            ? {
+                team: lineShift.team,
+                original_height_m: lineShift.current_line_height_m,
+                target_height_m: lineShift.target_line_height_m,
+              }
+            : undefined,
+        }),
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const data = (await r.json()) as CounterfactualEvaluation;
       setEvaluation(data);
+      if (delta) {
+        annotateWithEvaluation(data, "player_drag");
+      }
+      if (lineShift) {
+        annotateWithEvaluation(data, "defensive_line_shift");
+      }
     } catch (err) {
       setAdjudicationError(
         `Arbiter unreachable (${err instanceof Error ? err.message : "network error"}).`
@@ -81,7 +143,7 @@ export default function CounterfactualDeltaHUD({
     } finally {
       setAdjudicating(false);
     }
-  };
+  }, [tick, delta, lineShift, metrics]);
 
   if (!active) return null;
 
@@ -116,8 +178,8 @@ export default function CounterfactualDeltaHUD({
         {!delta ? (
           <p className="font-tech text-[10px] leading-relaxed text-slate-400">
             Sandbox armed — click any avatar on the pitch and drag it to a new
-            position. The Stage B twin recomputes Expected Threat and Pitch
-            Control against the relocated player.
+            position, or slide the collective defensive line below. The Stage B
+            twin recomputes Expected Threat and Pitch Control live.
           </p>
         ) : (
           <>
@@ -202,6 +264,8 @@ export default function CounterfactualDeltaHUD({
                 </div>
               </div>
             </div>
+
+            <DefensiveLineScrubber tick={tick} />
 
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               <button

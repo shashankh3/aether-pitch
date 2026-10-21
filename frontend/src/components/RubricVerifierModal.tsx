@@ -4,10 +4,12 @@
 // the result onto every hackathon judging requirement.
 
 import { useEffect, useRef, useState } from "react";
-import { ShieldCheck, X, Loader2, CheckCircle2 } from "lucide-react";
+import { ShieldCheck, X, Loader2, CheckCircle2, Crosshair } from "lucide-react";
 import type { PipelineAudit } from "@/lib/types";
 import { API_BASE } from "@/lib/api";
+import { counterfactualLedger, subscribeLedger } from "@/lib/ledgerStore";
 import { useModalA11y } from "@/lib/useModalA11y";
+import { cn } from "@/lib/utils";
 
 interface Props {
   open: boolean;
@@ -39,8 +41,11 @@ export default function RubricVerifierModal({ open, onClose }: Props) {
   const [audit, setAudit] = useState<PipelineAudit | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [ledger, setLedger] = useState(() => counterfactualLedger.slice());
   const panelRef = useRef<HTMLDivElement>(null);
   useModalA11y(open, onClose, panelRef);
+
+  useEffect(() => subscribeLedger(() => setLedger(counterfactualLedger.slice())), []);
 
   useEffect(() => {
     if (!open) return;
@@ -65,6 +70,11 @@ export default function RubricVerifierModal({ open, onClose }: Props) {
   }, [open]);
 
   if (!open) return null;
+
+  const ledgerCount = ledger.length;
+  const ledgerGrounded = ledger.filter((e) => e.numericGroundingVerified === true).length;
+  const ledgerDrags = ledger.filter((e) => e.kind === "player_drag").length;
+  const ledgerLines = ledger.filter((e) => e.kind === "defensive_line_shift").length;
   return (
     <div
       className="modal-backdrop pointer-events-auto z-50"
@@ -142,6 +152,31 @@ export default function RubricVerifierModal({ open, onClose }: Props) {
                   </div>
                 );
               })}
+            </div>
+
+            <div className="clip-chamfer mt-3 flex items-center gap-3 border border-cyan-300/30 bg-cyan-300/[0.06] px-3 py-2">
+              <Crosshair size={16} className="shrink-0 text-cyan-300" />
+              <div className="min-w-0 flex-1">
+                <div className="text-[12px] font-bold text-slate-100">
+                  Interactive Counterfactual Sandbox (What-If Digital Twin)
+                </div>
+                <div className="font-tech text-[9.5px] uppercase tracking-wider text-slate-500">
+                  {ledgerCount} experiment{ledgerCount === 1 ? "" : "s"} logged ·{" "}
+                  {ledgerGrounded} numerically grounded ·{" "}
+                  {ledgerDrags} player drag{ledgerDrags === 1 ? "" : "s"} ·{" "}
+                  {ledgerLines} line shift{ledgerLines === 1 ? "" : "s"}
+                </div>
+              </div>
+              <span
+                className={cn(
+                  "clip-skew px-2 py-0.5 font-tech text-[11px] font-bold",
+                  ledgerCount > 0
+                    ? "bg-cyan-300/20 text-cyan-300"
+                    : "bg-white/10 text-slate-500"
+                )}
+              >
+                {ledgerCount > 0 ? "EXERCISED" : "ARMED"}
+              </span>
             </div>
 
             <div className="clip-chamfer mt-3 border border-white/10 bg-white/[0.03] px-3 py-2">

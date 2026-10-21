@@ -13,6 +13,7 @@ import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import { telemetry } from "@/lib/telemetry";
+import { lineShiftedPlayers } from "@/lib/sandboxStore";
 import type { HighlightZone, TelestratorState } from "@/lib/types";
 
 const MAX_SPOTLIGHTS = 3;
@@ -99,9 +100,11 @@ function OffsideWall() {
       const poss = telemetry.match.possession;
       const defending = poss === "NLA" ? "MCS" : "NLA";
       const attackers = Array.from(telemetry.players.values()).filter((p) => p.team === poss && p.role !== "GK");
-      const defs = Array.from(telemetry.players.values())
-        .filter((p) => p.team === defending && p.role === "DEF")
-        .sort((a, b) => attackProgress(defending, a.x) - attackProgress(defending, b.x));
+      // The offside wall follows the collective line scrubber.
+      const defs = lineShiftedPlayers(
+        Array.from(telemetry.players.values())
+          .filter((p) => p.team === defending && p.role === "DEF"),
+      ).sort((a, b) => attackProgress(defending, a.x) - attackProgress(defending, b.x));
       const wallDef = defs[1] ?? defs[0]; // second-deepest defender
       g.visible = !!wallDef;
       if (wallDef) {
@@ -185,8 +188,12 @@ function CompactnessPolygon() {
     calcAt.current = now;
     const poss = telemetry.match.possession;
     const defending = poss === "NLA" ? "MCS" : "NLA";
-    const block = Array.from(telemetry.players.values())
-      .filter((p) => p.team === defending && (p.role === "DEF" || p.role === "MID"));
+    // The collective defensive line scrubber relocates the block, so the hull
+    // is built from the shifted players rather than the raw telemetry.
+    const block = lineShiftedPlayers(
+      Array.from(telemetry.players.values())
+        .filter((p) => p.team === defending && (p.role === "DEF" || p.role === "MID")),
+    );
     g.visible = block.length >= 3;
     if (!g.visible) return;
     const hull = convexHull(block.map((p) => ({ x: p.x - 52.5, y: p.y - 34 })));

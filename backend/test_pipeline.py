@@ -1121,6 +1121,85 @@ def main() -> int:
           and len(arbiter_calls) == 1,
           "no extra model call")
 
+    # ---- v6.2 TASK 4: collective defensive line shift -------------------
+    check("Line shift: Stage B evaluator exposes the full contract",
+          all(hasattr(math, "evaluate_defensive_line_shift")
+              for _ in [0]))
+    line_eval = math.evaluate_defensive_line_shift(st, "NLA", 45.0)
+    check("Line shift: returns every required field",
+          all(k in line_eval for k in (
+              "current_line_height_m", "target_line_height_m", "delta_m",
+              "compactness_area_m2", "compactness_area_after_m2",
+              "through_ball_exposure_xt", "offside_trap_catch_prob_pct",
+              "press_compression_gain_pct"))
+          and 5.0 <= line_eval["offside_trap_catch_prob_pct"] <= 95.0
+          and line_eval["compactness_area_m2"] >= 0.0
+          and line_eval["compactness_area_after_m2"] >= 0.0
+          and len(line_eval["backline_player_ids"]) == 4)
+    backline_roles = {
+        p["role"] for p in st["players"] if p["id"] in line_eval["backline_player_ids"]
+    }
+    check("Line shift: the backline unit is the four deepest own-goal players",
+          backline_roles == {"DEF"},
+          f"roles={sorted(backline_roles)}")
+    clamped = math.evaluate_defensive_line_shift(st, "NLA", 5.0)
+    check("Line shift: the target is clamped to [18, 52] metres",
+          clamped["target_line_height_m"] == 18.0
+          and math.evaluate_defensive_line_shift(
+              st, "NLA", 90.0)["target_line_height_m"] == 52.0)
+    # Pushing the line up must open space behind it and compress the centre.
+    low_line = math.evaluate_defensive_line_shift(st, "NLA", 20.0)
+    high_line = math.evaluate_defensive_line_shift(st, "NLA", 50.0)
+    check("Line shift: a higher line trades compactness for central space",
+          high_line["compactness_area_after_m2"] < low_line["compactness_area_after_m2"]
+          and high_line["press_compression_gain_pct"] > low_line["press_compression_gain_pct"],
+          f"area {low_line['compactness_area_after_m2']} -> "
+          f"{high_line['compactness_area_after_m2']}, press "
+          f"{low_line['press_compression_gain_pct']} -> "
+          f"{high_line['press_compression_gain_pct']}")
+    check("Line shift: deterministic for the same inputs",
+          math.evaluate_defensive_line_shift(st, "NLA", 45.0) == line_eval)
+
+    # The counterfactual request accepts the optional defensive line override.
+    check("Line shift: CounterfactualRequest accepts the line override",
+          "defensive_line_override" in
+          app_main.CounterfactualRequest.model_fields
+          and app_main.DefensiveLineOverride is not None)
+    line_request = app_main.CounterfactualRequest(
+        match_id="SYN-PL-2026-1019-NLA-MCS", minute=62.5,
+        displacements=[],
+        baseline_xt=0.0, baseline_pitch_control={}, current_chaos_index=0.52,
+        defensive_line_override=app_main.DefensiveLineOverride(
+            team="NLA",
+            original_height_m=line_eval["current_line_height_m"],
+            target_height_m=45.0),
+    )
+    line_eval_out = asyncio.get_event_loop().run_until_complete(
+        app_main.counterfactual_query(line_request))
+    line_shift = line_eval_out.get("defensive_line_shift") or {}
+    check("Line shift: the endpoint returns the line-shift evaluation",
+          bool(line_shift)
+          and abs(float(line_shift.get("target_line_height_m", 0.0)) - 45.0) < 0.11
+          and "through_ball_exposure_xt" in line_shift
+          and "press_compression_gain_pct" in line_shift
+          and "offside_trap_catch_prob_pct" in line_shift
+          and line_eval_out["numeric_grounding_verified"] is True
+          and line_eval_out["trace_id"].startswith("trace_"))
+    verdict_lower = line_eval_out["arbiter_verdict"].lower()
+    check("Line shift: the arbiter verdict cites the line shift",
+          "defensive line" in verdict_lower
+          and "through-ball exposure" in verdict_lower,
+          line_eval_out["arbiter_verdict"][:110])
+    check("Line shift: a line-only verdict is not framed as a relocation",
+          "Relocating the player" not in line_eval_out["arbiter_verdict"]
+          and "defensive line" in line_eval_out["arbiter_verdict"])
+    check("Line shift: the response keeps the full evaluation contract",
+          all(k in line_eval_out for k in (
+              "scenario_id", "projected_xt_shift", "pitch_control_shift_pct",
+              "structural_vulnerability_index", "arbiter_verdict",
+              "recommended_compensation_move", "numeric_grounding_verified",
+              "trace_id")))
+
     # ---- synthetic compliance -------------------------------------------
     check("Compliance: 100% synthetic squads",
           all(pl["name"] for pl in st["players"]) and len(

@@ -14,6 +14,7 @@ interface ToolsProps {
   telestrator: TelestratorState;
   onToggleTelestrator: (key: keyof Omit<TelestratorState, "customTacticalArrows" | "spotlightPlayerIds">) => void;
   onToggleSpotlight: () => void;
+  lineScrubber?: React.ReactNode;
 }
 
 export function TelestratorTools({ telestrator, onToggleTelestrator, onToggleSpotlight }: ToolsProps) {
@@ -84,7 +85,7 @@ const MAX_BACK = -150; // -15.0 s at 10 Hz
 
 export default function TelestratorDVRBar({
   isDvrPaused, dvrOffsetTicks, pausedClock, onTogglePause, onScrub, telestrator,
-  onToggleTelestrator, onToggleSpotlight,
+  onToggleTelestrator, onToggleSpotlight, lineScrubber,
 }: Props) {
   const history = telemetry.history;
   const secondsAgo = Math.abs(Math.min(0, dvrOffsetTicks)) / 10;
@@ -186,6 +187,8 @@ export default function TelestratorDVRBar({
           </button>
         </div>
       )}
+
+      {lineScrubber}
 
       {/* telestrator quick actions — visible in the Replay popover, 2×2 on phones */}
       <div className="mt-1 grid grid-cols-2 gap-1.5 border-t border-white/10 pt-1.5 sm:flex">

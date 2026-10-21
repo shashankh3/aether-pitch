@@ -895,10 +895,47 @@ class FoundryRouter:
         else:
             stance = "The move is marginal: hold the shape and re-test the next transition."
 
-        verdict = (
-            f"Relocating the player {xT_clause} and {territory_clause}, leaving the "
-            f"structural vulnerability index at {vuln:.2f}. {stance}"
-        )
+        line = evaluation.get("defensive_line_shift")
+        has_displacement = bool(evaluation.get("displacements"))
+        if line and not has_displacement:
+            # A collective line shift is its own story: lead with the line.
+            height = float(line.get("target_line_height_m") or 0.0)
+            exposure = float(line.get("through_ball_exposure_xt") or 0.0)
+            press = float(line.get("press_compression_gain_pct") or 0.0)
+            trap = float(line.get("offside_trap_catch_prob_pct") or 0.0)
+            area_before = float(line.get("compactness_area_m2") or 0.0)
+            area_after = float(line.get("compactness_area_after_m2") or 0.0)
+            territory_word = (
+                f"surrenders {abs(team_shift):.1f} points of central territory"
+                if team_shift < 0
+                else f"wins {team_shift:.1f} points of central territory"
+                if team_shift > 0
+                else "leaves the territory split unchanged"
+            )
+            verdict = (
+                f"Sliding the {displaced_team} defensive line to {height:.1f} m from its own "
+                f"goal {territory_word} and compresses the block from {area_before:.0f} m2 to "
+                f"{area_after:.0f} m2. Through-ball exposure reads {exposure:.3f} xT, the "
+                f"offside trap holds {trap:.0f}% of catches, and pressing gains "
+                f"{press:.1f}% of the central space, leaving the structural vulnerability "
+                f"index at {vuln:.2f}."
+            )
+        else:
+            verdict = (
+                f"Relocating the player {xT_clause} and {territory_clause}, leaving the "
+                f"structural vulnerability index at {vuln:.2f}. {stance}"
+            )
+        if line and has_displacement:
+            height = float(line.get("target_line_height_m") or 0.0)
+            exposure = float(line.get("through_ball_exposure_xt") or 0.0)
+            press = float(line.get("press_compression_gain_pct") or 0.0)
+            trap = float(line.get("offside_trap_catch_prob_pct") or 0.0)
+            verdict += (
+                f" The defensive line also slides to {height:.1f} m from its own goal: "
+                f"through-ball exposure reads {exposure:.3f} xT, the offside trap holds "
+                f"{trap:.0f}% of catches, and pressing compresses the central space by "
+                f"{press:.1f}%."
+            )
         return {
             "scenario_id": str(evaluation.get("scenario_id") or "cf_offline"),
             "projected_xt_shift": shift,
@@ -1010,6 +1047,9 @@ class FoundryRouter:
             # The interactive sandbox hands its relocation here so the arbiter
             # can adjudicate the structural consequence, not just re-state it.
             tools["counterfactual"] = counterfactual
+        line_shift = (ctx.get("evaluation") or {}).get("defensive_line_shift")
+        if line_shift:
+            tools["defensive_line_shift"] = line_shift
         return tools
 
     def _run_war_room_debate(self, ctx: dict, tools: dict, fallback: dict) -> dict:
