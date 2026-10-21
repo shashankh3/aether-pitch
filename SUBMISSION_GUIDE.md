@@ -523,6 +523,8 @@ Run through this immediately before you submit the repo and record the video.
 | 4 | Frontend types | `cd frontend && npx tsc --noEmit` | No output |
 | 5 | Production build | `npm run build` | `✓ Compiled successfully` |
 | 6 | SSR smoke | `npm run smoke` | `RESULT: SSR SMOKE PASSED` |
+| 6b | Headless logic | `npm run check:logic` | `RESULT: ALL 28 FRONTEND LOGIC CHECKS PASSED` |
+| 6c | Headless UI render | `npm run smoke:ui` | `RESULT: ALL 30 COMPONENT RENDER CHECKS PASSED` |
 | 7 | **Live visual boot** | Terminal 1: `cd backend && python -m uvicorn main:app --reload --port 8000`<br>Terminal 2: `cd frontend && npm run dev` | 3D canvas renders at 60 FPS; no console errors |
 | 8 | Colourblind palette | Controls → **Fan** → toggle the palette | 3D defensive lasers and HUD pills shift to cyan/amber |
 | 9 | Bio-load meter | Controls → **Stats** → lock a player | Load bar, +10 m projection and relief directive all populate |
@@ -567,13 +569,19 @@ cd ../frontend
 npx tsc --noEmit
 npm run build
 npm run smoke          # server-rendered smoke test: 200, runtime config, no SSR errors
+npm run check:logic    # 28 headless assertions: browser twin, sandbox, ledger, dossier, DVR
+npm run smoke:ui       # 30 assertions: every judge-facing HUD surface renders
 ```
 
 The backend suite also runs the **Official Rules & trademark compliance audit**
 and validates the Azure ARM template (`infra/validate_template.py`). The
 frontend `npm run smoke` boots the production server in-process, asserts the
 page renders with the runtime configuration injected and no SSR error, then
-shuts down — it leaves no background process behind.
+shuts down — it leaves no background process behind. `npm run check:logic` and
+`npm run smoke:ui` are pure Node: no server, no browser, no network.
+
+Together the four suites make **201 automated assertions** with zero dependencies
+beyond what the project already ships.
 
 Expected results:
 

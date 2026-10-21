@@ -159,7 +159,7 @@ The 3D stage is not an observer feed — it is a sandbox.
 | Build | `npm run build` | Production compile |
 | SSR | `npm run smoke` | In-process server render, runtime config injection, no SSR error |
 | Logic | `npm run check:logic` | 28 headless assertions over the browser twin, the sandbox, the ledger, the dossier and the DVR buffer |
-| UI render | `npm run smoke:ui` | 15 assertions — every judge-facing surface renders without throwing |
+| UI render | `npm run smoke:ui` | 30 assertions — every judge-facing surface renders without throwing |
 
 The backend suite also runs the **Official Rules compliance audit** — synthetic
 metadata, deterministic replay, Stage A–E payload keys, zero third-party brand
