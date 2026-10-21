@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start -p 3000",
     "smoke": "node scripts/ssr-smoke.mjs",
-    "verify": "npm run build && npm run smoke"
+    "check:logic": "node --import ./scripts/ts-resolve.mjs scripts/logic-check.ts",
+    "verify": "npm run build && npm run smoke && npm run check:logic"
   },
   "dependencies": {
     "@react-three/drei": "^9.114.3",

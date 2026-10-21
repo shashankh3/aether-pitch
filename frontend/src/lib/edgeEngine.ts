@@ -1417,11 +1417,13 @@ export function computeBioLoadProfile(p: {
   highIntensitySeconds: number;
   pressSeconds: number;
 }): BioLoadProfile {
-  const load = Number(clamp(p.bioLoad, 0, 100).toFixed(1));
-  const stamina = Number(p.stamina.toFixed(1));
+  const load = Number(clamp(p.bioLoad ?? 0, 0, 100).toFixed(1));
+  const stamina = Number((p.stamina ?? 100).toFixed(1));
+  const pressSeconds = p.pressSeconds ?? 0;
+  const highIntensitySeconds = p.highIntensitySeconds ?? 0;
   const drainPerMinute = 0.008 * 60 + 0.05 * 0.62 * 60 - 0.02 * 60;
   const loadScaledDrain = drainPerMinute * (1 + load / 60);
-  const pressPenalty = Math.min(4, p.pressSeconds * 0.035);
+  const pressPenalty = Math.min(4, pressSeconds * 0.035);
   const projected = Number(
     clamp(stamina - (loadScaledDrain + pressPenalty) * 10, 30, 100).toFixed(1),
   );
@@ -1448,8 +1450,8 @@ export function computeBioLoadProfile(p: {
     sprint_load_index: load,
     projected_stamina_10m: projected,
     fatigue_pdr_penalty: penalty,
-    high_intensity_seconds: Number(p.highIntensitySeconds.toFixed(1)),
-    press_seconds: Number(p.pressSeconds.toFixed(1)),
+    high_intensity_seconds: Number(highIntensitySeconds.toFixed(1)),
+    press_seconds: Number(pressSeconds.toFixed(1)),
     stamina_now: stamina,
     tactical_relief_directive: directive,
     relief_required: needsRelief,

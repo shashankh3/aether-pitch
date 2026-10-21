@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Crosshair, GitCompareArrows, Send, Undo2, X, TrendingUp, TrendingDown, Gavel,
-  ShieldCheck, Loader2, NotebookPen,
+  ShieldCheck, Loader2,
 } from "lucide-react";
 import {
   buildCounterfactualRequest, evaluateSandbox, lineScrubber, sandbox,
