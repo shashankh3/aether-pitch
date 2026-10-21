@@ -162,6 +162,10 @@ export default function StudioProducer({
       if (!r.ok) throw new Error(`studio query HTTP ${r.status}`);
       const data: StudioQueryResponse = await r.json();
       if (!data.scene_directive) throw new Error("studio query returned no scene directive");
+      if (!data.answer || !Array.isArray(data.grounding_citations) ||
+          !Array.isArray(data.suggested_actions)) {
+        throw new Error("studio query payload missing required fields");
+      }
       setResponse(data);
       onStudioDirective(data.scene_directive);
       if (!isVoiceMuted) speakInsight(data.studio_answer_localized, lang);
@@ -502,6 +506,20 @@ export function BenchWarRoomPanel({ metrics, lang, onProjectShift }: WarRoomProp
       });
       if (!r.ok) throw new Error(`war-room HTTP ${r.status}`);
       const data = (await r.json()) as WarRoomResponse;
+      // A malformed payload must never leave the panel blank: fall back to
+      // the deterministic edge debate instead.
+      const t = data?.agent_debate_transcript;
+      if (
+        !t ||
+        !t.manager_proposal ||
+        !t.scout_counter ||
+        !t.arbiter_verdict ||
+        typeof data.projected_30s_xt_delta !== "number" ||
+        typeof data.win_prob_shift_pct !== "number" ||
+        !Array.isArray(data.target_zones)
+      ) {
+        throw new Error("war-room payload missing required fields");
+      }
       setWarRoom(data);
       setOffline(false);
     } catch {

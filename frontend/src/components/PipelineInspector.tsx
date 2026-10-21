@@ -13,6 +13,7 @@ import type {
   AgentTrace, AgentTraceSpan, EngineStatus, FoundryEvalScorecard, Pipeline, PipelineAudit,
 } from "@/lib/types";
 import type { FailoverDrillState } from "@/hooks/useResilientMatchEngine";
+import { STANDARD_PALETTE, type BroadcastPalette } from "@/lib/hudContext";
 import { API_BASE } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -62,9 +63,12 @@ interface ChipProps {
   status: EngineStatus;
   open: boolean;
   onToggle: () => void;
+  palette?: BroadcastPalette;
 }
 
-export function PipelineChip({ pipeline, connected, status, open, onToggle }: ChipProps) {
+export function PipelineChip({
+  pipeline, connected, status, open, onToggle, palette = STANDARD_PALETTE,
+}: ChipProps) {
   const live = status === "CONNECTED_PIPELINE_LIVE";
   const trace = pipeline?.agent_trace;
   return (
@@ -77,13 +81,14 @@ export function PipelineChip({ pipeline, connected, status, open, onToggle }: Ch
       )}
       title="Grounded 4-node agent handoff, stage latencies, and raw payloads"
     >
-      <Activity size={13} className={connected ? "text-pitch" : "text-gold"} />
+      <Activity size={13} style={{ color: connected ? palette.positive : palette.warning }} />
       <span className="hidden 2xl:inline">Pipeline</span>
       <span
-        className={cn(
-          "clip-skew px-1 py-0.5 font-tech text-[8.5px] uppercase",
-          live ? "bg-pitch/20 text-pitch" : "animate-breathe bg-gold/20 text-gold",
-        )}
+        className="clip-skew px-1 py-0.5 font-tech text-[8.5px] uppercase"
+        style={{
+          background: live ? `${palette.positive}22` : `${palette.warning}22`,
+          color: live ? palette.positive : palette.warning,
+        }}
       >
         {live ? "🟢 PIPELINE" : "⚡ EDGE"}
       </span>
@@ -382,7 +387,12 @@ function CloudResilienceCard({ drill, connected, status, onTrigger }: FailoverPr
   const edgeLive = status === "EDGE_SYNTHETIC_FALLBACK";
   const swapMs = drill?.swapLatencyMs ?? 0;
   const reconciled = drill?.reconciledTicks ?? 0;
-  const continuity = 100;
+  // Continuity is a measurement, not a claim: frames delivered over the
+  // frames the 10 Hz edge engine owed us during the outage window.
+  const expectedFrames = drill?.durationMs ? Math.round(drill.durationMs / 100) : 0;
+  const continuity = drill && drill.phase !== "idle" && expectedFrames > 0
+    ? Math.min(100, (reconciled / expectedFrames) * 100)
+    : null;
 
   return (
     <div
@@ -421,11 +431,13 @@ function CloudResilienceCard({ drill, connected, status, onTrigger }: FailoverPr
               Hot-Swap
             </span>
             <span className="font-display text-[12px] font-bold text-tactical">
-              {swapMs > 0 ? `${swapMs.toFixed(0)}ms` : "<12ms"}
+              {swapMs > 0 ? `${swapMs.toFixed(0)}ms` : "—"}
             </span>
           </div>
           <p className="mt-0.5 font-tech text-[7.5px] leading-relaxed text-slate-500">
-            FastAPI WS → EdgeEngine handover
+            {swapMs > 0
+              ? "Measured FastAPI WS → EdgeEngine handover"
+              : "Run the drill to measure the handover"}
           </p>
         </div>
         <div className="border border-white/10 bg-slate-950/55 p-1.5">
@@ -433,10 +445,14 @@ function CloudResilienceCard({ drill, connected, status, onTrigger }: FailoverPr
             <span className="font-tech text-[7.5px] font-bold uppercase tracking-[0.14em] text-slate-500">
               10Hz Continuity
             </span>
-            <span className="font-display text-[12px] font-bold text-pitch">{continuity}%</span>
+            <span className="font-display text-[12px] font-bold text-pitch">
+              {continuity == null ? "—" : `${continuity.toFixed(0)}%`}
+            </span>
           </div>
           <p className="mt-0.5 font-tech text-[7.5px] leading-relaxed text-slate-500">
-            {reconciled} frames · 0 dropped
+            {continuity == null
+              ? "Run the drill to measure continuity"
+              : `${reconciled} frames · 0 dropped`}
           </p>
         </div>
         <div className="border border-white/10 bg-slate-950/55 p-1.5">

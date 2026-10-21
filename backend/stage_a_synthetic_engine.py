@@ -52,6 +52,9 @@ PRESSURE_RADIUS_M = 6.0
 PRESS_POSE_RADIUS_M = 5.0
 PASS_CONE_HALF_DEG = 15.0
 KICK_POSE_S = 0.5
+#: v6.2 bio-load recovery time constant (seconds). Fatigue decays slowly so
+#: a single burst still shows in the +10 minute projection.
+BIO_LOAD_RECOVERY_TAU_S = 150.0
 
 
 def _clamp(v: float, lo: float, hi: float) -> float:
@@ -86,7 +89,8 @@ class Player:
     next_distance_alert_m: float = 0.0
     bio_load: float = 0.0       # rolling high-intensity metabolic load (0..100)
     high_intensity_seconds: float = 0.0
-    press_events: int = 0
+    press_seconds: float = 0.0
+    press_active: bool = False
 
     @property
     def speed(self) -> float:
@@ -324,15 +328,27 @@ class PitchForgeEngine:
         for team, squad in (("NLA", SQUAD_NLA), ("MCS", SQUAD_MCS)):
             for num, name, role, bx, by, ms in squad:
                 baseline = (baseline_km[role] + self.rng.uniform(-0.35, 0.35)) * 1000.0
+                sprint_baseline = round(baseline * 0.14, 1)
+                # The simulation starts at minute 62, so the physiological
+                # ledger must already reflect the work done: remaining
+                # stamina and the metabolic load are both seeded from the
+                # match-to-date distance rather than starting at 100%.
+                stamina_seed = _clamp(100.0 - baseline_km[role] * 2.2, 58.0, 97.0)
                 player = Player(
                     pid=f"{team}_{num}", team=team, number=num, name=name,
                     role=role, base=(bx, by), max_speed=ms,
                     distance_m=round(baseline, 1),
-                    sprint_distance_m=round(baseline * 0.14, 1),
+                    sprint_distance_m=sprint_baseline,
+                    stamina=round(stamina_seed, 1),
                     top_speed_kmh=round(self.rng.uniform(28.5, 34.5), 1),
                     next_distance_alert_m=float(
                         (int(baseline // 250.0) + 1) * 250
                     ),
+                    # The metabolic ledger is seeded from the sprint distance
+                    # already covered, so the load index is meaningful from
+                    # the first frame instead of starting at zero.
+                    bio_load=round(_clamp(sprint_baseline * 0.052, 0.0, 78.0), 1),
+                    high_intensity_seconds=round(sprint_baseline / 7.4, 1),
                 )
                 self.players.append(player)
         self.by_id: Dict[str, Player] = {p.pid: p for p in self.players}
@@ -808,14 +824,19 @@ class PitchForgeEngine:
             p.stamina - dt * (0.008 + 0.05 * (sp / p.max_speed) ** 2) + dt * 0.02, 40.0, 100.0
         )
         # ---- v6.2 bio-mechanical load accumulation --------------------
-        # High-intensity work is everything above 55% of max speed; the
-        # metabolic load is a rolling decay so recent efforts dominate.
+        # Metabolic cost scales with the cube of relative intensity (the
+        # standard sRPE relationship) and recovers with a long first-order
+        # time constant, so recent efforts dominate but fatigue is sticky.
+        # A press adds a discrete high-intensity cost on top of the running.
         intensity = sp / p.max_speed if p.max_speed > 0 else 0.0
         if intensity >= 0.55:
             p.high_intensity_seconds += dt
-            p.bio_load = _clamp(p.bio_load + dt * 9.0 * intensity, 0.0, 100.0)
-        else:
-            p.bio_load = _clamp(p.bio_load - dt * 1.15, 0.0, 100.0)
+        cost = (intensity ** 3) * 2.1
+        if p.press_active:
+            p.press_seconds += dt
+            cost += 0.25
+        p.bio_load = _clamp(p.bio_load + dt * cost, 0.0, 100.0)
+        p.bio_load *= math.exp(-dt / BIO_LOAD_RECOVERY_TAU_S)
 
     def _team_motion(self, dt: float) -> None:
         poss = self.possession
@@ -934,12 +955,16 @@ class PitchForgeEngine:
     # ------------------------------------------------------------- output
     def _pose_state(self, p: Player) -> str:
         if self._kick and self._kick[0] == p.pid and self.t_match < self._kick[1]:
+            p.press_active = False
             return "KICK"
         if p.speed_kmh >= SPRINT_POSE_KMH:
+            p.press_active = False
             return "SPRINT"
         if (self.owner is not None and p.team != self.possession and p.role != "GK"
                 and math.hypot(p.x - self.ball["x"], p.y - self.ball["y"]) < PRESS_POSE_RADIUS_M):
+            p.press_active = True
             return "PRESS"
+        p.press_active = False
         if p.speed_kmh >= 3.0:
             return "JOG"
         return "IDLE"
@@ -985,8 +1010,14 @@ class PitchForgeEngine:
         stamina = round(p.stamina, 1)
         # +10 match minutes of projection: the current drain rate continues,
         # softened slightly by the natural recovery the model already applies.
+        # A loaded player drains faster than a fresh one, and pressing adds a
+        # further cost on top.
         drain_per_minute = 0.008 * 60 + 0.05 * 0.62 * 60 - 0.02 * 60
-        projected = round(_clamp(stamina - drain_per_minute * 10.0, 30.0, 100.0), 1)
+        drain_per_minute *= 1.0 + load / 60.0
+        press_penalty = min(4.0, p.press_seconds * 0.035)
+        projected = round(
+            _clamp(stamina - (drain_per_minute + press_penalty) * 10.0, 30.0, 100.0), 1
+        )
         # Fatigue penalty on pass difficulty: heavy load erodes execution quality.
         penalty = round(min(24.0, load * 0.24 + max(0.0, (70.0 - projected)) * 0.18), 1)
         needs_relief = projected < 65.0 or load >= 70.0
@@ -995,6 +1026,7 @@ class PitchForgeEngine:
             "projected_stamina_10m": projected,
             "fatigue_pdr_penalty": penalty,
             "high_intensity_seconds": round(p.high_intensity_seconds, 1),
+            "press_seconds": round(p.press_seconds, 1),
             "stamina_now": stamina,
             "tactical_relief_directive": (
                 self._relief_directive(p, projected, load) if needs_relief

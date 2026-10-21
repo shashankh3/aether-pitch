@@ -12,7 +12,7 @@ import {
   Eye, EyeOff, Maximize2, Minimize2, Crosshair, Network, Activity,
 } from "lucide-react";
 import { telemetry } from "@/lib/telemetry";
-import type { MatchEvent } from "@/lib/types";
+import type { MatchEvent, PoseState } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 // camera ground-plane homography (pitch meters -> optical frame plane)
@@ -38,13 +38,26 @@ interface Props {
 
 type LogLine = { id: number; text: string };
 
-const POSE_DISTRIBUTION = [
-  { id: "idle", label: "IDLE", count: 6 },
-  { id: "jog", label: "JOG", count: 7 },
-  { id: "sprint", label: "SPRINT", count: 5 },
-  { id: "press", label: "PRESS", count: 2 },
-  { id: "kick", label: "KICK", count: 2 },
+const POSE_ORDER: { id: PoseState; label: string }[] = [
+  { id: "SPRINT", label: "SPRINT" },
+  { id: "PRESS", label: "PRESS" },
+  { id: "KICK", label: "KICK" },
+  { id: "JOG", label: "JOG" },
+  { id: "IDLE", label: "IDLE" },
 ];
+
+/** Live 14-joint pose distribution, counted from the real 22-player feed. */
+function readPoseDistribution(): { id: PoseState; label: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const player of telemetry.players.values()) {
+    counts.set(player.pose_state, (counts.get(player.pose_state) ?? 0) + 1);
+  }
+  return POSE_ORDER.map((pose) => ({
+    id: pose.id,
+    label: pose.label,
+    count: counts.get(pose.id) ?? 0,
+  }));
+}
 
 let logSeq = 0;
 
@@ -58,6 +71,21 @@ export default function VisionAutoEventerHUD({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [log, setLog] = useState<LogLine[]>([]);
   const seenEvent = useRef<string>("");
+  // Republished on the telemetry clock so the distribution tracks the match.
+  const [poseDistribution, setPoseDistribution] = useState(() => readPoseDistribution());
+
+  // ---- live 14-joint pose distribution (recomputed at ~2Hz) ------------
+  useEffect(() => {
+    if (!enabled) return;
+    const timer = setInterval(() => {
+      setPoseDistribution((prev) => {
+        const next = readPoseDistribution();
+        const same = next.every((row, i) => row.count === prev[i]?.count);
+        return same ? prev : next;
+      });
+    }, 500);
+    return () => clearInterval(timer);
+  }, [enabled]);
 
   // ---- auto-event emission log (machine-detected, zero manual tagging) ----
   useEffect(() => {
@@ -343,7 +371,7 @@ export default function VisionAutoEventerHUD({
             </span>
           </div>
           <div className="mt-1 flex flex-wrap gap-[3px]">
-            {POSE_DISTRIBUTION.map((pose) => (
+            {poseDistribution.map((pose) => (
               <span
                 key={pose.id}
                 className="border border-white/10 bg-white/[0.04] px-1 py-0.5 font-tech text-[7.5px] text-slate-400"
@@ -354,7 +382,8 @@ export default function VisionAutoEventerHUD({
             ))}
           </div>
           <p className="mt-0.5 font-tech text-[7.5px] leading-relaxed text-slate-500">
-            14 landmarks per player (head, shoulders, hips, knees, ankles) · 100% synthetic
+            14 landmarks per player (head, shoulders, hips, knees, ankles) ·{" "}
+            {telemetry.players.size}/22 tracked · 100% synthetic
           </p>
         </div>
       </div>

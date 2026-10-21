@@ -6,6 +6,7 @@ import type {
 
 const PITCH_L = 105;
 const PITCH_W = 68;
+const BIO_LOAD_RECOVERY_TAU_S = 150;
 
 function buildEdgeTrace(
   event: MatchEvent,
@@ -43,7 +44,7 @@ function buildEdgeTrace(
         role: "Deterministic gate",
         status: "completed",
         latency_ms: 0,
-        summary: `PDR ${pdr.toFixed(0)}% · ΔxT ${dxt >= 0 ? "+" : ""}${dxt.toFixed(2)} · ΔChaos ${deltaChaos >= 0 ? "+" : ""}${deltaChaos.toFixed(2)}`,
+        summary: `PDR ${pdr.toFixed(0)}% Â· Î”xT ${dxt >= 0 ? "+" : ""}${dxt.toFixed(2)} Â· Î”Chaos ${deltaChaos >= 0 ? "+" : ""}${deltaChaos.toFixed(2)}`,
         detail: gate.reasons?.join("; ") || "Edge threshold gate",
       },
       {
@@ -61,7 +62,7 @@ function buildEdgeTrace(
         role: "Narrative + numeric critic",
         status: "fallback",
         latency_ms: 0,
-        summary: "Deterministic edge template · 100% grounded",
+        summary: "Deterministic edge template Â· 100% grounded",
         detail: ghostDelta != null
           ? `Ghost lane ${ghostDelta >= 0 ? "+" : ""}${ghostDelta.toFixed(2)} xT vs actual ${dxt >= 0 ? "+" : ""}${dxt.toFixed(2)} xT.`
           : "No higher-value ghost lane in the edge scan.",
@@ -72,7 +73,7 @@ function buildEdgeTrace(
         role: "Overlay + camera + i18n",
         status: "completed",
         latency_ms: 0,
-        summary: "Tactical pulse · auto camera · 4 languages",
+        summary: "Tactical pulse Â· auto camera Â· 4 languages",
         detail: "Edge render contract active while the backend reconnects.",
       },
     ],
@@ -140,6 +141,7 @@ interface EdgePlayer {
   badge: PlayStyleBadge | null;
   bioLoad: number;
   highIntensitySeconds: number;
+  pressSeconds: number;
 }
 
 interface Flight {
@@ -283,6 +285,12 @@ export class EdgeEngine {
       for (const [number, name, role, bx, by, maxSpeed] of squad.rows) {
         const baseX = squad.team === "NLA" ? bx * PITCH_L : PITCH_L - bx * PITCH_L;
         const distanceM = role === "GK" ? 3100 : role === "DEF" ? 6700 : role === "MID" ? 7800 : 7200;
+        const sprintDistanceM = distanceM * 0.13;
+        // The edge engine mirrors Stage A's minute-62 physiological seed:
+        // remaining stamina and metabolic load both reflect the work already
+        // done, so the bio-load twin reads the same in either engine.
+        const baselineKm = role === "GK" ? 3.1 : role === "DEF" ? 6.7 : role === "MID" ? 7.8 : 7.2;
+        const staminaSeed = clamp(100 - baselineKm * 2.2, 58, 97);
         const player: EdgePlayer = {
           id: `${squad.team}_${number}`,
           team: squad.team,
@@ -298,15 +306,16 @@ export class EdgeEngine {
           vy: 0,
           heading: squad.team === "NLA" ? 0 : Math.PI,
           speedKmh: 0,
-          stamina: 88 + rand() * 10,
+          stamina: Number((staminaSeed + (rand() - 0.5) * 0.7).toFixed(1)),
           distanceM: distanceM + (rand() - 0.5) * 700,
-          sprintDistanceM: distanceM * 0.13,
+          sprintDistanceM,
           topSpeedKmh: 28.5 + rand() * 6.0,
           nextDistanceAlertM: distanceM + 250,
           pose: "IDLE",
           badge: null,
-          bioLoad: 0,
-          highIntensitySeconds: 0,
+          bioLoad: Number(clamp(sprintDistanceM * 0.052, 0, 78).toFixed(1)),
+          highIntensitySeconds: Number((sprintDistanceM / 7.4).toFixed(1)),
+          pressSeconds: 0,
         };
         const baseline = role === "GK" ? [20, 17, 0, 0] : role === "DEF" ? [36, 30, 0, 2] : role === "MID" ? [48, 41, 1, 1] : [28, 22, 2, 0];
         this.playerStats[player.id] = {
@@ -410,7 +419,7 @@ export class EdgeEngine {
             player_id: event.player_id,
             player_name: event.player_name,
             headline: "5th Consecutive Line-Breaking Pass",
-            detail: `Cumulative PDR streak live · ${pdr.toFixed(0)}% latest`,
+            detail: `Cumulative PDR streak live Â· ${pdr.toFixed(0)}% latest`,
             value: pdr,
           });
         }
@@ -461,19 +470,19 @@ export class EdgeEngine {
             ? `The ball moved into a zone worth ${dxt.toFixed(2)} more xT, dragging the ${opponent} block ${metrics.stretch_m.toFixed(0)}m out of shape.`
             : `Turnover rate is ${metrics.turnover_rate.toFixed(1)} per minute and ball-speed variance is low, so ${team} are circulating without fracturing.`;
     const story = archetype === "counter_overload"
-      ? `Lightning break! ${team} stole it and exploded forward at ${(event.speed_kmh ?? 31.6).toFixed(0)} km/h — the defence was caught square.`
+      ? `Lightning break! ${team} stole it and exploded forward at ${(event.speed_kmh ?? 31.6).toFixed(0)} km/h â€” the defence was caught square.`
       : archetype === "pressing_trap"
-        ? `${opponent} sprang a perfect pressing trap — three defenders swarmed the ball and won it high. The crowd can smell a chance!`
+        ? `${opponent} sprang a perfect pressing trap â€” three defenders swarmed the ball and won it high. The crowd can smell a chance!`
         : archetype === "difficult_progression"
-          ? `What a pass from ${player} — threaded through a forest of defenders! One mistake there and it is a counter.`
+          ? `What a pass from ${player} â€” threaded through a forest of defenders! One mistake there and it is a counter.`
           : archetype === "threat_surge"
-            ? `${team} are slicing through the pitch — every pass is pulling defenders out of position.`
+            ? `${team} are slicing through the pitch â€” every pass is pulling defenders out of position.`
             : `Calm, controlled possession from ${team}. They are passing the opponent into submission.`;
     const translations = {
       en: story,
-      es: `¡Momento táctico! ${story}`,
-      ar: `لحظة تكتيكية! ${story}`,
-      hi: `रणनीतिक पल! ${story}`,
+      es: `Â¡Momento tÃ¡ctico! ${story}`,
+      ar: `Ù„Ø­Ø¸Ø© ØªÙƒØªÙŠÙƒÙŠØ©! ${story}`,
+      hi: `à¤°à¤£à¤¨à¥€à¤¤à¤¿à¤• à¤ªà¤²! ${story}`,
     };
     const eventId = event.id;
     const trace = buildEdgeTrace(event, tick, metrics, archetype, pdr, dxt, ghost, this.insightSeq);
@@ -494,10 +503,10 @@ export class EdgeEngine {
       stage_c_explainability: {
         moment_headline: headline,
         why_it_matters_causal: causal,
-        tactical_catalyst: `PDR ${pdr.toFixed(0)}% • ΔxT ${dxt.toFixed(2)} • Chaos ${metrics.chaos_index.toFixed(2)}`,
+        tactical_catalyst: `PDR ${pdr.toFixed(0)}% â€¢ Î”xT ${dxt.toFixed(2)} â€¢ Chaos ${metrics.chaos_index.toFixed(2)}`,
         commentator_talking_point: archetype === "difficult_progression"
-          ? `That is an 80-plus difficulty ball — one misjudged touch and it is a counter the other way. ${player} took the gamble and it stuck.`
-          : `Watch the shape — ${team} turned a single moment into a structural problem in under three seconds.`,
+          ? `That is an 80-plus difficulty ball â€” one misjudged touch and it is a counter the other way. ${player} took the gamble and it stuck.`
+          : `Watch the shape â€” ${team} turned a single moment into a structural problem in under three seconds.`,
       },
       stage_d_broadcast_overlay: {
         timecode: event.clock,
@@ -505,14 +514,14 @@ export class EdgeEngine {
         highlight_players: [event.player_id, ghost?.target_id].filter(Boolean) as string[],
         draw_ghost_pass: !!ghost,
         lower_third_title: headline.toUpperCase(),
-        lower_third_subtitle: `Pass Difficulty ${pdr.toFixed(1)}% • ΔxT ${dxt.toFixed(2)} • Chaos ${metrics.chaos_index.toFixed(2)}`,
+        lower_third_subtitle: `Pass Difficulty ${pdr.toFixed(1)}% â€¢ Î”xT ${dxt.toFixed(2)} â€¢ Chaos ${metrics.chaos_index.toFixed(2)}`,
       },
       stage_e_personalization: {
         analyst_mode: {
-          metrics_summary: `PPDA ${metrics.ppda.NLA.toFixed(1)}/${metrics.ppda.MCS.toFixed(1)} | ΔxT ${dxt.toFixed(3)} | Pass Diff ${pdr.toFixed(1)}% | Pass Acc ${(teamRow?.pass_accuracy ?? 0).toFixed(1)}% | Shots ${teamRow?.shots ?? 0} | Chaos ${metrics.chaos_index.toFixed(2)}`,
+          metrics_summary: `PPDA ${metrics.ppda.NLA.toFixed(1)}/${metrics.ppda.MCS.toFixed(1)} | Î”xT ${dxt.toFixed(3)} | Pass Diff ${pdr.toFixed(1)}% | Pass Acc ${(teamRow?.pass_accuracy ?? 0).toFixed(1)}% | Shots ${teamRow?.shots ?? 0} | Chaos ${metrics.chaos_index.toFixed(2)}`,
           tactical_note: ghost
             ? `Optimal alternative was ${ghost.target_id ?? "a free man"} (+${ghost.delta_xt.toFixed(2)} xT, ${(ghost.openness_m ?? 0).toFixed(0)}m of space) vs ${dxt.toFixed(2)} on the actual ball.`
-            : `No higher-value option available — the executed ball was already the spatial optimum.`,
+            : `No higher-value option available â€” the executed ball was already the spatial optimum.`,
           metric_focus_note: "EDGE AUTONOMOUS ENGINE: full metric set unavailable while the backend reconnects.",
         },
         casual_fan_mode: { story_card: story, excitement_rating: Math.round(clamp(52 + metrics.chaos_index * 40 + pdr * 0.08, 44, 99)) },
@@ -593,6 +602,7 @@ export class EdgeEngine {
           stamina: p.stamina,
           bioLoad: p.bioLoad,
           highIntensitySeconds: p.highIntensitySeconds,
+          pressSeconds: p.pressSeconds,
         }),
       })),
       ball: {
@@ -667,19 +677,38 @@ export class EdgeEngine {
     p.speedKmh = v * 3.6;
     if (v > 0.25) p.heading = Math.atan2(p.vy, p.vx);
     p.stamina = clamp(p.stamina - v * dt * 0.013, 42, 100);
-    p.pose = p.speedKmh >= 27 ? "SPRINT" : p.speedKmh >= 8 ? "JOG" : "IDLE";
+    // Pressing pose mirrors Stage A: a defender within 5.2 m of the ball
+    // while the opposition has it is in a PRESS pose.
+    const pressing =
+      p.role !== "GK"
+      && p.team !== this.possession
+      && Math.hypot(p.x - this.ball.x, p.y - this.ball.y) < 5.2;
+    p.pose = pressing
+      ? "PRESS"
+      : p.speedKmh >= 27
+        ? "SPRINT"
+        : p.speedKmh >= 8
+          ? "JOG"
+          : "IDLE";
     const moved = Math.hypot(p.x - prevX, p.y - prevY);
     p.distanceM += moved;
     if (p.speedKmh >= 30) p.sprintDistanceM += moved;
     p.topSpeedKmh = Math.max(p.topSpeedKmh, p.speedKmh);
     // ---- v6.2 bio-mechanical load accumulation (mirrors Stage A) -------
+    // Metabolic cost scales with the cube of relative intensity and decays
+    // with a long recovery time constant, so recent efforts dominate but
+    // fatigue is sticky. A press adds a discrete high-intensity cost.
     const intensity = p.maxSpeed > 0 ? v / p.maxSpeed : 0;
     if (intensity >= 0.55) {
       p.highIntensitySeconds += dt;
-      p.bioLoad = clamp(p.bioLoad + dt * 9.0 * intensity, 0, 100);
-    } else {
-      p.bioLoad = clamp(p.bioLoad - dt * 1.15, 0, 100);
     }
+    let cost = intensity ** 3 * 0.9;
+    if (p.pose === "PRESS") {
+      p.pressSeconds += dt;
+      cost += 0.25;
+    }
+    p.bioLoad = clamp(p.bioLoad + dt * cost, 0, 100);
+    p.bioLoad *= Math.exp(-dt / BIO_LOAD_RECOVERY_TAU_S);
     if (p.role !== "GK" && p.distanceM >= p.nextDistanceAlertM) {
       p.nextDistanceAlertM += 250;
       this.eventSeq += 1;
@@ -819,7 +848,7 @@ export class EdgeEngine {
         should_explain: pdr > 80 || dxt > 0.08 || !!this.scenarioName,
         reasons: [
           ...(pdr > 80 ? ["PDR > 80"] : []),
-          ...(dxt > 0.08 ? ["ΔxT > 0.08"] : []),
+          ...(dxt > 0.08 ? ["Î”xT > 0.08"] : []),
           ...(this.scenarioName ? ["Scenario"] : []),
         ],
       },
@@ -1123,11 +1152,16 @@ export function computeBioLoadProfile(p: {
   stamina: number;
   bioLoad: number;
   highIntensitySeconds: number;
+  pressSeconds: number;
 }): BioLoadProfile {
   const load = Number(clamp(p.bioLoad, 0, 100).toFixed(1));
   const stamina = Number(p.stamina.toFixed(1));
   const drainPerMinute = 0.008 * 60 + 0.05 * 0.62 * 60 - 0.02 * 60;
-  const projected = Number(clamp(stamina - drainPerMinute * 10, 30, 100).toFixed(1));
+  const loadScaledDrain = drainPerMinute * (1 + load / 60);
+  const pressPenalty = Math.min(4, p.pressSeconds * 0.035);
+  const projected = Number(
+    clamp(stamina - (loadScaledDrain + pressPenalty) * 10, 30, 100).toFixed(1),
+  );
   const penalty = Number(
     Math.min(24, load * 0.24 + Math.max(0, 70 - projected) * 0.18).toFixed(1),
   );
@@ -1152,6 +1186,7 @@ export function computeBioLoadProfile(p: {
     projected_stamina_10m: projected,
     fatigue_pdr_penalty: penalty,
     high_intensity_seconds: Number(p.highIntensitySeconds.toFixed(1)),
+    press_seconds: Number(p.pressSeconds.toFixed(1)),
     stamina_now: stamina,
     tactical_relief_directive: directive,
     relief_required: needsRelief,
@@ -1295,9 +1330,9 @@ export function edgeWarRoom(
         `Verdict: ACCEPT the ${team} overload. Against the ${opp} counter-press the arbiter weights territory (${territory.nla_territory_pct.toFixed(0)}% to ${territory.mcs_territory_pct.toFixed(0)}%), xT at the target zone (${xtAtGap.toFixed(3)}) and the ${gap.toFixed(1)}m seam. Net projected gain is +${overload.toFixed(2)} xT over the next 30 seconds, with the ${opp} counter priced in as a ${Math.max(0, 1.8 - overload * 6).toFixed(1)}% win-probability drag.`,
     },
     recommended_adjustment: {
-      title: `Invert Right Fullback — ${zx},${zy} Overload`,
+      title: `Invert Right Fullback â€” ${zx},${zy} Overload`,
       directive:
-        `Drop the right fullback into the ${zx},${zy} half-space, overload the ${defender.id ?? "—"} seam 3v2 and release the inside-left channel into the ${opp} pivot trap.`,
+        `Drop the right fullback into the ${zx},${zy} half-space, overload the ${defender.id ?? "â€”"} seam 3v2 and release the inside-left channel into the ${opp} pivot trap.`,
       team,
       opponent: opp,
     },

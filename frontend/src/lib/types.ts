@@ -156,6 +156,7 @@ export interface BioLoadProfile {
   projected_stamina_10m: number;
   fatigue_pdr_penalty: number;
   high_intensity_seconds: number;
+  press_seconds?: number;
   stamina_now: number;
   tactical_relief_directive: string;
   relief_required: boolean;

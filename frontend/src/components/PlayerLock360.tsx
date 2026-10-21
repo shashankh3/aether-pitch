@@ -196,7 +196,8 @@ function BioLoadMeter({ player }: { player: PlayerTick }) {
       </div>
       <p className="mt-1 flex items-center gap-1 font-tech text-[7.5px] uppercase tracking-wider text-slate-600">
         <Activity size={8} /> {profile.high_intensity_seconds.toFixed(0)}s high-intensity ·
-        {" "}{profile.stamina_now.toFixed(0)}% now
+        {" "}{profile.press_seconds != null ? `${profile.press_seconds.toFixed(0)}s pressing · ` : ""}
+        {profile.stamina_now.toFixed(0)}% now
       </p>
     </div>
   );

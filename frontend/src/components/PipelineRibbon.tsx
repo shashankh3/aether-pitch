@@ -6,6 +6,7 @@
 import { Activity, ChevronRight, GitBranch, CloudOff, ShieldCheck } from "lucide-react";
 import type { EngineStatus, Pipeline } from "@/lib/types";
 import type { FailoverDrillState } from "@/hooks/useResilientMatchEngine";
+import { STANDARD_PALETTE, type BroadcastPalette } from "@/lib/hudContext";
 import { PIPELINE_STAGES } from "@/components/PipelineInspector";
 import { cn } from "@/lib/utils";
 
@@ -14,9 +15,12 @@ interface Props {
   connected: boolean;
   status: EngineStatus;
   drill?: FailoverDrillState | null;
+  palette?: BroadcastPalette;
 }
 
-export default function PipelineRibbon({ pipeline, connected, status, drill }: Props) {
+export default function PipelineRibbon({
+  pipeline, connected, status, drill, palette = STANDARD_PALETTE,
+}: Props) {
   const live = status === "CONNECTED_PIPELINE_LIVE";
   const trace = pipeline?.agent_trace;
   const grounded = trace ? trace.grounding.status !== "review" : false;
@@ -32,14 +36,20 @@ export default function PipelineRibbon({ pipeline, connected, status, drill }: P
       )}
     >
       <span className="flex shrink-0 items-center gap-1">
-        <Activity size={11} className={connected ? "text-pitch" : "text-gold"} />
+        <Activity size={11} style={{ color: connected ? palette.positive : palette.warning }} />
         <span className="font-display text-[8.5px] font-bold uppercase tracking-[0.2em] text-slate-400">
           Live pipeline
         </span>
-        <span className={cn(
-          "clip-skew px-1 py-0.5 font-tech text-[7.5px] font-bold uppercase tracking-wider",
-          live ? "bg-pitch/15 text-pitch" : "animate-breathe bg-gold/15 text-gold",
-        )}>
+        <span
+          className={cn(
+            "clip-skew px-1 py-0.5 font-tech text-[7.5px] font-bold uppercase tracking-wider",
+            !live && "animate-breathe",
+          )}
+          style={{
+            background: live ? `${palette.positive}22` : `${palette.warning}22`,
+            color: live ? palette.positive : palette.warning,
+          }}
+        >
           {live ? "LIVE" : "EDGE"}
         </span>
       </span>

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 // AETHER PITCH - live match intelligence under the scorebug.
 // Turns the Stage B rolling stats into judge-readable proof: possession,
 // passing, shot quality, defensive work and the two distance leaders.

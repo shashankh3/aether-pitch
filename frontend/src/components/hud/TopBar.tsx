@@ -35,7 +35,7 @@ export default function TopBar({
   isFullscreen, onToggleFullscreen, autopilotActive, autopilotElapsed, autopilotStep, onToggleAutopilot,
   isSpeaking, isVoiceMuted, onToggleMute,
 }: Props) {
-  const { controlCenterOpen, openControlCenter } = useHud();
+  const { controlCenterOpen, openControlCenter, palette } = useHud();
 
   return (
     <header className="clip-ea panel-lux pointer-events-auto flex h-[52px] items-center gap-2 px-3">
@@ -52,7 +52,10 @@ export default function TopBar({
             AETHER<span className="text-tactical">PITCH</span>
           </div>
           <div className="mt-1 hidden items-center gap-1.5 sm:flex">
-            <span className={cn("h-1.5 w-1.5 rounded-full", connected ? "bg-crimson animate-breathe" : "bg-slate-600")} />
+            <span
+              className={cn("h-1.5 w-1.5 rounded-full", connected ? "animate-breathe" : "bg-slate-600")}
+              style={connected ? { background: palette.positive } : undefined}
+            />
             <span className="font-tech text-[8.5px] font-semibold uppercase tracking-[0.3em] text-slate-400">
               Live 3D Broadcast · 10 Hz
             </span>
@@ -67,17 +70,20 @@ export default function TopBar({
           aria-pressed={isVoiceMuted}
           className={cn(
             "clip-skew flex h-8 items-center gap-1 border px-2 transition",
-            isVoiceMuted
-              ? "border-crimson/30 bg-crimson/10 text-crimson"
-              : isSpeaking
-                ? "border-pitch/40 bg-pitch/10 text-pitch"
-                : "border-white/10 bg-slate-950/75 text-slate-400 hover:border-tactical/40 hover:text-white",
+            !isVoiceMuted && !isSpeaking && "border-white/10 bg-slate-950/75 text-slate-400 hover:border-tactical/40 hover:text-white",
           )}
+          style={
+            isVoiceMuted
+              ? { borderColor: `${palette.warning}55`, background: `${palette.warning}18`, color: palette.warning }
+              : isSpeaking
+                ? { borderColor: `${palette.positive}55`, background: `${palette.positive}18`, color: palette.positive }
+                : undefined
+          }
           title={isVoiceMuted ? "Unmute AI broadcast voice" : "Mute AI broadcast voice"}
         >
           {isVoiceMuted ? <VolumeX size={13} /> : <Volume2 size={13} />}
           {isSpeaking && !isVoiceMuted && (
-            <span className="h-1.5 w-1.5 animate-breathe rounded-full bg-pitch" />
+            <span className="h-1.5 w-1.5 animate-breathe rounded-full" style={{ background: palette.positive }} />
           )}
           <span className="sr-only">{isVoiceMuted ? "Unmute AI voice" : "Mute AI voice"}</span>
         </button>

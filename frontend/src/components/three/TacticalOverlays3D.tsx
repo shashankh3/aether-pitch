@@ -142,12 +142,18 @@ export function DefensiveLasers({
       <TeamLinks team="NLA" color={palette.primary} />
       <TeamLinks team="MCS" color={palette.secondary} />
       <Html position={[-44, 1.6, 0]} center distanceFactor={60} zIndexRange={[15, 0]}>
-        <div className="clip-ea pointer-events-none whitespace-nowrap border border-crimson/50 bg-slate-950/80 px-2 py-0.5 font-tech text-[11px] font-bold tracking-wide text-crimson">
+        <div
+          className="clip-ea pointer-events-none whitespace-nowrap border bg-slate-950/80 px-2 py-0.5 font-tech text-[11px] font-bold tracking-wide"
+          style={{ borderColor: palette.primary, color: palette.primary }}
+        >
           NLA LINE {nla.toFixed(1)}m
         </div>
       </Html>
       <Html position={[44, 1.6, 0]} center distanceFactor={60} zIndexRange={[15, 0]}>
-        <div className="clip-ea pointer-events-none whitespace-nowrap border border-tactical/50 bg-slate-950/80 px-2 py-0.5 font-tech text-[11px] font-bold tracking-wide text-tactical">
+        <div
+          className="clip-ea pointer-events-none whitespace-nowrap border bg-slate-950/80 px-2 py-0.5 font-tech text-[11px] font-bold tracking-wide"
+          style={{ borderColor: palette.secondary, color: palette.secondary }}
+        >
           MCS LINE {mcs.toFixed(1)}m
         </div>
       </Html>

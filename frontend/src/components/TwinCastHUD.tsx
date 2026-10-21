@@ -35,13 +35,14 @@ const METRIC_LABELS: Record<MetricFocus, string> = {
 };
 
 function AnalystCard({
-  metrics, tick, latestEvent, focus, showRawNumbers = true,
+  metrics, tick, latestEvent, focus, showRawNumbers = true, jargon = true,
 }: {
   metrics: Metrics | null;
   tick: MatchTick | null;
   latestEvent: MatchEvent | null;
   focus: MetricFocus;
   showRawNumbers?: boolean;
+  jargon?: boolean;
 }) {
   const fastest = tick?.players.reduce((best, p) => p.speed_kmh > best ? p.speed_kmh : best, 0) ?? 0;
   const sprinters = tick?.players.filter((p) => p.speed_kmh >= 30).length ?? 0;
@@ -91,7 +92,22 @@ function AnalystCard({
     ["SPRINTERS NOW", `${sprinters} of 22`, "text-pitch"],
     ["TEAM ENERGY", bioSummary ? `${bioSummary.mean_projected_stamina_10m.toFixed(0)}%` : "—", "text-gold"],
   ];
-  const visibleRows = showRawNumbers ? rows : casualRows;
+  // Fantasy Hunter leads with individual player production, not team shape.
+  const fantasyRows: [string, string, string][] = [
+    ["TOP SPRINTER", `${fastest.toFixed(1)} km/h`, "text-crimson"],
+    ["SPRINT LEADERS", `${sprinters} of 22 over 30`, "text-pitch"],
+    ["STAMINA BURN", bioSummary ? `${bioSummary.mean_sprint_load_index.toFixed(0)}` : "—", "text-gold"],
+    ["BEST ΔxT", latestEvent?.delta_xt != null
+      ? `${latestEvent.delta_xt >= 0 ? "+" : ""}${latestEvent.delta_xt.toFixed(2)}`
+      : "—", "text-tactical"],
+    ["FATIGUE RISK", bioSummary ? `${bioSummary.at_risk_count} players` : "—", "text-crimson"],
+    ["GHOST EDGE", latestEvent?.ghost_pass?.delta_xt != null
+      ? `+${latestEvent.ghost_pass.delta_xt.toFixed(2)}`
+      : "—", "text-slate-300"],
+  ];
+  const visibleRows = showRawNumbers
+    ? (jargon ? rows : fantasyRows)
+    : casualRows;
   return (
     <div className="space-y-2.5">
       <div className="grid grid-cols-2 gap-1.5">
@@ -277,6 +293,7 @@ export default function TwinCastHUD({
                 latestEvent={latestEvent}
                 focus={metricFocus}
                 showRawNumbers={showRawNumbers}
+                jargon={densityMeta.jargon}
               />
             </div>
             <div className="clip-chamfer mt-2.5 border border-white/10 bg-white/[0.03] px-2.5 py-2">

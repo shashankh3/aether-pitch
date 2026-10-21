@@ -322,6 +322,7 @@ export default function RightDock(props: Props) {
                 connected={connected}
                 status={status}
                 drill={drill}
+                palette={palette}
               />
               <PipelinePanel
                 pipeline={pipeline}

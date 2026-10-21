@@ -240,6 +240,21 @@ def test_rules_and_trademark_compliance(
         f"competitions={sorted(competition_names)}",
     ))
 
+    # -- encoding hygiene: no stray UTF-8 BOM in shipped source ---------
+    bom_files: list = []
+    for path in _iter_source_files():
+        try:
+            if path.read_bytes()[:3] == b"\xef\xbb\xbf":
+                bom_files.append(str(path.relative_to(_repo_root())))
+        except OSError:
+            continue
+    results.append((
+        "Source encoding hygiene: no UTF-8 BOM in shipped files",
+        not bom_files,
+        f"{len(bom_files)} files with a BOM"
+        + (f" -> {bom_files[:5]}" if bom_files else ""),
+    ))
+
     report = {
         "rules_version": "official-rules-audit-v1",
         "metadata": {
@@ -687,6 +702,17 @@ def main() -> int:
           and "max_fatigue_pdr_penalty" in bio_summary
           and "at_risk_count" in bio_summary
           and isinstance(bio_summary.get("most_at_risk"), list))
+    # The load index must discriminate: a flat or fully saturated metric is
+    # useless as a scouting signal, so assert a real spread and a mix of
+    # sustainable vs at-risk players.
+    load_values = [p["sprint_load_index"] for p in bio_profiles]
+    projected_values = [p["projected_stamina_10m"] for p in bio_profiles]
+    check("Bio-load: metric discriminates instead of saturating",
+          max(load_values) - min(load_values) > 15.0
+          and max(load_values) < 99.9
+          and min(load_values) > 0.1
+          and max(projected_values) - min(projected_values) > 10.0
+          and 0 < sum(1 for p in bio_profiles if p["relief_required"]) < 22)
 
     # ---- v6.2 TASK 2b: inclusive broadcast personalization schema -------
     normalized = Personalizer.normalize_preferences({

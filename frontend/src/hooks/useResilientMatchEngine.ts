@@ -79,8 +79,6 @@ export function useResilientMatchEngine(): ResilientStudioState {
     timer: ReturnType<typeof setTimeout> | null;
     reconcileTimer: ReturnType<typeof setTimeout> | null;
   }>({ active: false, swapStartedAt: 0, reconciledTicks: 0, timer: null, reconcileTimer: null });
-  const drillStartRef = useRef<number | null>(null);
-  const drillDurationRef = useRef(6000);
   const drillReconnectRef = useRef<(() => void) | null>(null);
   const runDrillRef = useRef<((durationMs: number) => void) | null>(null);
 
@@ -107,8 +105,6 @@ export function useResilientMatchEngine(): ResilientStudioState {
       drill.active = true;
       drill.swapStartedAt = performance.now();
       drill.reconciledTicks = 0;
-      drillStartRef.current = performance.now();
-      drillDurationRef.current = durationMs;
       setFailoverDrillState({
         active: true,
         swapLatencyMs: 0,
@@ -170,11 +166,17 @@ export function useResilientMatchEngine(): ResilientStudioState {
         if (!telemetry.playbackPaused) setTick(frame.tick);
         frameCount.current += 1;
         // During a drill every edge frame proves continuity: zero dropped.
+        // The badge is republished at 1Hz, not 10Hz, so the drill never
+        // causes the re-render churn it is supposed to prove does not exist.
         if (drillRef.current.active) {
           drillRef.current.reconciledTicks += 1;
-          setFailoverDrillState((prev) =>
-            prev.active ? { ...prev, reconciledTicks: drillRef.current.reconciledTicks } : prev,
-          );
+          if (drillRef.current.reconciledTicks % 10 === 0) {
+            setFailoverDrillState((prev) =>
+              prev.active
+                ? { ...prev, reconciledTicks: drillRef.current.reconciledTicks }
+                : prev,
+            );
+          }
         }
         if (frameCount.current % 5 === 0) {
           telemetry.applyMetrics(frame.metrics);
@@ -223,17 +225,13 @@ export function useResilientMatchEngine(): ResilientStudioState {
         setStatus("CONNECTED_PIPELINE_LIVE");
         stopEdge();
         // The cloud is back: reconcile the match clock against the edge twin.
-        if (drillRef.current.active || drillStartRef.current !== null) {
-          const cloudClock = tickRef.current?.clock ?? "—";
-          const edgeClock = engine.currentState().clock;
+        if (drillRef.current.active) {
+          drillRef.current.reconciledTicks += 1;
           setFailoverDrillState((prev) => ({
             ...prev,
-            reconciledTicks: Math.max(prev.reconciledTicks, drillRef.current.reconciledTicks),
+            reconciledTicks: drillRef.current.reconciledTicks,
             phase: prev.phase === "outage" ? "reconciling" : prev.phase,
           }));
-          drillRef.current.reconciledTicks += 1;
-          void cloudClock;
-          void edgeClock;
         }
       };
 
