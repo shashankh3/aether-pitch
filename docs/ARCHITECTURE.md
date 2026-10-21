@@ -34,8 +34,9 @@ backend/
   agent_trace.py                208 LOC  grounded handoff trace
   rai_shield.py                 267 LOC  prompt shield + neutrality + grounding
   content_safety.py             132 LOC  Azure AI Content Safety (optional)
-  main.py                     1,301 LOC  HTTP/WS surface + match loop
-  test_pipeline.py            1,148 LOC  131 assertions
+  counterfactual.py             336 LOC  what-if contract + evaluation (no globals)
+  main.py                     1,075 LOC  HTTP/WS surface + match loop
+  test_pipeline.py            1,300 LOC  143 assertions
 
 frontend/src/
   lib/edgeEngine.ts           1,623 LOC  the browser-native twin

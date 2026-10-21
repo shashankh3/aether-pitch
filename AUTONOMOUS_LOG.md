@@ -50,3 +50,7 @@ Base commit: `d28ccdf`
 ### 2026-10-21T22:03:16Z — Track B/A — DVR invariants, twin event-contract parity, and the edge-mode passing-network fix
 - Files: frontend/scripts/logic-check.ts, backend/test_pipeline.py, frontend/src/lib/edgeEngine.ts, frontend/src/lib/types.ts
 - Verification: 137 backend assertions; 28 logic checks; ARM valid; tsc clean; build ok; SSR smoke ok
+
+### 2026-10-21T22:10:41Z — Track E — extract the counterfactual core out of main.py
+- Files: backend/counterfactual.py, backend/main.py, backend/test_pipeline.py
+- Verification: 143 backend assertions; ARM valid; tsc clean; build ok; SSR smoke ok; 28 logic checks ok

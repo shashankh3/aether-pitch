@@ -41,8 +41,18 @@ services:
       # Runtime configuration: the Next.js server reads these per request and
       # inlines them into the page. `NEXT_PUBLIC_*` would be frozen into the
       # bundle at build time and would point the browser at the wrong host.
-      # AETHER_API_URL / AETHER_WS_URL may be left empty to use the
-      # same-origin proxy (BACKEND_ORIGIN) instead.
+      #
+      # `azd` cannot cross-reference the engine's public FQDN, so the WebSocket
+      # URL needs one manual step after the first deploy:
+      #
+      #   azd up
+      #   azd env get-values                     # copy the engine FQDN
+      #   azd env set AETHER_WS_URL wss://<engine-fqdn>
+      #   azd deploy
+      #
+      # Until that is set the studio still runs — the resilient engine falls
+      # back to the browser-native twin — but the badge will read EDGE rather
+      # than LIVE. `infra/main.json` wires the FQDN automatically.
       - name: AETHER_API_URL
         value: ${AETHER_API_URL}
       - name: AETHER_WS_URL

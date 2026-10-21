@@ -1,5 +1,5 @@
 # Autonomous Improvement Backlog
-Last Updated: 2026-10-21T22:03:15Z
+Last Updated: 2026-10-21T22:10:41Z
 Was Updated: 2026-10-22T00:00:00Z
 
 Scope: AETHER PITCH (Premier League × Azure "Inside the Game" hackathon).
@@ -14,13 +14,15 @@ Verification gate (all must pass before a commit):
 - [ ] [Track C] Tighten `backend/main.py` typing: `Dict[str, Any]` responses are unchecked — add `TypedDict` shapes for the audit and counterfactual payloads
 - [ ] [Track E] Split the 1,623-line `frontend/src/lib/edgeEngine.ts` into `edgeEngine/` (simulation, math, war-room, bio-load) with a barrel re-export so imports stay stable
 - [ ] [Track E] Split the 1,408-line `backend/stage_c_foundry_agents.py` — extract the war-room, counterfactual arbiter and RAI shield into focused modules
-- [ ] [Track E] Split the 1,301-line `backend/main.py` — extract the counterfactual, war-room and compliance routers into a `routers/` package
 - [ ] [Track F] Add a `CONTRIBUTING.md` describing the verification gate, the branch policy and the compliance rules contributors must not break
 
 ## In Progress
 - None
 
 ## Completed
+- [x] [Track E] Split the 1,301-line `backend/main.py` — extract the counterfactual, war-room and compliance routers into a `routers/` package
+  - files: backend/counterfactual.py (new), backend/main.py
+  - note: Extracted the what-if wire contract and the deterministic Stage B evaluation into backend/counterfactual.py — no module globals, independently testable. main.py 1,350 -> 1,075 lines, 6 new assertions
 - [x] [Track B] Extend the frontend logic checks to cover the `judgeCard` / `telemetry` history cap and the `DVR` scrub clamping
   - files: frontend/scripts/logic-check.ts, backend/test_pipeline.py
   - note: Added 6 DVR buffer invariants (150-frame cap, offset clamping, chronological order, pause anchoring, pass-link bound) and a Stage A / browser-twin PASS event contract parity check

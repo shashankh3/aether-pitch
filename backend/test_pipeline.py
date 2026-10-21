@@ -1136,6 +1136,43 @@ def main() -> int:
           and state_endpoint["metrics"].get("chaos_index") is not None,
           "state and metrics served from the same publish")
 
+    # ---- the extracted counterfactual module is usable on its own ---------
+    from counterfactual import (
+        CounterfactualRejected, DefensiveLineOverride as _DefLine,
+        evaluate_counterfactual, line_compensation_move, line_shift_overrides,
+        resolve_sandbox_player,
+    )
+    from counterfactual import CounterfactualRequest as _CFRequest
+    check("Counterfactual module: the wire contract is importable standalone",
+          _CFRequest is not None and _DefLine is not None
+          and issubclass(CounterfactualRejected, Exception))
+    cf_state = app_main.LIVE[0]
+    resolved_player = resolve_sandbox_player(cf_state, rb["shirt_number"], "NLA_2", "NLA")
+    check("Counterfactual module: a player resolves by shirt number or canonical id",
+          resolved_player is not None and resolved_player.get("id") == "NLA_2")
+    check("Counterfactual module: an unknown player resolves to None",
+          resolve_sandbox_player(cf_state, 99, None, "MCS") is None)
+    overrides = line_shift_overrides(cf_state, "NLA", 5.0)
+    check("Counterfactual module: a line shift produces player overrides",
+          len(overrides) == 8
+          and all("player_id" in o and "x" in o and "y" in o for o in overrides),
+          f"{len(overrides)} overrides (4 backline + 4 midfield)")
+    check("Counterfactual module: the line compensation move names a real player",
+          line_compensation_move(cf_state, "NLA", {"target_line_height_m": 40.0})
+          .get("player_id", 0) > 0)
+    try:
+        evaluate_counterfactual(
+            _CFRequest(
+                match_id="x", minute=1.0,
+                displacements=[], baseline_xt=0.0,
+                baseline_pitch_control={}, current_chaos_index=0.5),
+            cf_state, app_main.LIVE[1] or {}, math)
+        empty_rejected = False
+    except CounterfactualRejected as exc:
+        empty_rejected = exc.status_code == 400
+    check("Counterfactual module: an empty scenario is rejected with a 400",
+          empty_rejected)
+
     # ---- Stage A / browser-twin PASS event contract ---------------------
     pass_events = []
     for _ in range(600):
