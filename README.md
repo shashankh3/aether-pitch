@@ -38,7 +38,14 @@ Running entirely on self-generated, IP-clean synthetic telemetry — **North Lar
 
 **The problem:** a live match produces thousands of events, but analysts, casual fans and broadcasters each need a different explanation, in the language and context they care about, without waiting on a studio. **The solution:** AETHER PITCH ingests synthetic 10 Hz telemetry, interprets it with deterministic football math, explains key moments with Azure AI Foundry-hosted agents, renders synchronized 3D/AR overlays, and personalizes the same moment by persona, density, metric, club, player and language.
 
-The project was built for the **Microsoft Premier League Hackathon ("Inside the Game")**. Azure services are optional: without credentials every stage falls back to a deterministic local implementation, so the full studio runs offline. For the full architecture, mathematical appendix, sub-two-minute demo script and Official Rules checklist, see [SUBMISSION_GUIDE.md](SUBMISSION_GUIDE.md).
+The project was built for the **Microsoft Premier League Hackathon ("Inside the Game")**. Azure services are optional: without credentials every stage falls back to a deterministic local implementation, so the full studio runs offline.
+
+| Document | What it covers |
+|---|---|
+| [SUBMISSION_GUIDE.md](SUBMISSION_GUIDE.md) | Full architecture, mathematical appendix, sub-two-minute demo script, Official Rules checklist, paste-ready portal answers |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Module map, data flow, the five stages, the four resilience layers, the counterfactual sandbox |
+| [docs/RUNTIME_CONFIG.md](docs/RUNTIME_CONFIG.md) | Why the studio hydrates its backend coordinates server-side per request instead of using `NEXT_PUBLIC_*` |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | The verification gate, the branch policy and the non-negotiable ground rules |
 
 ## Judge Quick Start (60 seconds)
 

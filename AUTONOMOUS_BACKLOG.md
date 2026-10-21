@@ -1,5 +1,5 @@
 # Autonomous Improvement Backlog
-Last Updated: 2026-10-21T21:12:54Z
+Last Updated: 2026-10-21T21:16:17Z
 Was Updated: 2026-10-22T00:00:00Z
 
 Scope: AETHER PITCH (Premier League × Azure "Inside the Game" hackathon).
@@ -9,19 +9,15 @@ Verification gate (all must pass before a commit):
 `cd frontend && npx tsc --noEmit` · `npm run build` · `npm run smoke` · `npm run check:logic`
 
 ## Pending Tasks
-- [ ] [Track A] `StadiumEnvironment3D` builds instanced crowd/star geometry in `useMemo` without disposal — add the same unmount cleanup
-- [ ] [Track A] `useResilientMatchEngine` drill timers are not cleared when a second drill is requested mid-outage, allowing two overlapping drills to fight over `failoverDrillState` **[RE-CHECKED: the `drill.active` guard already rejects a concurrent drill and the timers are cleared on unmount — no defect; folded into the hub resilience work instead]**
 - [ ] [Track A] `Stage C` `_chat()` retry loop re-sends the same request on 429/5xx without honouring `Retry-After`, and a 4xx is retried once unnecessarily
 - [ ] [Track B] Extend the frontend logic checks to cover the `judgeCard` / `telemetry` history cap and the `DVR` scrub clamping
 - [ ] [Track C] Replace the `any` casts in `frontend/scripts/logic-check.ts` with typed helpers so the logic suite is type-safe rather than `any`-driven
 - [ ] [Track C] `frontend/src/lib/types.ts` has drifted to 825 lines of mixed contracts — split the v6.x payload types into a dedicated `types/spatial.ts` and re-export from the barrel so imports stay stable
 - [ ] [Track C] Tighten `backend/main.py` typing: `Dict[str, Any]` responses are unchecked — add `TypedDict` shapes for the audit and counterfactual payloads
-- [ ] [Track D] `edgeEngine.computePitchControlSplit` and `centralUsableCells` both scan 192 cells × 22 players; cache the player projection so the sandbox slider does not pay for two full scans per frame
 - [ ] [Track D] `PlayerAvatar3D` allocates `new THREE.Plane` / `Vector3` refs per avatar; hoist the shared ground plane to a module constant
 - [ ] [Track E] Split the 1,623-line `frontend/src/lib/edgeEngine.ts` into `edgeEngine/` (simulation, math, war-room, bio-load) with a barrel re-export so imports stay stable
 - [ ] [Track E] Split the 1,408-line `backend/stage_c_foundry_agents.py` — extract the war-room, counterfactual arbiter and RAI shield into focused modules
 - [ ] [Track E] Split the 1,301-line `backend/main.py` — extract the counterfactual, war-room and compliance routers into a `routers/` package
-- [ ] [Track F] Document the runtime configuration contract (server-side per-request resolution) in a dedicated `docs/RUNTIME_CONFIG.md` and link it from the README
 - [ ] [Track F] Add `docs/ARCHITECTURE.md` — module map, data flow, the five stages, and the four resilience layers
 - [ ] [Track F] Add a `CONTRIBUTING.md` describing the verification gate, the branch policy and the compliance rules contributors must not break
 
@@ -29,6 +25,18 @@ Verification gate (all must pass before a commit):
 - None
 
 ## Completed
+- [x] [Track F] Document the runtime configuration contract (server-side per-request resolution) in a dedicated `docs/RUNTIME_CONFIG.md` and link it from the README
+  - files: docs/RUNTIME_CONFIG.md
+  - note: Explains why NEXT_PUBLIC_* breaks container deploys and how the studio hydrates coordinates server-side per request
+- [x] [Track A] `useResilientMatchEngine` drill timers are not cleared when a second drill is requested mid-outage, allowing two overlapping drills to fight over `failoverDrillState` **[RE-CHECKED: the `drill.active` guard already rejects a concurrent drill and the timers are cleared on unmount — no defect; folded into the hub resilience work instead]**
+  - files: n/a
+  - note: DONE — re-checked, the drill.active guard already prevents overlap; the timers are cleared on unmount
+- [x] [Track A] `StadiumEnvironment3D` builds instanced crowd/star geometry in `useMemo` without disposal — add the same unmount cleanup
+  - files: frontend/src/components/three/StadiumEnvironment3D.tsx
+  - note: DONE — the CanvasTexture is now disposed via useDisposable
+- [x] [Track D] `edgeEngine.computePitchControlSplit` and `centralUsableCells` both scan 192 cells × 22 players; cache the player projection so the sandbox slider does not pay for two full scans per frame
+  - files: backend/stage_b_math_engine.py, frontend/src/lib/edgeEngine.ts
+  - note: DONE — vectorised both engines instead (8.3x Python, 2.4x TS) with permanent parity tests
 - [x] [Track D] `backend/stage_b_math_engine.snapshot()` recomputes `pitch_control_split`, `passing_network_edges` and `bio_load_summary` on every call, and `snapshot` is called per insight — memoise the expensive per-state derivations on a state fingerprint
   - files: backend/stage_b_math_engine.py, frontend/src/lib/edgeEngine.ts
   - note: Vectorised the 192-cell x 22-player territory attribution with NumPy in Python and a flat typed-array pass in TS. Python snapshot 7.18ms -> 2.16ms, pitch_control_split 6.5ms -> 0.78ms (8.3x), TS 0.068ms -> 0.028ms (2.4x). Both verified byte-identical against the scalar reference, and the parity checks are now permanent tests
