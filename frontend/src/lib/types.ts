@@ -226,6 +226,8 @@ export interface MatchEvent {
   player_id: string | null;
   player_name: string | null;
   target_id?: string | null;
+  /** Why the pass was made: line_breaking | under_pressure | buildup. */
+  reason?: string | null;
   start?: [number, number];
   end?: [number, number];
   distance_m?: number;

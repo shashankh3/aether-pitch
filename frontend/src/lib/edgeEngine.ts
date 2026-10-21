@@ -877,6 +877,14 @@ export class EdgeEngine {
       team: carrier.team,
       player_id: carrier.id,
       player_name: carrier.name,
+      // The receiver is what makes the pass network and the receiver pill
+      // work; without it the edge engine's 3D passing lanes stay empty.
+      target_id: target.id,
+      target_name: target.name,
+      // The Stage A engine tags every pass with a decision reason; the twin
+      // must carry the same field so both engines expose one contract.
+      reason: dxt > 0.06 ? "line_breaking" : "buildup",
+      line_breaking: dxt > 0.06,
       pass_seq: this.passSeq,
       start: [Number(start[0].toFixed(2)), Number(start[1].toFixed(2))],
       end: [Number(end[0].toFixed(2)), Number(end[1].toFixed(2))],
@@ -891,7 +899,6 @@ export class EdgeEngine {
       delta_chaos: Number((Math.random() - 0.45).toFixed(3)),
       scenario: this.scenarioName,
       scenario_signature: this.scenarioName === "chaos_counter" && dxt > 0.06,
-      line_breaking: dxt > 0.06,
       leverage: Number((Math.abs(dxt) * 3.2 + pdr / 45).toFixed(2)),
       ai_gate: {
         should_explain: pdr > 80 || dxt > 0.08 || !!this.scenarioName,

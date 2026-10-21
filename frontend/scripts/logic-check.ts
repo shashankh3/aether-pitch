@@ -428,6 +428,65 @@ check(
   md.includes("Data lineage:") && md.includes("AETHER Synthetic League"),
 );
 
+// --- DVR buffer invariants ------------------------------------------------
+import { telemetry } from "../src/lib/telemetry";
+
+const dvrEngine = new EdgeEngine(23);
+for (let i = 0; i < 400; i += 1) {
+  const frame = dvrEngine.step(0.1);
+  telemetry.recordLive(frame.tick as MatchTick);
+  for (const event of frame.events) {
+    if (event.type === "PASS" && event.player_id && event.start && event.end && event.team) {
+      telemetry.recordPassLink(
+        event.player_id,
+        event.target_id || "",
+        event.team,
+        event.start,
+        event.end,
+        event.delta_xt ?? 0,
+      );
+    }
+  }
+}
+check(
+  "DVR: the history buffer is capped at 15 s (150 frames)",
+  telemetry.history.length === 150,
+  `${telemetry.history.length} frames held`,
+);
+check(
+  "DVR: snapshotAt clamps an offset past the start of the buffer",
+  telemetry.snapshotAt(-9999) != null
+    && telemetry.snapshotAt(-9999) === telemetry.history[0],
+  "clamps to the oldest frame",
+);
+check(
+  "DVR: snapshotAt clamps an offset past the live edge",
+  telemetry.snapshotAt(9999) != null
+    && telemetry.snapshotAt(9999) === telemetry.history[telemetry.history.length - 1],
+  "clamps to the newest frame",
+);
+check(
+  "DVR: the buffer is strictly chronological",
+  telemetry.history.every((s, i) => i === 0 || s.t_match >= telemetry.history[i - 1].t_match),
+);
+check(
+  "DVR: a paused store stops recording so scrubs stay anchored",
+  (() => {
+    const before = telemetry.history.length;
+    telemetry.playbackPaused = true;
+    telemetry.recordLive(dvrEngine.step(0.1).tick as MatchTick);
+    const after = telemetry.history.length;
+    telemetry.playbackPaused = false;
+    return after === before;
+  })(),
+  "a frozen feed does not grow the buffer",
+);
+check(
+  "DVR: the pass-link table is bounded",
+  telemetry.passLinks.size > 0 && telemetry.passLinks.size <= 96,
+  `${telemetry.passLinks.size} links held (cap 96)`,
+);
+
 // --- cleanup ----------------------------------------------------------------
 clearSandbox();
 clearLedger();

@@ -1,5 +1,5 @@
 # Autonomous Improvement Backlog
-Last Updated: 2026-10-21T21:52:26Z
+Last Updated: 2026-10-21T22:03:15Z
 Was Updated: 2026-10-22T00:00:00Z
 
 Scope: AETHER PITCH (Premier League × Azure "Inside the Game" hackathon).
@@ -9,8 +9,7 @@ Verification gate (all must pass before a commit):
 `cd frontend && npx tsc --noEmit` · `npm run build` · `npm run smoke` · `npm run check:logic`
 
 ## Pending Tasks
-- [ ] [Track B] Extend the frontend logic checks to cover the `judgeCard` / `telemetry` history cap and the `DVR` scrub clamping
-- [ ] [Track C] Replace the `any` casts in `frontend/scripts/logic-check.ts` with typed helpers so the logic suite is type-safe rather than `any`-driven
+- [x] [Track C] Replace the `any` casts in `frontend/scripts/logic-check.ts` with typed helpers so the logic suite is type-safe rather than `any`-driven
 - [ ] [Track C] `frontend/src/lib/types.ts` has drifted to 825 lines of mixed contracts — split the v6.x payload types into a dedicated `types/spatial.ts` and re-export from the barrel so imports stay stable
 - [ ] [Track C] Tighten `backend/main.py` typing: `Dict[str, Any]` responses are unchecked — add `TypedDict` shapes for the audit and counterfactual payloads
 - [ ] [Track E] Split the 1,623-line `frontend/src/lib/edgeEngine.ts` into `edgeEngine/` (simulation, math, war-room, bio-load) with a barrel re-export so imports stay stable
@@ -22,6 +21,9 @@ Verification gate (all must pass before a commit):
 - None
 
 ## Completed
+- [x] [Track B] Extend the frontend logic checks to cover the `judgeCard` / `telemetry` history cap and the `DVR` scrub clamping
+  - files: frontend/scripts/logic-check.ts, backend/test_pipeline.py
+  - note: Added 6 DVR buffer invariants (150-frame cap, offset clamping, chronological order, pause anchoring, pass-link bound) and a Stage A / browser-twin PASS event contract parity check
 - [x] [Track D] `PlayerAvatar3D` allocates `new THREE.Plane` / `Vector3` refs per avatar; hoist the shared ground plane to a module constant
   - files: frontend/src/components/three/PlayerAvatar3D.tsx
   - note: Hoisted the immutable ground plane and the drag scratch vector to module scope — 22 avatars no longer each allocate their own

@@ -1136,6 +1136,40 @@ def main() -> int:
           and state_endpoint["metrics"].get("chaos_index") is not None,
           "state and metrics served from the same publish")
 
+    # ---- Stage A / browser-twin PASS event contract ---------------------
+    pass_events = []
+    for _ in range(600):
+        st_ev, raw_ev = eng.tick(0.1)
+        pass_events.extend([e for e in raw_ev if e.get("type") == "PASS"])
+    check("Stage A: PASS events carry the receiver and the decision reason",
+          bool(pass_events)
+          and all(e.get("target_id") for e in pass_events)
+          and all(e.get("reason") for e in pass_events)
+          and all("start" in e and "end" in e for e in pass_events)
+          and all(e.get("line_breaking") in (True, False) for e in pass_events),
+          f"{len(pass_events)} pass events, "
+          f"fields={sorted(set(pass_events[0].keys()) & {'target_id', 'reason'})}"
+          if pass_events else "no pass events")
+    # The browser twin must expose the same fields, or the 3D passing network
+    # and the receiver pill silently empty in edge mode.
+    twin_fields = {
+        "target_id", "target_name", "reason", "line_breaking",
+        "start", "end", "distance_m", "ball_speed_kmh",
+        "defenders_in_cone", "nearest_defender_m", "pass_seq", "scenario",
+    }
+    with open(
+        Path(__file__).resolve().parent.parent
+        / "frontend" / "src" / "lib" / "edgeEngine.ts",
+        encoding="utf-8",
+    ) as fh:
+        twin_source = fh.read()
+    twin_block = twin_source[twin_source.index('type: "PASS"'):]
+    twin_block = twin_block[: twin_block.index("ai_gate")]
+    missing_twin = sorted(f for f in twin_fields if f not in twin_block)
+    check("Twin contract: the browser twin emits the same PASS fields as Stage A",
+          not missing_twin,
+          f"missing in twin: {missing_twin}" if missing_twin else "all fields present")
+
     # ---- Foundry retry policy -------------------------------------------
     from stage_c_foundry_agents import (
         RETRYABLE_STATUSES, _is_retryable_status, _retry_after_seconds,

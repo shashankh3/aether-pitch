@@ -46,3 +46,7 @@ Base commit: `d28ccdf`
 ### 2026-10-21T21:52:26Z — Track C/D — type the logic suite, type the dossier, hoist the drag allocations
 - Files: frontend/scripts/logic-check.ts, frontend/src/lib/dossier.ts, frontend/src/components/three/PlayerAvatar3D.tsx
 - Verification: 135 backend assertions; ARM valid; tsc clean; build ok; SSR smoke ok; 22 logic checks ok
+
+### 2026-10-21T22:03:16Z — Track B/A — DVR invariants, twin event-contract parity, and the edge-mode passing-network fix
+- Files: frontend/scripts/logic-check.ts, backend/test_pipeline.py, frontend/src/lib/edgeEngine.ts, frontend/src/lib/types.ts
+- Verification: 137 backend assertions; 28 logic checks; ARM valid; tsc clean; build ok; SSR smoke ok
