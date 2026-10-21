@@ -144,6 +144,25 @@ export interface Metrics {
   team_stats: Record<Team, TeamStats>;
   player_stats: Record<string, PlayerStats>;
   leaders: { fastest?: StatsLeader; farthest?: StatsLeader };
+  pitch_control_split?: PitchControlSplit;
+  passing_network_edges?: PassingNetworkEdge[];
+}
+
+/* ------------------------------------------- v6.2 spatial ownership + network */
+export interface PitchControlSplit {
+  nla_territory_pct: number;
+  mcs_territory_pct: number;
+  neutral_pct?: number;
+}
+
+export interface PassingNetworkEdge {
+  from_id: string;
+  to_id: string;
+  team: Team;
+  xt_weight: number;
+  distance_m: number;
+  from_xy: Vec2;
+  to_xy: Vec2;
 }
 
 export interface GhostPass {
@@ -534,13 +553,91 @@ export interface StudioQueryResponse {
   studio_answer_localized: string;
   commentator_cue_15s: string;
   scene_directive: StudioSceneDirective;
+  foundry_safety_shield?: FoundrySafetyShield;
   model?: string;
+}
+
+/* ------------------------------------------- v6.2 Foundry RAI safety shield */
+export interface FoundrySafetyShield {
+  prompt_shield_status: "PROTECTED" | "CLEAR";
+  severity: "clear" | "guarded" | "blocked";
+  categories: string[];
+  numeric_grounding_pass: boolean;
+  club_neutrality_pass: boolean;
+  grounding_status: string;
+  numbers_checked?: number;
+  unmatched_numbers?: string[];
+  deflection: string | null;
+  reasons: string[];
+  policy_version: string;
+}
+
+/* ------------------------------------------- v6.2 adversarial bench war-room */
+export interface WarRoomAgent {
+  id: string;
+  agent: string;
+  role: string;
+  status: string;
+}
+
+export interface WarRoomZone {
+  x: number;
+  y: number;
+  label: string;
+}
+
+export interface WarRoomVector {
+  from: Vec2;
+  to: Vec2;
+  label: string;
+}
+
+export interface WarRoomResponse {
+  agent_debate_transcript: {
+    manager_proposal: string;
+    scout_counter: string;
+    arbiter_verdict: string;
+  };
+  recommended_adjustment: {
+    title: string;
+    directive: string;
+    team: string;
+    opponent: string;
+  };
+  projected_30s_xt_delta: number;
+  win_prob_shift_pct: number;
+  target_zones: WarRoomZone[];
+  adjustment_vectors: WarRoomVector[];
+  agents: WarRoomAgent[];
+  telemetry_basis: Record<string, unknown>;
+  foundry_safety_shield?: FoundrySafetyShield;
+  mode?: string;
+  model?: string;
+}
+
+/* ------------------------------------------- v6.2 Foundry eval scorecard */
+export interface FoundryEvalScorecard {
+  mathematical_groundedness_pct: number;
+  tactical_coherence_pct: number;
+  prompt_shield_status: "PROTECTED" | "CLEAR";
+  prompt_shield_active: boolean;
+  hallucinations: number;
+  policy_breaches: number;
+  p95_frame_sla_pct: number;
+  p95_budget_ms: number;
+  p95_observed_ms: number;
+  numbers_checked: number;
+  sla_met: boolean;
+  evaluated_at: string;
+  eval_suite: string;
 }
 
 /* ------------------------------------------------ v4.0 rubric audit */
 export interface StageBSummary {
   peak_chaos_index: number;
   team_ppda: Record<string, unknown>;
+  pitch_control_split?: PitchControlSplit;
+  passing_network_edges?: PassingNetworkEdge[];
   top_delta_xt: {
     clock: string;
     player: string;
@@ -581,6 +678,8 @@ export interface PipelineAudit {
   synthetic_data_compliance: boolean;
   match_summary?: AuditMatchSummary;
   stage_b_summary?: StageBSummary;
+  foundry_eval?: FoundryEvalScorecard;
+  foundry_safety_shield?: FoundrySafetyShield;
   audit: {
     stage_a_ingest_ms: number;
     stage_b_interpret_ms: number;

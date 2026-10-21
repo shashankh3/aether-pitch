@@ -4,8 +4,8 @@
 // variant="dock" renders the compact segment embedded in the unified bottom
 // dock; variant="deck" keeps the legacy standalone footer.
 
-import { Zap, ShieldAlert, Shuffle, Clapperboard, Loader2 } from "lucide-react";
-import type { MatchTick } from "@/lib/types";
+import { Zap, ShieldAlert, Shuffle, Clapperboard, Loader2, Radar } from "lucide-react";
+import type { MatchTick, Metrics, PitchControlSplit } from "@/lib/types";
 
 const SCENARIOS = [
   {
@@ -185,5 +185,73 @@ export default function PitchForgeDeck({ tick, busy, onInject, variant = "deck" 
         );
       })}
     </footer>
+  );
+}
+
+/* ------------------------------------------------------- spatial ownership */
+
+interface ControlBarProps {
+  metrics: Metrics | null;
+  tick?: MatchTick | null;
+}
+
+/**
+ * Live Spatial Pitch Control Bar — the territory split computed by Stage B
+ * across the 16x12 xT grid (proximity + velocity weighted influence).
+ */
+export function SpatialPitchControlBar({ metrics }: ControlBarProps) {
+  const split: PitchControlSplit = metrics?.pitch_control_split ?? {
+    nla_territory_pct: 50,
+    mcs_territory_pct: 50,
+    neutral_pct: 0,
+  };
+  const nla = Math.max(0, Math.min(100, split.nla_territory_pct ?? 50));
+  const mcs = Math.max(0, Math.min(100, split.mcs_territory_pct ?? 50));
+  const neutral = Math.max(0, Math.min(100, split.neutral_pct ?? 0));
+  const lead = nla - mcs;
+  const leader = lead >= 0 ? "NLA" : "MCS";
+
+  return (
+    <div className="clip-chamfer border border-white/10 bg-black/25 p-2" aria-label="Spatial pitch control">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <span className="flex items-center gap-1.5 font-display text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+          <Radar size={11} className="text-tactical" /> Spatial Pitch Control
+        </span>
+        <span className="font-tech text-[8.5px] uppercase tracking-wider text-slate-500">
+          16×12 xT grid
+        </span>
+      </div>
+
+      <div className="flex h-5 overflow-hidden border border-white/10">
+        <div
+          className="flex items-center justify-center bg-gradient-to-r from-crimson/90 to-crimson/60 transition-all duration-300"
+          style={{ width: `${nla}%` }}
+        >
+          <span className="font-tech text-[9px] font-bold text-white">NLA {nla.toFixed(0)}%</span>
+        </div>
+        <div
+          className="flex items-center justify-center bg-white/[0.07] transition-all duration-300"
+          style={{ width: `${neutral}%` }}
+          title="Contested / neutral territory"
+        >
+          {neutral >= 8 && (
+            <span className="font-tech text-[8px] text-slate-500">{neutral.toFixed(0)}%</span>
+          )}
+        </div>
+        <div
+          className="flex items-center justify-center bg-gradient-to-r from-tactical/60 to-tactical/90 transition-all duration-300"
+          style={{ width: `${mcs}%` }}
+        >
+          <span className="font-tech text-[9px] font-bold text-white">MCS {mcs.toFixed(0)}%</span>
+        </div>
+      </div>
+
+      <div className="mt-1 flex items-center justify-between font-tech text-[8.5px] uppercase tracking-wider text-slate-500">
+        <span>
+          {leader} leads by {Math.abs(lead).toFixed(1)} pts
+        </span>
+        <span>{metrics?.chaos_state?.toLowerCase() ?? "—"}</span>
+      </div>
+    </div>
   );
 }

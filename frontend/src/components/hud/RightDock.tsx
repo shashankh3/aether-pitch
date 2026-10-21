@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import CameraDirectorBar from "@/components/CameraDirectorBar";
 import TwinCastHUD from "@/components/TwinCastHUD";
-import StudioProducer from "@/components/StudioProducer";
+import StudioProducer, { BenchWarRoomPanel } from "@/components/StudioProducer";
 import FanPersonalizationPanel from "@/components/FanPersonalizationTuner";
 import TacticalRadarMiniMap from "@/components/TacticalRadarMiniMap";
 import PlayerLock360 from "@/components/PlayerLock360";
@@ -22,10 +22,11 @@ import TacticalPulseBar from "@/components/TacticalPulseBar";
 import PipelineRibbon from "@/components/PipelineRibbon";
 import { PipelinePanel } from "@/components/PipelineInspector";
 import { TelestratorTools } from "@/components/TelestratorDVRBar";
+import { SpatialPitchControlBar } from "@/components/PitchForgeDeck";
 import type {
   ClubBias, Insight, LangCode, MatchEvent, MatchTick, MetricFocus, Metrics,
   PersonalizationState, PersonaMode, Recap, StudioQueryResponse, StudioSuggestedAction,
-  TelestratorState,
+  TelestratorState, WarRoomVector, WarRoomZone,
 } from "@/lib/types";
 import type { OverlayToggles } from "@/components/three/HoloPitch3D";
 import type { CameraMode } from "@/lib/types";
@@ -59,6 +60,7 @@ interface Props {
   lockedId: string | null;
   onStudioDirective: (d: StudioQueryResponse["scene_directive"]) => void;
   onStudioAction: (action: StudioSuggestedAction) => void;
+  onProjectShift: (zones: WarRoomZone[], vectors: WarRoomVector[]) => void;
   // Fan tab
   personalization: PersonalizationState;
   applyPreferences: (next: PersonalizationState) => void;
@@ -101,6 +103,7 @@ export default function RightDock(props: Props) {
     camMode, pickCamera, toggles, toggleKey, aiDirected,
     insights, persona, onPersona, lang, onLang, metrics, tick, latestEvent, metricFocus, clubBias,
     latest, studioRecap, onCloseRecap, lockedId, onStudioDirective, onStudioAction,
+    onProjectShift,
     personalization, applyPreferences,
     telestrator, onLock, events, cvExpanded,
     toggleTelestrator, autoSpotlight,
@@ -231,6 +234,7 @@ export default function RightDock(props: Props) {
 
           {controlTab === "stats" && (
             <div className="space-y-2">
+              <SpatialPitchControlBar metrics={metrics} tick={tick} />
               <TacticalPulseBar metrics={metrics} compact={false} />
               <MatchIntelPanel tick={tick} metrics={metrics} />
               <TacticalRadarMiniMap lockedId={lockedId} telestrator={telestrator} onLock={onLock} />
@@ -290,7 +294,12 @@ export default function RightDock(props: Props) {
 
           {controlTab === "cv" && (
             <div className="space-y-2">
-              <VisionAutoEventerHUD events={events} expandedOverride={cvExpanded} />
+              <VisionAutoEventerHUD
+                events={events}
+                expandedOverride={cvExpanded}
+                passingNetworkOn={toggles.passingNetwork}
+                onTogglePassingNetwork={() => toggleKey("passingNetwork")}
+              />
               <p className="px-1 font-tech text-[9px] leading-relaxed text-slate-500">
                 Computer-vision eventing runs on the live 10 Hz spatial feed. It is a
                 transparency view, not a required step for the fan experience.
@@ -315,6 +324,11 @@ export default function RightDock(props: Props) {
                 onShowAlphaModal={onShowAlphaModal}
                 onShowRubric={onShowRubric}
                 onShowRecap={onShowRecap}
+              />
+              <BenchWarRoomPanel
+                metrics={metrics}
+                lang={lang}
+                onProjectShift={onProjectShift}
               />
               <div className="border border-white/15 bg-slate-950/70 p-2">
                 <div className="mb-1.5 font-tech text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">

@@ -15,7 +15,9 @@ import BroadcastAlphaModal, { SMPTEChip } from "@/components/BroadcastAlphaModal
 import RubricVerifierModal from "@/components/RubricVerifierModal";
 import MatchRecapStudioModal from "@/components/MatchRecapStudioModal";
 import LiveCaptionStrip from "@/components/LiveCaptionStrip";
-import JudgeAutopilotTour, { AUTOPILOT_STEPS, AUTOPILOT_TOTAL_SECONDS } from "@/components/JudgeAutopilotTour";
+import JudgeAutopilotTour, {
+  AUTOPILOT_STEPS, AUTOPILOT_TOTAL_SECONDS, type ProofJump,
+} from "@/components/JudgeAutopilotTour";
 import TopBar from "@/components/hud/TopBar";
 import LeftRail from "@/components/hud/LeftRail";
 import RightDock from "@/components/hud/RightDock";
@@ -29,7 +31,7 @@ import { API_BASE } from "@/lib/api";
 import type {
   CameraDirective, CameraMode, HighlightZone, Insight, LangCode, MatchRecapStoryboard,
   MetricFocus, PersonaMode, PersonaModeV5, PersonalizationState, RecapAct, RecapPassArc,
-  StudioQueryResponse, StudioSuggestedAction, TelestratorState,
+  StudioQueryResponse, StudioSuggestedAction, TelestratorState, WarRoomVector, WarRoomZone,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -121,6 +123,9 @@ function StudioOrchestrator() {
   const [pausedClock, setPausedClock] = useState<string | null>(null);
   const [telestrator, setTelestrator] = useState<TelestratorState>(EMPTY_TELESTRATOR);
   const [highlightZone, setHighlightZone] = useState<HighlightZone | null>(null);
+  const [warRoomShift, setWarRoomShift] = useState<
+    { zones: WarRoomZone[]; vectors: WarRoomVector[] } | null
+  >(null);
 
   // ---- v4.0 broadcast alpha + production cluster ----
   const [alphaMode, setAlphaMode] = useState(false);
@@ -572,6 +577,42 @@ function StudioOrchestrator() {
     }
   }, [handleLock, lockedId]);
 
+  // ---- bench war-room -> 3D tactical projection -----------------------
+  const handleProjectShift = useCallback(
+    (zones: WarRoomZone[], vectors: WarRoomVector[]) => {
+      setWarRoomShift({ zones, vectors });
+      const primary = zones[0];
+      if (primary) {
+        setHighlightZone({
+          x_min: Math.max(0, primary.x - 9),
+          x_max: Math.min(105, primary.x + 9),
+          y_min: Math.max(0, primary.y - 7),
+          y_max: Math.min(68, primary.y + 7),
+          label: primary.label,
+        });
+      }
+      setToggles((t) => ({ ...t, passingNetwork: true }));
+      setOverride({
+        directive: {
+          recommended_mode: "TACTICAL_DRONE",
+          focus_target_id: lockedId,
+          cinematic_slow_mo: false,
+          ar_highlight_zone: primary?.label ?? "TACTICAL SHIFT",
+        },
+        at: performance.now(),
+      });
+      if (overrideTimer.current) clearTimeout(overrideTimer.current);
+      overrideTimer.current = setTimeout(() => setOverride(null), CAMERA_OVERRIDE_MS);
+    },
+    [lockedId]
+  );
+
+  // ---- rubric proof-jumper: open the exact Control Center tab ----------
+  const handleInspectProof = useCallback((jump: ProofJump) => {
+    setCinemaMode(false);
+    openControlCenter(jump.tab);
+  }, [openControlCenter]);
+
   const handleAutopilotStop = useCallback((keepRubric = false, keepVoiceSuppressed = false) => {
     tourFxTimers.current.forEach((t) => clearTimeout(t));
     tourFxTimers.current = [];
@@ -586,6 +627,7 @@ function StudioOrchestrator() {
     setShowRecap(false);
     if (!keepRubric) setShowRubric(false);
     setHighlightZone(null);
+    setWarRoomShift(null);
     setTelestrator((t) => ({ ...t, animateGhostReplay: false, customTacticalArrows: [] }));
     telemetry.telestratorSpotlightIds = [];
     if (tickRef.current) telemetry.applyTick(tickRef.current, false);
@@ -824,6 +866,7 @@ function StudioOrchestrator() {
         highlightZone={highlightZone}
         alphaMode={alphaMode}
         recapPass={recapPass}
+        warRoomShift={warRoomShift}
         onLock={handleLock}
       />
 
@@ -961,7 +1004,12 @@ function StudioOrchestrator() {
         </div>
 
         {/* autopilot step banner (hidden with the HUD in cinema mode) */}
-        <JudgeAutopilotTour active={autopilotActive && !alphaMode} currentStep={autopilotStep} elapsed={autopilotElapsed} />
+        <JudgeAutopilotTour
+          active={autopilotActive && !alphaMode}
+          currentStep={autopilotStep}
+          elapsed={autopilotElapsed}
+          onInspectProof={handleInspectProof}
+        />
       </div>
 
       {/* ---------- optional Control Center (closed by default) ---------- */}
@@ -988,6 +1036,7 @@ function StudioOrchestrator() {
           lockedId={lockedId}
           onStudioDirective={handleStudioDirective}
           onStudioAction={handleStudioAction}
+          onProjectShift={handleProjectShift}
           personalization={personalization}
           applyPreferences={applyPreferences}
           telestrator={telestrator}

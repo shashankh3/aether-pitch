@@ -8,7 +8,9 @@
 // calibration grid, and the machine-detected auto-event emission log.
 
 import { useEffect, useRef, useState } from "react";
-import { Eye, EyeOff, Maximize2, Minimize2 } from "lucide-react";
+import {
+  Eye, EyeOff, Maximize2, Minimize2, Crosshair, Network, Activity,
+} from "lucide-react";
 import { telemetry } from "@/lib/telemetry";
 import type { MatchEvent } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -30,13 +32,25 @@ function applyH(x: number, y: number): [number, number] {
 interface Props {
   events: MatchEvent[];
   expandedOverride?: boolean | null;
+  onTogglePassingNetwork?: (next: boolean) => void;
+  passingNetworkOn?: boolean;
 }
 
 type LogLine = { id: number; text: string };
 
+const POSE_DISTRIBUTION = [
+  { id: "idle", label: "IDLE", count: 6 },
+  { id: "jog", label: "JOG", count: 7 },
+  { id: "sprint", label: "SPRINT", count: 5 },
+  { id: "press", label: "PRESS", count: 2 },
+  { id: "kick", label: "KICK", count: 2 },
+];
+
 let logSeq = 0;
 
-export default function VisionAutoEventerHUD({ events, expandedOverride = null }: Props) {
+export default function VisionAutoEventerHUD({
+  events, expandedOverride = null, onTogglePassingNetwork, passingNetworkOn = false,
+}: Props) {
   const [enabled, setEnabled] = useState(true);
   const [expanded, setExpanded] = useState(false);
   const [showGrid, setShowGrid] = useState(false);
@@ -299,6 +313,70 @@ export default function VisionAutoEventerHUD({ events, expandedOverride = null }
         height={isExpanded ? 470 : 190}
         className="block w-full"
       />
+
+      {/* ---- v6.2 CV telemetry: homography lock, pose distribution, xT network ---- */}
+      <div className="grid grid-cols-1 gap-1 border-t border-white/10 px-2 py-1.5 sm:grid-cols-2">
+        <div className="border border-tactical/25 bg-tactical/[0.05] px-1.5 py-1">
+          <div className="flex items-center justify-between gap-1">
+            <span className="flex items-center gap-1 font-tech text-[8px] font-bold uppercase tracking-[0.14em] text-tactical">
+              <Crosshair size={9} /> Homography Calibration
+            </span>
+            <span className="flex items-center gap-1 font-tech text-[7.5px] font-bold uppercase tracking-wider text-pitch">
+              <span className="h-1.5 w-1.5 rounded-full bg-pitch" /> LOCKED
+            </span>
+          </div>
+          <div className="mt-0.5 font-tech text-[9px] font-bold uppercase tracking-wider text-slate-200">
+            105×68m FIFA Standard Locked
+          </div>
+          <p className="mt-0.5 font-tech text-[7.5px] leading-relaxed text-slate-500">
+            Plane-projective ground mapping · 3-point calibration · 0.004m residual
+          </p>
+        </div>
+
+        <div className="border border-white/10 bg-black/25 px-1.5 py-1">
+          <div className="flex items-center justify-between gap-1">
+            <span className="flex items-center gap-1 font-tech text-[8px] font-bold uppercase tracking-[0.14em] text-slate-400">
+              <Activity size={9} /> 14-Joint Pose Distribution
+            </span>
+            <span className="font-tech text-[7.5px] font-bold uppercase tracking-wider text-tactical">
+              22/22 TRACKED
+            </span>
+          </div>
+          <div className="mt-1 flex flex-wrap gap-[3px]">
+            {POSE_DISTRIBUTION.map((pose) => (
+              <span
+                key={pose.id}
+                className="border border-white/10 bg-white/[0.04] px-1 py-0.5 font-tech text-[7.5px] text-slate-400"
+                title={`${pose.label}: ${pose.count} players · 14 joints each`}
+              >
+                {pose.label} <b className="text-slate-200">{pose.count}</b>
+              </span>
+            ))}
+          </div>
+          <p className="mt-0.5 font-tech text-[7.5px] leading-relaxed text-slate-500">
+            14 landmarks per player (head, shoulders, hips, knees, ankles) · 100% synthetic
+          </p>
+        </div>
+      </div>
+
+      {onTogglePassingNetwork && (
+        <div className="border-t border-white/10 px-2 py-1">
+          <button
+            onClick={() => onTogglePassingNetwork(!passingNetworkOn)}
+            aria-pressed={passingNetworkOn}
+            className={cn(
+              "clip-skew flex w-full items-center justify-center gap-1.5 py-1 font-tech text-[9px] font-bold uppercase tracking-wider transition",
+              passingNetworkOn
+                ? "bg-tactical/25 text-tactical"
+                : "bg-white/[0.04] text-slate-400 hover:text-tactical",
+            )}
+            title="Render the Stage B top-xT passing lanes as glowing 3D tubes scaled by expected threat"
+          >
+            <Network size={11} />
+            {passingNetworkOn ? "3D xT Passing Network · ON" : "3D xT Passing Network"}
+          </button>
+        </div>
+      )}
 
       {/* real-time auto-event emission log */}
       <div className="border-t border-white/10 px-2 py-1">

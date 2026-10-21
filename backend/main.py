@@ -30,6 +30,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from agent_trace import build_agent_trace, gate_snapshot, p95, verify_grounding
 from config import settings
+from rai_shield import build_safety_shield, detect_prompt_risk
 from stage_a_synthetic_engine import PitchForgeEngine
 from stage_b_math_engine import TacticalMathEngine
 from stage_c_foundry_agents import FoundryRouter
@@ -653,10 +654,41 @@ async def _studio_query_handler(body: dict) -> dict:
     return result
 
 
+async def _tactical_war_room_handler(body: dict) -> dict:
+    """Adversarial 3-agent bench negotiation over the live Stage B state."""
+    body = body if isinstance(body, dict) else {}
+    raw_team = body.get("team")
+    team = raw_team if raw_team in ("NLA", "MCS") else None
+    language = body.get("language")
+    ctx = {
+        "query": body.get("query") or "Run a multi-agent bench war-room on the live match state.",
+        "language": language if isinstance(language, str) else "en",
+        "persona": "analyst",
+        "locked_player_id": body.get("locked_player_id") or None,
+        "spatial": _spatial_context(team),
+        "metrics": last_metrics,
+        "recent_events": [e for e in list(math.stream) if e[1] not in ("_tick",)][-8:],
+        "top_inflections": top_inflections,
+        "match_metadata": (last_state or {}).get("match_metadata"),
+        "personalization": active_personalization,
+    }
+    result = await foundry.tactical_war_room(ctx)
+    shield = build_safety_shield(
+        ctx["query"], ctx["language"], None, str(result.get("recommended_adjustment", "")))
+    result["foundry_safety_shield"] = shield
+    return result
+
+
 @app.post("/api/studio-query")
 async def studio_query(body: dict) -> dict:
     """Bi-directional 'Ask The 12th Man' agentic co-pilot."""
     return await _studio_query_handler(body)
+
+
+@app.post("/api/tactical-war-room")
+async def tactical_war_room(body: dict) -> dict:
+    """Adversarial 3-agent bench negotiation (manager / scout / arbiter)."""
+    return await _tactical_war_room_handler(body)
 
 
 def _stage_b_summary(metrics: dict) -> dict:
@@ -703,6 +735,8 @@ def _stage_b_summary(metrics: dict) -> dict:
     return {
         "peak_chaos_index": round(float(peak_chaos or 0.0), 3),
         "team_ppda": metrics.get("ppda") or {},
+        "pitch_control_split": metrics.get("pitch_control_split") or {},
+        "passing_network_edges": metrics.get("passing_network_edges") or [],
         "top_delta_xt": rows[:3],
         "ghost_counterfactual": ghost,
     }
@@ -781,11 +815,22 @@ async def pipeline_audit() -> dict:
         "data_source": "Stage A deterministic 10Hz synthetic engine",
         "provenance": "No real footage, third-party broadcast marks, or external video assets.",
     }
+    audit_p95 = {k: p95(v) for k, v in latency_samples.items()}
+    eval_shield = build_safety_shield(
+        "live pipeline audit", "en", sample_trace.get("grounding"), "")
+    foundry_eval = FoundryRouter.eval_scorecard(
+        grounding=sample_trace.get("grounding"),
+        gate_stats={**gate_stats, "chaos_index": mets.get("chaos_index", 0.0)},
+        latency_p95=audit_p95,
+        shield=eval_shield,
+    )
     return {
         "status": "ok",
         "synthetic_data_compliance": True,
         "match_summary": match_summary,
         "stage_b_summary": _stage_b_summary(live_metrics),
+        "foundry_eval": foundry_eval,
+        "foundry_safety_shield": eval_shield,
         "audit": {
             "stage_a_ingest_ms": round(t_a / reps, 3),
             "stage_b_interpret_ms": round(t_b / reps, 3),

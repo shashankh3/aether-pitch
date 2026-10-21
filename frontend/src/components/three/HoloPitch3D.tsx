@@ -19,10 +19,12 @@ import BroadcastCameraRig from "./BroadcastCameraRig";
 import Telestrator3DOverlays from "./Telestrator3DOverlays";
 import SpatialControlSurface3D from "./SpatialControlSurface3D";
 import RecapPassTubes from "./RecapPassTubes";
+import { WarRoomProjection, XTPassingNetwork } from "./SpatialLayers3D";
 import { DefensiveLasers, XTGrid } from "./TacticalOverlays3D";
 import { telemetry, tickAlpha } from "@/lib/telemetry";
 import type {
   CameraDirective, CameraMode, HighlightZone, Metrics, RecapPassArc, TelestratorState,
+  WarRoomVector, WarRoomZone,
 } from "@/lib/types";
 
 const CA_OFFSET = new THREE.Vector2(0.00045, 0.00045);
@@ -62,6 +64,7 @@ interface Props {
   highlightZone: HighlightZone | null;
   alphaMode: boolean;
   recapPass: RecapPassArc | null;
+  warRoomShift: { zones: WarRoomZone[]; vectors: WarRoomVector[] } | null;
   onLock: (id: string | null) => void;
 }
 
@@ -227,7 +230,7 @@ const PostFX = memo(function PostFX({ alphaMode }: { alphaMode: boolean }) {
 /* ------------------------------------------------------------------ scene */
 function Scene({
   camMode, override, toggles, lockedId, keyIds, metrics,
-  telestrator, highlightZone, alphaMode, recapPass, onLock,
+  telestrator, highlightZone, alphaMode, recapPass, warRoomShift, onLock,
 }: Props) {
   return (
     <>
@@ -269,6 +272,12 @@ function Scene({
         showControl={toggles.pitchControl}
         showNetwork={toggles.passingNetwork}
       />
+      {toggles.passingNetwork && (
+        <XTPassingNetwork edges={metrics?.passing_network_edges ?? []} />
+      )}
+      {warRoomShift && (
+        <WarRoomProjection zones={warRoomShift.zones} vectors={warRoomShift.vectors} />
+      )}
       <Telestrator3DOverlays telestrator={telestrator} highlightZone={highlightZone} />
       <RecapPassTubes arc={recapPass} />
 

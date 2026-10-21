@@ -2,7 +2,10 @@
 // AETHER PITCH v6.1 — Judge Autopilot step banner. The 6-step engine
 // (timers, voiceover, step choreography) lives in the page orchestrator so
 // the TopBar trigger and the banner share one source of truth.
+// v6.2 adds the 1-click rubric PROOF-JUMPER: one button per prize track that
+// opens the exact Control Center tab holding that track's live proof.
 
+import { BadgeCheck, Swords, CloudCog, FlaskConical } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface AutopilotStep {
@@ -15,6 +18,44 @@ export interface AutopilotStep {
   at: number;
   duration: number;
 }
+
+/* ------------------------------------------- v6.2 prize-track proof-jumper */
+
+export type ProofTarget = "foundry" | "multi-agent" | "cloud-native";
+
+export interface ProofJump {
+  id: ProofTarget;
+  label: string;
+  detail: string;
+  tab: "data" | "prod" | "copilot";
+}
+
+export const PROOF_JUMPS: ProofJump[] = [
+  {
+    id: "foundry",
+    label: "Best Use of Microsoft Foundry",
+    detail: "Foundry Eval & RAI Scorecard",
+    tab: "data",
+  },
+  {
+    id: "multi-agent",
+    label: "Best Multi-Agent System",
+    detail: "3-Agent Bench War-Room + handoff DAG",
+    tab: "prod",
+  },
+  {
+    id: "cloud-native",
+    label: "Best Azure Cloud Native",
+    detail: "Distributed trace + dual-engine failover",
+    tab: "copilot",
+  },
+];
+
+const PROOF_ICONS = {
+  foundry: FlaskConical,
+  "multi-agent": Swords,
+  "cloud-native": CloudCog,
+} as const;
 
 export const AUTOPILOT_TOTAL_SECONDS = 80;
 
@@ -85,9 +126,10 @@ interface Props {
   active: boolean;
   currentStep: number;
   elapsed: number;
+  onInspectProof?: (jump: ProofJump) => void;
 }
 
-export default function JudgeAutopilotTour({ active, currentStep, elapsed }: Props) {
+export default function JudgeAutopilotTour({ active, currentStep, elapsed, onInspectProof }: Props) {
   if (!active) return null;
   const step = AUTOPILOT_STEPS[Math.max(0, currentStep)] ?? AUTOPILOT_STEPS[0];
 
@@ -121,6 +163,31 @@ export default function JudgeAutopilotTour({ active, currentStep, elapsed }: Pro
         <p className="mt-1 line-clamp-2 text-[10.5px] leading-snug text-slate-300">
           {step.voiceover}
         </p>
+
+        {onInspectProof && (
+          <div className="mt-1.5 border-t border-white/10 pt-1.5">
+            <div className="mb-1 flex items-center gap-1 font-tech text-[7.5px] font-bold uppercase tracking-[0.18em] text-slate-500">
+              <BadgeCheck size={9} /> Inspect live proof
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {PROOF_JUMPS.map((jump) => {
+                const Icon = PROOF_ICONS[jump.id];
+                return (
+                  <button
+                    key={jump.id}
+                    onClick={() => onInspectProof(jump)}
+                    className="pointer-events-auto clip-skew flex items-center gap-1 border border-gold/35 bg-gold/[0.08] px-1.5 py-0.5 font-tech text-[7.5px] font-bold uppercase tracking-wider text-gold transition hover:bg-gold/25"
+                    title={`Open the ${jump.tab} tab — ${jump.detail}`}
+                  >
+                    <Icon size={9} />
+                    {jump.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="mt-1.5 h-1 overflow-hidden bg-white/10">
           <div
             className="h-full bg-gradient-to-r from-gold via-tactical to-pitch transition-all duration-200"

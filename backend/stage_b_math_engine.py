@@ -393,6 +393,91 @@ class TacticalMathEngine:
                 out[team] = round(PITCH_L - max(p["x"] for p in dfs), 1)
         return out
 
+    def pitch_control_split(self, state: dict) -> Dict[str, float]:
+        """Territory ownership across the 16x12 xT grid.
+
+        Each grid cell is attributed to whichever team has the stronger
+        proximity + velocity-weighted influence around it. The result is the
+        share of pitch territory currently controlled by NLA vs MCS.
+        """
+        players = [p for p in state.get("players", []) if p.get("role") != "GK"]
+        if not players:
+            return {"nla_territory_pct": 50.0, "mcs_territory_pct": 50.0}
+        nla_cells = 0
+        mcs_cells = 0
+        neutral_cells = 0
+        for row in range(XT_ROWS):
+            for col in range(XT_COLS):
+                cx = (col + 0.5) * PITCH_L / XT_COLS
+                cy = (row + 0.5) * PITCH_W / XT_ROWS
+                nla = 0.0
+                mcs = 0.0
+                for p in players:
+                    px = p["x"] + float(p.get("vx", 0.0)) * 0.45
+                    py = p["y"] + float(p.get("vy", 0.0)) * 0.45
+                    d2 = (cx - px) ** 2 + (cy - py) ** 2
+                    if d2 > 400.0:  # 20 m reach
+                        continue
+                    weight = math.exp(-d2 / 144.0) * (
+                        0.55 + min(0.75, float(p.get("speed_kmh", 0.0)) / 45.0))
+                    if p["team"] == "NLA":
+                        nla += weight
+                    else:
+                        mcs += weight
+                if nla > mcs * 1.02:
+                    nla_cells += 1
+                elif mcs > nla * 1.02:
+                    mcs_cells += 1
+                else:
+                    neutral_cells += 1
+        total = max(1, nla_cells + mcs_cells + neutral_cells)
+        return {
+            "nla_territory_pct": round(nla_cells / total * 100.0, 1),
+            "mcs_territory_pct": round(mcs_cells / total * 100.0, 1),
+            "neutral_pct": round(neutral_cells / total * 100.0, 1),
+        }
+
+    def passing_network_edges(self, state: dict, limit: int = 5) -> List[dict]:
+        """Top passing lanes by xT weight across both teams.
+
+        Each candidate lane is scored with the same 16x12 xT surface the rest
+        of Stage B uses, so the 3D network overlay and the tactical math never
+        disagree. `xt_weight` is the expected threat gained by the receiver.
+        """
+        outfield = [p for p in state.get("players", [])
+                    if p.get("role") != "GK" and p.get("role") != "DEF"]
+        edges: List[dict] = []
+        for a in outfield:
+            for b in outfield:
+                if a["team"] != b["team"] or a["id"] == b["id"]:
+                    continue
+                d = math.hypot(b["x"] - a["x"], b["y"] - a["y"])
+                if d < 8.0 or d > 45.0:
+                    continue
+                weight = self.delta_xt(a["team"], (a["x"], a["y"]), (b["x"], b["y"]))
+                if weight <= 0.0:
+                    continue
+                edges.append({
+                    "from_id": a["id"],
+                    "to_id": b["id"],
+                    "team": a["team"],
+                    "xt_weight": round(weight, 4),
+                    "distance_m": round(d, 1),
+                    "from_xy": {"x": round(a["x"], 2), "y": round(a["y"], 2)},
+                    "to_xy": {"x": round(b["x"], 2), "y": round(b["y"], 2)},
+                })
+        edges.sort(key=lambda e: (-e["xt_weight"], e["from_id"], e["to_id"]))
+        # Keep both teams represented in the network overlay: the top lanes of
+        # each side are merged, then the strongest survive the global limit.
+        per_team: Dict[str, List[dict]] = {"NLA": [], "MCS": []}
+        for edge in edges:
+            bucket = per_team.setdefault(edge["team"], [])
+            if len(bucket) < 3:
+                bucket.append(edge)
+        merged = per_team.get("NLA", []) + per_team.get("MCS", [])
+        merged.sort(key=lambda e: (-e["xt_weight"], e["from_id"], e["to_id"]))
+        return merged[:limit]
+
     def snapshot(self, state: dict, t: Optional[float] = None) -> dict:
         t = t if t is not None else state["t_match"]
         window = [s for s in self.stream if s[0] >= t - self.window_s]
@@ -412,6 +497,8 @@ class TacticalMathEngine:
             "ball_speed_var": round(float(np.var(speeds)), 1),
             "stretch_m": round(self._line_stretch(state) * 35.0, 1),
             "possession": state["possession"],
+            "pitch_control_split": self.pitch_control_split(state),
+            "passing_network_edges": self.passing_network_edges(state),
             **self._match_stats_snapshot(state),
         }
 

@@ -8,13 +8,17 @@
 import { useRef, useState } from "react";
 import {
   ArrowUpRight, Clapperboard, Film, Mic, X, Zap, Camera, Send, Sparkles, Loader2, Quote,
+  Swords, ShieldAlert, Gavel, Radar, Crosshair,
 } from "lucide-react";
 import type {
-  Insight, LangCode, Recap, StudioQueryResponse, StudioSuggestedAction,
+  Insight, LangCode, Recap, StudioQueryResponse, StudioSuggestedAction, WarRoomResponse,
+  WarRoomVector, WarRoomZone, Metrics,
 } from "@/lib/types";
 import { useSpeechController } from "@/hooks/useSpeechController";
 import { useModalA11y } from "@/lib/useModalA11y";
 import { API_BASE } from "@/lib/api";
+import { telemetry } from "@/lib/telemetry";
+import { edgeWarRoom } from "@/lib/edgeEngine";
 
 interface Props {
   latest: Insight | null;
@@ -424,5 +428,193 @@ export default function StudioProducer({
         </div>
       )}
     </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* v6.2 — Adversarial Bench War-Room (3-agent adversarial negotiation) */
+/* ------------------------------------------------------------------ */
+
+function frontendSpatialContext() {
+  const players = Array.from(telemetry.players.values());
+  const team = telemetry.match.possession ?? "NLA";
+  const opp = team === "NLA" ? "MCS" : "NLA";
+  const defenders = players
+    .filter((p) => p.team === team && p.role === "DEF")
+    .sort((a, b) => a.y - b.y);
+  const stretch = defenders.length
+    ? defenders[defenders.length - 1].y - defenders[0].y
+    : 0;
+  let gapM = 0;
+  let gapCenter = { x: 70, y: 34 };
+  let gapDefender: { id?: string; name?: string } = {};
+  for (let i = 0; i < defenders.length - 1; i++) {
+    const seam = defenders[i + 1].y - defenders[i].y;
+    if (seam > gapM) {
+      gapM = seam;
+      gapCenter = {
+        x: (defenders[i].x + defenders[i + 1].x) / 2,
+        y: (defenders[i].y + defenders[i + 1].y) / 2,
+      };
+      gapDefender = { id: defenders[i + 1].id, name: defenders[i + 1].name };
+    }
+  }
+  const runners = players.filter((p) => p.role !== "GK" && p.team === opp);
+  const fastest = runners.length
+    ? runners.reduce((best, p) => (p.speed_kmh > best.speed_kmh ? p : best))
+    : null;
+  return {
+    team,
+    backline_stretch_m: stretch,
+    widest_gap_m: gapM,
+    gap_center: gapCenter,
+    gap_defender: gapDefender,
+    fastest_sprinter: fastest
+      ? {
+          id: fastest.id,
+          name: fastest.name,
+          shirt_number: fastest.shirt_number,
+          speed_kmh: fastest.speed_kmh,
+        }
+      : {},
+    xt_at_gap: 0.05,
+  };
+}
+
+interface WarRoomProps {
+  metrics: Metrics | null;
+  lang: LangCode;
+  onProjectShift: (zones: WarRoomZone[], vectors: WarRoomVector[]) => void;
+}
+
+export function BenchWarRoomPanel({ metrics, lang, onProjectShift }: WarRoomProps) {
+  const [warRoom, setWarRoom] = useState<WarRoomResponse | null>(null);
+  const [running, setRunning] = useState(false);
+  const [offline, setOffline] = useState(false);
+
+  const runWarRoom = async () => {
+    setRunning(true);
+    try {
+      const r = await fetch(`${API_BASE}/api/tactical-war-room`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ language: lang, team: telemetry.match.possession ?? "NLA" }),
+      });
+      if (!r.ok) throw new Error(`war-room HTTP ${r.status}`);
+      const data = (await r.json()) as WarRoomResponse;
+      setWarRoom(data);
+      setOffline(false);
+    } catch {
+      setWarRoom(edgeWarRoom(metrics, frontendSpatialContext()));
+      setOffline(true);
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const transcript = warRoom?.agent_debate_transcript;
+
+  return (
+    <section
+      className="clip-ea panel-lux p-3"
+      aria-label="Multi-agent bench war-room"
+    >
+      <div className="mb-2 flex items-start justify-between gap-2 border-b border-white/10 pb-2">
+        <div className="min-w-0">
+          <h2 className="flex items-center gap-1.5 font-display text-[13px] font-bold uppercase tracking-[0.22em] text-crimson">
+            <Swords size={13} /> Bench War-Room
+          </h2>
+          <p className="mt-0.5 font-tech text-[9px] uppercase tracking-[0.18em] text-slate-500">
+            3 adversarial agents · live Stage B telemetry
+          </p>
+        </div>
+        <button
+          onClick={runWarRoom}
+          disabled={running}
+          className="clip-skew flex shrink-0 items-center gap-1 bg-crimson/20 px-2 py-1 font-tech text-[9.5px] font-bold uppercase tracking-wider text-crimson transition hover:bg-crimson/35 disabled:opacity-50"
+          title="Run the NLATacticalManagerAgent / MCSOppositionScoutAgent / SpatialArbiterAgent debate"
+        >
+          {running ? <Loader2 size={11} className="animate-spin" /> : <Radar size={11} />}
+          {running ? "Debating" : "Run War-Room"}
+        </button>
+      </div>
+
+      {!warRoom && !running && (
+        <p className="font-tech text-[9.5px] leading-relaxed text-slate-500">
+          The NLA tactical manager proposes, the MCS opposition scout counters, and the
+          spatial arbiter adjudicates against the 16×12 xT tensor to issue one
+          grounded tactical prescription.
+        </p>
+      )}
+
+      {warRoom && transcript && (
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="clip-skew bg-pitch/20 px-1.5 py-0.5 font-tech text-[9px] font-bold uppercase tracking-wider text-pitch">
+              +{warRoom.projected_30s_xt_delta.toFixed(2)} xT / 30s
+            </span>
+            <span className="clip-skew bg-gold/20 px-1.5 py-0.5 font-tech text-[9px] font-bold uppercase tracking-wider text-gold">
+              +{warRoom.win_prob_shift_pct.toFixed(1)}% WIN PROB
+            </span>
+            <span className="font-tech text-[8.5px] uppercase tracking-wider text-slate-500">
+              {warRoom.mode === "edge" ? "edge fallback" : (warRoom.model ?? "foundry")}
+            </span>
+          </div>
+
+          <div className="space-y-1">
+            <div className="border-l-2 border-pitch/60 bg-pitch/[0.06] px-2 py-1.5">
+              <div className="flex items-center gap-1 font-tech text-[8.5px] font-bold uppercase tracking-wider text-pitch">
+                <Crosshair size={9} /> NLATacticalManagerAgent
+              </div>
+              <p className="mt-0.5 text-[10px] leading-relaxed text-slate-300">
+                {transcript.manager_proposal}
+              </p>
+            </div>
+            <div className="border-l-2 border-crimson/60 bg-crimson/[0.06] px-2 py-1.5">
+              <div className="flex items-center gap-1 font-tech text-[8.5px] font-bold uppercase tracking-wider text-crimson">
+                <ShieldAlert size={9} /> MCSOppositionScoutAgent
+              </div>
+              <p className="mt-0.5 text-[10px] leading-relaxed text-slate-300">
+                {transcript.scout_counter}
+              </p>
+            </div>
+            <div className="border-l-2 border-tactical/60 bg-tactical/[0.06] px-2 py-1.5">
+              <div className="flex items-center gap-1 font-tech text-[8.5px] font-bold uppercase tracking-wider text-tactical">
+                <Gavel size={9} /> SpatialArbiterAgent · Verdict
+              </div>
+              <p className="mt-0.5 text-[10px] leading-relaxed text-slate-300">
+                {transcript.arbiter_verdict}
+              </p>
+            </div>
+          </div>
+
+          <div className="border border-white/10 bg-black/25 px-2 py-1.5">
+            <div className="font-tech text-[8.5px] font-bold uppercase tracking-wider text-slate-500">
+              Prescription
+            </div>
+            <div className="mt-0.5 text-[10.5px] font-bold text-slate-100">
+              {warRoom.recommended_adjustment.title}
+            </div>
+            <p className="mt-0.5 text-[9.5px] leading-relaxed text-slate-400">
+              {warRoom.recommended_adjustment.directive}
+            </p>
+          </div>
+
+          <button
+            onClick={() => onProjectShift(warRoom.target_zones, warRoom.adjustment_vectors)}
+            className="clip-skew flex w-full items-center justify-center gap-1.5 bg-tactical/20 py-1.5 font-tech text-[10px] font-bold uppercase tracking-wider text-tactical transition hover:bg-tactical/35"
+            title="Highlight the recommended overload zones and adjustment vectors on the 3D pitch"
+          >
+            <ArrowUpRight size={11} /> Project Tactical Shift on 3D Pitch
+          </button>
+
+          {offline && (
+            <p className="font-tech text-[8.5px] uppercase tracking-wider text-gold">
+              Backend offline · deterministic edge debate
+            </p>
+          )}
+        </div>
+      )}
+    </section>
   );
 }

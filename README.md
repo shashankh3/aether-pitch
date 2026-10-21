@@ -108,10 +108,44 @@ The project was built for the **Microsoft Premier League Hackathon ("Inside the 
 
 ### Expanded automated tests
 - `backend/test_pipeline.py` now asserts:
-  - Studio query schema for all 4 specialist types with `answer`, `agent_specialist`, 2–3 `grounding_citations`, 2–3 `suggested_actions` (valid types).
+  - Studio query schema for all 4 specialist types with `answer`, `agent_specialist`, 2-3 `grounding_citations`, 2-3 `suggested_actions` (valid types).
   - Ghost counterfactual payload completeness and `net_xt_gain` formula.
   - Pipeline audit includes `stage_b_summary`, `match_summary`, and `synthetic_data_compliance`.
   - All four God Mode scenarios (`chaos_counter`, `high_press_turnover`, `tactical_inversion`, `halftime_recap`) execute without error.
+
+## Phase 3 - Adversarial Bench War-Room, Foundry RAI, 3D Spatial Layers & Proof-Jumper (v6.2)
+
+### Adversarial Bench War-Room (Best Multi-Agent System)
+- **`POST /api/tactical-war-room`** runs a three-agent adversarial negotiation grounded in live Stage B telemetry (xT grid, PDR, PPDA, Chaos Index, defensive line height):
+  1. `NLATacticalManagerAgent` proposes the high-leverage adjustment (e.g. invert RB into the 78,12 half-space for a 4v3 overload).
+  2. `MCSOppositionScoutAgent` models MCS's optimal counter (pivot #6 into the vacated channel, re-drop the line 4m).
+  3. `SpatialArbiterAgent` adjudicates both proposals against the 16x12 xT tensor and issues one **Tactical Prescription**.
+- **Output contract:** `agent_debate_transcript` (`manager_proposal`, `scout_counter`, `arbiter_verdict`), `recommended_adjustment` (title + directive), `projected_30s_xt_delta`, `win_prob_shift_pct`, `target_zones`, `adjustment_vectors`, `telemetry_basis`.
+- **Studio (`prod`) tab UI:** debate cards for each agent, `+ΔxT` / `+WIN PROB` badges, and **"Project Tactical Shift on 3D Pitch"** which highlights the overload zones as pulsing ground rings and draws the adjustment vectors as glowing arrows on the 3D Digital Twin.
+- **Zero-config fallback:** `edgeWarRoom()` in `frontend/src/lib/edgeEngine.ts` reproduces the identical debate offline.
+
+### Microsoft Foundry Responsible AI (Best Use of Microsoft Foundry)
+- **Prompt Shield (`backend/rai_shield.py`)** runs before every Stage C call:
+  - Detects prompt injection (instruction override, role hijack, jailbreak, prompt exfiltration, guardrail bypass), off-topic queries, and third-party real-world entities.
+  - A blocked query never reaches the model: the response is replaced with a grounded deflection back to the live NLA vs MCS telemetry in EN/ES/AR/HI.
+  - Every response carries `foundry_safety_shield` with `prompt_shield_status` (`CLEAR` / `PROTECTED`), `numeric_grounding_pass`, and `club_neutrality_pass`.
+- **Foundry Eval & Responsible AI Scorecard** in the Control Center **Data (`data`)** tab renders four live telemetry metrics: Mathematical Groundedness, Tactical Coherence, Prompt Shield status (hallucinations / policy breaches), and P95 Broadcast Frame SLA against the 100 ms budget.
+- **"Run Live Foundry Grounding Audit"** button fetches `/api/health/pipeline-audit` and flashes a verified, timestamped audit receipt.
+
+### 3D Passing Network & Spatial Pitch Ownership
+- **Stage B math:** `pitch_control_split` (`nla_territory_pct` / `mcs_territory_pct` / `neutral_pct`) attributes every 16x12 xT cell by proximity + velocity-weighted influence; `passing_network_edges` returns the top 5 high-value lanes as `[from_id, to_id, xt_weight]` with coordinates.
+- **Stats tab:** live **Spatial Pitch Control Bar** (NLA % vs MCS %).
+- **CV tab:** **Homography Calibration Status** (`105x68m FIFA Standard Locked`), **14-Joint Skeletal Pose Distribution** across all 22 players, and a **"3D xT Passing Network"** toggle.
+- **3D Digital Twin:** glowing passing-lane tubes scaled by `xt_weight` (the same tensor the math uses, so the picture and the numbers can never disagree).
+
+### Judge Rubric Proof-Jumper
+- The autopilot tour bar now carries three **"Inspect Live Proof"** buttons, one per prize track, that open the exact Control Center tab holding that track's evidence:
+
+| Prize track | Opens | Shows |
+|---|---|---|
+| Best Use of Microsoft Foundry | Data (`data`) | Foundry Eval & RAI Scorecard + 4-node handoff DAG |
+| Best Multi-Agent System | Studio (`prod`) | 3-Agent Bench War-Room + handoff DAG |
+| Best Azure Cloud Native | Ask AI (`copilot`) | Distributed trace + dual-engine failover inspector |
 
 ## Architecture
 
@@ -319,7 +353,7 @@ Base URL: `http://localhost:8000` · WebSocket: `ws://localhost:8000/ws`
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/health` | Service health, active stage backends, connected clients, clock, and score |
-| `GET` | `/api/health/pipeline-audit` | Synchronous five-stage self-test with per-stage timings, P95 latency, gate economy, agent trace, and sample payloads |
+| `GET` | `/api/health/pipeline-audit` | Synchronous five-stage self-test with per-stage timings, P95 latency, gate economy, agent trace, **Foundry Eval & RAI scorecard**, and sample payloads |
 | `GET` | `/api/state` | Latest match state, metrics, and pipeline trace |
 | `GET` | `/api/match-stats` | Synthetic match metadata, team/player stats, pass accuracy, distance leaders |
 | `GET` | `/api/insights` | Recent Stage C insight packets |
@@ -328,7 +362,8 @@ Base URL: `http://localhost:8000` · WebSocket: `ws://localhost:8000/ws`
 | `GET` | `/api/match-recap` | Build and return the current three-act recap |
 | `POST` | `/api/match-recap` | Trigger the same recap build |
 | `GET` / `POST` | `/api/scenario/{name}` | Inject `chaos_counter`, `high_press_turnover`, `tactical_inversion`, or `halftime_recap` |
-| `POST` | `/api/studio-query` | Ask the tactical co-pilot a question |
+| `POST` | `/api/studio-query` | Ask the tactical co-pilot a question (returns `foundry_safety_shield` metadata) |
+| `POST` | `/api/tactical-war-room` | Run the 3-agent adversarial Bench War-Room (manager → scout → arbiter) |
 
 ### Studio query example
 
@@ -339,6 +374,48 @@ curl -X POST http://localhost:8000/api/studio-query \
 ```
 
 `query` is required and must be a non-empty string. `language`, `persona`, and `locked_player_id` are optional; malformed JSON objects or non-string queries return `400`.
+
+Every response carries a `foundry_safety_shield` block:
+
+```json
+{
+  "prompt_shield_status": "CLEAR",
+  "severity": "clear",
+  "categories": [],
+  "numeric_grounding_pass": true,
+  "club_neutrality_pass": true,
+  "grounding_status": "fallback_verified",
+  "deflection": null,
+  "reasons": [],
+  "policy_version": "aether-prompt-shield-v1"
+}
+```
+
+### Tactical war-room example
+
+```bash
+curl -X POST http://localhost:8000/api/tactical-war-room \
+  -H "Content-Type: application/json" \
+  -d '{"language":"en","team":"NLA"}'
+```
+
+Returns a three-agent adversarial debate over the live Stage B state:
+
+```json
+{
+  "agent_debate_transcript": {
+    "manager_proposal": "NLA should invert the right fullback into the 78,12 half-space…",
+    "scout_counter": "MCS counters by pivoting the #6 midfielder into the vacated wide channel…",
+    "arbiter_verdict": "Verdict: ACCEPT the NLA overload…"
+  },
+  "recommended_adjustment": { "title": "Invert Right Fullback — 78,12 Overload", "directive": "…" },
+  "projected_30s_xt_delta": 0.119,
+  "win_prob_shift_pct": 5.7,
+  "target_zones": [{ "x": 78.0, "y": 12.0, "label": "OVERLOAD ZONE" }],
+  "adjustment_vectors": [{ "from": { "x": 84, "y": -2 }, "to": { "x": 78, "y": 12 }, "label": "INVERT RB" }]
+}
+```
+
 
 ### Personalization example
 
