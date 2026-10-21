@@ -26,3 +26,7 @@ Base commit: `d28ccdf`
 ### 2026-10-21T20:55:59Z — Track A — publish the live (state, metrics) pair atomically
 - Files: backend/main.py, backend/test_pipeline.py
 - Verification: 118 backend assertions; tsc clean; build ok; SSR smoke ok; 21 logic checks ok
+
+### 2026-10-21T21:00:32Z — Track B — cover the model-output boundary, preference fallbacks and hull edge cases
+- Files: backend/test_pipeline.py
+- Verification: 130 backend assertions; tsc clean; build ok; SSR smoke ok; 21 logic checks ok

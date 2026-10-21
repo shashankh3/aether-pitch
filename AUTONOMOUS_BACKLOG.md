@@ -1,5 +1,5 @@
 # Autonomous Improvement Backlog
-Last Updated: 2026-10-21T20:55:58Z
+Last Updated: 2026-10-21T21:00:32Z
 Was Updated: 2026-10-22T00:00:00Z
 
 Scope: AETHER PITCH (Premier League × Azure "Inside the Game" hackathon).
@@ -10,7 +10,7 @@ Verification gate (all must pass before a commit):
 
 ## Pending Tasks
 - [ ] [Track A] `StadiumEnvironment3D` builds instanced crowd/star geometry in `useMemo` without disposal — add the same unmount cleanup
-- [ ] [Track A] `useResilientMatchEngine` drill timers are not cleared when a second drill is requested mid-outage, allowing two overlapping drills to fight over `failoverDrillState`
+- [ ] [Track A] `useResilientMatchEngine` drill timers are not cleared when a second drill is requested mid-outage, allowing two overlapping drills to fight over `failoverDrillState` **[RE-CHECKED: the `drill.active` guard already rejects a concurrent drill and the timers are cleared on unmount — no defect; folded into the hub resilience work instead]**
 - [ ] [Track A] `Stage C` `_chat()` retry loop re-sends the same request on 429/5xx without honouring `Retry-After`, and a 4xx is retried once unnecessarily
 - [ ] [Track B] Add Python tests for `FoundryRouter._parse_agent_json` (malformed / fenced / non-dict payloads) and for the `content_safety` error branch
 - [ ] [Track B] Add Python tests for `Personalizer.normalize_preferences` rejecting every invalid enum value, including the new `cognitive_density`

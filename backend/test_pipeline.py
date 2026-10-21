@@ -1134,6 +1134,65 @@ def main() -> int:
           and state_endpoint["metrics"].get("chaos_index") is not None,
           "state and metrics served from the same publish")
 
+    # ---- model-output boundary + preference normalisation ---------------
+    parse = FoundryRouter._parse_agent_json
+    check("Agent JSON: parses a clean object",
+          parse('{"statement": "ok"}') == {"statement": "ok"})
+    check("Agent JSON: strips markdown fences",
+          parse('```json\n{"statement": "ok"}\n```') == {"statement": "ok"})
+    check("Agent JSON: rejects malformed, array and scalar payloads",
+          parse("{not json") == {}
+          and parse("[1, 2, 3]") == {}
+          and parse("\"just a string\"") == {}
+          and parse("") == {}
+          and parse("null") == {})
+    check("Agent JSON: survives a model returning a JSON array",
+          isinstance(parse("[{\"a\": 1}]"), dict))
+    normalized = Personalizer.normalize_preferences({
+        "persona_mode": "not_a_persona",
+        "metric_focus": "not_a_metric",
+        "favorite_club_bias": "not_a_club",
+        "market_language": "zz",
+        "cognitive_density": "not_a_density",
+        "locked_player_id": 12345,
+    })
+    check("Preferences: every invalid enum falls back to a safe default",
+          normalized["persona_mode"] == "TWINCAST_SPLIT"
+          and normalized["metric_focus"] == "ALL"
+          and normalized["favorite_club_bias"] == "NEUTRAL"
+          and normalized["market_language"] == "en"
+          and normalized["cognitive_density"] == "PRO_TACTICAL_DIRECTOR"
+          and normalized["locked_player_id"] == "12345"
+          and normalized["colorblind_safe"] is False,
+          json.dumps(normalized))
+    check("Preferences: a valid cognitive density survives normalisation",
+          Personalizer.normalize_preferences(
+              {"cognitive_density": "fantasy_hunter"})["cognitive_density"]
+          == "FANTASY_HUNTER")
+    check("Preferences: colourblind flag is preserved",
+          Personalizer.normalize_preferences(
+              {"colorblind_safe": True})["colorblind_safe"] is True)
+
+    # ---- geometry edge cases --------------------------------------------
+    from stage_b_math_engine import _convex_hull_area, _central_usable_cells
+    check("Hull: degenerate inputs produce zero area",
+          _convex_hull_area([]) == 0.0
+          and _convex_hull_area([(1.0, 1.0)]) == 0.0
+          and _convex_hull_area([(0.0, 0.0), (1.0, 1.0)]) == 0.0
+          and _convex_hull_area([(0.0, 0.0), (1.0, 1.0), (2.0, 2.0)]) == 0.0)
+    check("Hull: a unit square has area 1",
+          abs(_convex_hull_area(
+              [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]) - 1.0) < 1e-9)
+    check("Hull: a known rectangle has the right area",
+          abs(_convex_hull_area(
+              [(0.0, 0.0), (4.0, 0.0), (4.0, 3.0), (0.0, 3.0)]) - 12.0) < 1e-9)
+    check("Hull: an interior point does not change the area",
+          abs(_convex_hull_area(
+              [(0.0, 0.0), (4.0, 0.0), (4.0, 3.0), (0.0, 3.0), (2.0, 1.5)]) - 12.0) < 1e-9)
+    check("Central cells: an empty squad yields zero usable cells",
+          _central_usable_cells({"players": []}, "NLA") == 0
+          and _central_usable_cells({"players": []}, "NLA", []) == 0)
+
     # ---- hub resilience: a slow peer must not stall the 10 Hz engine ----
     class SlowSocket:
         def __init__(self, delay):
