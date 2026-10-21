@@ -101,6 +101,66 @@ check(
   `${zeroMove.nla_territory_pct} -> ${after.nla_territory_pct}`,
 );
 
+// --- the vectorised browser twin must equal the scalar reference -----------
+function scalarSplit(
+  t: any,
+  override?: { playerId: string; x: number; y: number },
+) {
+  const players = t.players.filter((p: any) => p.role !== "GK");
+  if (!players.length) return { nla_territory_pct: 50, mcs_territory_pct: 50, neutral_pct: 0 };
+  let nla = 0;
+  let mcs = 0;
+  let neutral = 0;
+  for (let row = 0; row < 12; row += 1) {
+    for (let col = 0; col < 16; col += 1) {
+      const cx = (col + 0.5) * (105 / 16);
+      const cy = (row + 0.5) * (68 / 12);
+      let ni = 0;
+      let mi = 0;
+      for (const p of players) {
+        const moved = override && p.id === override.playerId;
+        const px = (moved ? override.x : p.x) + p.vx * 0.45;
+        const py = (moved ? override.y : p.y) + p.vy * 0.45;
+        const d2 = (cx - px) ** 2 + (cy - py) ** 2;
+        if (d2 > 400) continue;
+        const w = Math.exp(-d2 / 144) * (0.55 + Math.min(0.75, p.speed_kmh / 45));
+        if (p.team === "NLA") ni += w;
+        else mi += w;
+      }
+      if (ni > mi * 1.02) nla += 1;
+      else if (mi > ni * 1.02) mcs += 1;
+      else neutral += 1;
+    }
+  }
+  const total = Math.max(1, nla + mcs + neutral);
+  return {
+    nla_territory_pct: Number(((nla / total) * 100).toFixed(1)),
+    mcs_territory_pct: Number(((mcs / total) * 100).toFixed(1)),
+    neutral_pct: Number(((neutral / total) * 100).toFixed(1)),
+  };
+}
+
+let parityOk = true;
+for (let i = 0; i < 40 && parityOk; i += 1) {
+  const frame = engine.step(0.1);
+  const live = frame.tick;
+  if (JSON.stringify(scalarSplit(live)) !== JSON.stringify(computePitchControlSplit(live))) {
+    parityOk = false;
+  }
+  const ov = [{ playerId: "NLA_2", x: 40, y: 30 }];
+  if (
+    JSON.stringify(scalarSplit(live, ov[0])) !==
+    JSON.stringify(computePitchControlSplit(live, ov[0]))
+  ) {
+    parityOk = false;
+  }
+}
+check(
+  "the vectorised browser twin equals the scalar reference",
+  parityOk,
+  "192-cell x 22-player attribution",
+);
+
 // --- defensive line scrubber ------------------------------------------------
 const line = evaluateDefensiveLineShift(tick, "NLA", 45);
 check(

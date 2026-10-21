@@ -94,6 +94,48 @@ def _convex_hull_area(points: List[Tuple[float, float]]) -> float:
     return abs(area) / 2.0
 
 
+#: Pre-computed cell-centre grid (row = y, col = x) for the 16x12 xT surface.
+_CELL_XS = (np.arange(XT_COLS) + 0.5) * (PITCH_L / XT_COLS)
+_CELL_YS = (np.arange(XT_ROWS) + 0.5) * (PITCH_W / XT_ROWS)
+_GRID_X, _GRID_Y = np.meshgrid(_CELL_XS, _CELL_YS)
+#: A player influences a cell only inside this radius (matches the scalar path).
+_REACH_M = 20.0
+_REACH_M2 = _REACH_M * _REACH_M
+#: Gaussian falloff denominator (sigma = 12 m).
+_SIGMA2 = 144.0
+
+
+def _influence_surface(
+    players: List[dict],
+    moved: Dict[str, Tuple[float, float]],
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Per-team influence surfaces over the 16x12 grid.
+
+    Vectorised equivalent of the scalar accumulation: only cells inside a
+    player's reach evaluate the exponential, which is ~18% of the grid.
+    """
+    nla = np.zeros((XT_ROWS, XT_COLS), dtype=float)
+    mcs = np.zeros((XT_ROWS, XT_COLS), dtype=float)
+    for p in players:
+        override = moved.get(p.get("id"))
+        base_x = override[0] if override else float(p.get("x", 0.0))
+        base_y = override[1] if override else float(p.get("y", 0.0))
+        px = base_x + float(p.get("vx", 0.0)) * 0.45
+        py = base_y + float(p.get("vy", 0.0)) * 0.45
+        d2 = (_GRID_X - px) ** 2 + (_GRID_Y - py) ** 2
+        near = d2 <= _REACH_M2
+        if not near.any():
+            continue
+        factor = 0.55 + min(0.75, float(p.get("speed_kmh", 0.0)) / 45.0)
+        weight = np.zeros((XT_ROWS, XT_COLS), dtype=float)
+        weight[near] = np.exp(-d2[near] / _SIGMA2) * factor
+        if p.get("team") == "NLA":
+            nla += weight
+        else:
+            mcs += weight
+    return nla, mcs
+
+
 def _central_usable_cells(
     state: dict,
     defending_team: str,
@@ -111,35 +153,13 @@ def _central_usable_cells(
     players = [p for p in state.get("players", []) if p.get("role") != "GK"]
     if not players:
         return 0
-    usable = 0
-    for row in range(XT_ROWS):
-        for col in range(XT_COLS):
-            cx = (col + 0.5) * PITCH_L / XT_COLS
-            cy = (row + 0.5) * PITCH_W / XT_ROWS
-            # Central third of the pitch only.
-            if not (PITCH_L * 0.33 <= cx <= PITCH_L * 0.67):
-                continue
-            att = 0.0
-            dfn = 0.0
-            for p in players:
-                ov = moved.get(p.get("id"))
-                base_x = ov[0] if ov else float(p.get("x", 0.0))
-                base_y = ov[1] if ov else float(p.get("y", 0.0))
-                px = base_x + float(p.get("vx", 0.0)) * 0.45
-                py = base_y + float(p.get("vy", 0.0)) * 0.45
-                d2 = (cx - px) ** 2 + (cy - py) ** 2
-                if d2 > 400.0:
-                    continue
-                weight = math.exp(-d2 / 144.0) * (
-                    0.55 + min(0.75, float(p.get("speed_kmh", 0.0)) / 45.0)
-                )
-                if p.get("team") == defending_team:
-                    dfn += weight
-                else:
-                    att += weight
-            if att > dfn * 1.02:
-                usable += 1
-    return usable
+    nla, mcs = _influence_surface(players, moved)
+    central = (_GRID_X >= PITCH_L * 0.33) & (_GRID_X <= PITCH_L * 0.67)
+    if defending_team == "NLA":
+        usable = (mcs > nla * 1.02) & central
+    else:
+        usable = (nla > mcs * 1.02) & central
+    return int(usable.sum())
 
 
 class TacticalMathEngine:
@@ -505,37 +525,12 @@ class TacticalMathEngine:
         if not players:
             return {"nla_territory_pct": 50.0, "mcs_territory_pct": 50.0,
                     "neutral_pct": 0.0}
-        nla_cells = 0
-        mcs_cells = 0
-        neutral_cells = 0
-        for row in range(XT_ROWS):
-            for col in range(XT_COLS):
-                cx = (col + 0.5) * PITCH_L / XT_COLS
-                cy = (row + 0.5) * PITCH_W / XT_ROWS
-                nla = 0.0
-                mcs = 0.0
-                for p in players:
-                    override = moved.get(p.get("id"))
-                    base_x = override[0] if override else float(p.get("x", 0.0))
-                    base_y = override[1] if override else float(p.get("y", 0.0))
-                    px = base_x + float(p.get("vx", 0.0)) * 0.45
-                    py = base_y + float(p.get("vy", 0.0)) * 0.45
-                    d2 = (cx - px) ** 2 + (cy - py) ** 2
-                    if d2 > 400.0:  # 20 m reach
-                        continue
-                    weight = math.exp(-d2 / 144.0) * (
-                        0.55 + min(0.75, float(p.get("speed_kmh", 0.0)) / 45.0)
-                    )
-                    if p.get("team") == "NLA":
-                        nla += weight
-                    else:
-                        mcs += weight
-                if nla > mcs * 1.02:
-                    nla_cells += 1
-                elif mcs > nla * 1.02:
-                    mcs_cells += 1
-                else:
-                    neutral_cells += 1
+        nla, mcs = _influence_surface(players, moved)
+        nla_wins = nla > mcs * 1.02
+        mcs_wins = (~nla_wins) & (mcs > nla * 1.02)
+        nla_cells = int(nla_wins.sum())
+        mcs_cells = int(mcs_wins.sum())
+        neutral_cells = XT_ROWS * XT_COLS - nla_cells - mcs_cells
         total = max(1, nla_cells + mcs_cells + neutral_cells)
         return {
             "nla_territory_pct": round(nla_cells / total * 100.0, 1),
@@ -583,52 +578,6 @@ class TacticalMathEngine:
         merged = per_team.get("NLA", []) + per_team.get("MCS", [])
         merged.sort(key=lambda e: (-e["xt_weight"], e["from_id"], e["to_id"]))
         return merged[:limit]
-
-    def bio_load_summary(self, state: dict) -> dict:
-        """Team-level fatigue read-out derived from the Stage A bio profiles.
-
-        Stage A produces the per-player projection; Stage B interprets it:
-        which players are the weakest links right now, and how much collective
-        execution capacity the match has left.
-        """
-        players = state.get("players", [])
-        profiles = []
-        for p in players:
-            profile = p.get("bio_load_profile") or {}
-            if not profile:
-                continue
-            profiles.append({
-                "player_id": p.get("id"),
-                "player_name": p.get("name"),
-                "team": p.get("team"),
-                "role": p.get("role"),
-                "sprint_load_index": profile.get("sprint_load_index", 0.0),
-                "projected_stamina_10m": profile.get("projected_stamina_10m", 100.0),
-                "fatigue_pdr_penalty": profile.get("fatigue_pdr_penalty", 0.0),
-                "relief_required": bool(profile.get("relief_required")),
-            })
-        if not profiles:
-            return {
-                "mean_sprint_load_index": 0.0,
-                "mean_projected_stamina_10m": 100.0,
-                "max_fatigue_pdr_penalty": 0.0,
-                "at_risk_count": 0,
-                "most_at_risk": [],
-            }
-        loads = [row["sprint_load_index"] for row in profiles]
-        projections = [row["projected_stamina_10m"] for row in profiles]
-        penalties = [row["fatigue_pdr_penalty"] for row in profiles]
-        at_risk = sorted(
-            (row for row in profiles if row["relief_required"]),
-            key=lambda row: (row["projected_stamina_10m"], -row["sprint_load_index"]),
-        )
-        return {
-            "mean_sprint_load_index": round(sum(loads) / len(loads), 1),
-            "mean_projected_stamina_10m": round(sum(projections) / len(projections), 1),
-            "max_fatigue_pdr_penalty": round(max(penalties), 1),
-            "at_risk_count": len(at_risk),
-            "most_at_risk": at_risk[:3],
-        }
 
     def top_xt_zones(self, limit: int = 3) -> List[dict]:
         """The highest-value Expected Threat cells on the 16x12 grid.
@@ -774,6 +723,52 @@ class TacticalMathEngine:
             "line_cohesion": round(cohesion, 3),
             "backline_player_ids": [p.get("id") for p in backline],
             "midfield_player_ids": [p.get("id") for p in midfield],
+        }
+
+    def bio_load_summary(self, state: dict) -> dict:
+        """Team-level fatigue read-out derived from the Stage A bio profiles.
+
+        Stage A produces the per-player projection; Stage B interprets it:
+        which players are the weakest links right now, and how much collective
+        execution capacity the match has left.
+        """
+        players = state.get("players", [])
+        profiles = []
+        for p in players:
+            profile = p.get("bio_load_profile") or {}
+            if not profile:
+                continue
+            profiles.append({
+                "player_id": p.get("id"),
+                "player_name": p.get("name"),
+                "team": p.get("team"),
+                "role": p.get("role"),
+                "sprint_load_index": profile.get("sprint_load_index", 0.0),
+                "projected_stamina_10m": profile.get("projected_stamina_10m", 100.0),
+                "fatigue_pdr_penalty": profile.get("fatigue_pdr_penalty", 0.0),
+                "relief_required": bool(profile.get("relief_required")),
+            })
+        if not profiles:
+            return {
+                "mean_sprint_load_index": 0.0,
+                "mean_projected_stamina_10m": 100.0,
+                "max_fatigue_pdr_penalty": 0.0,
+                "at_risk_count": 0,
+                "most_at_risk": [],
+            }
+        loads = [row["sprint_load_index"] for row in profiles]
+        projections = [row["projected_stamina_10m"] for row in profiles]
+        penalties = [row["fatigue_pdr_penalty"] for row in profiles]
+        at_risk = sorted(
+            (row for row in profiles if row["relief_required"]),
+            key=lambda row: (row["projected_stamina_10m"], -row["sprint_load_index"]),
+        )
+        return {
+            "mean_sprint_load_index": round(sum(loads) / len(loads), 1),
+            "mean_projected_stamina_10m": round(sum(projections) / len(projections), 1),
+            "max_fatigue_pdr_penalty": round(max(penalties), 1),
+            "at_risk_count": len(at_risk),
+            "most_at_risk": at_risk[:3],
         }
 
     def snapshot(self, state: dict, t: Optional[float] = None) -> dict:

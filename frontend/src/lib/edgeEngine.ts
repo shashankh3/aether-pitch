@@ -1208,31 +1208,19 @@ export function centralUsableCells(
   defendingTeam: Team,
   overrides?: { playerId: string; x: number; y: number }[],
 ): number {
-  const moved = new Map((overrides ?? []).map((o) => [o.playerId, [o.x, o.y]]));
   const outfield = players.filter((p) => p.role !== "GK");
   if (!outfield.length) return 0;
+  const moved = overrides && overrides.length ? overrides[0] : undefined;
+  const { nla, mcs } = influenceSurface(outfield, moved);
   let usable = 0;
-  for (let row = 0; row < XT_ROWS; row += 1) {
-    for (let col = 0; col < XT_COLS; col += 1) {
-      const cx = (col + 0.5) * (PITCH_L / XT_COLS);
-      const cy = (row + 0.5) * (PITCH_W / XT_ROWS);
-      if (!(PITCH_L * 0.33 <= cx && cx <= PITCH_L * 0.67)) continue;
-      let att = 0;
-      let dfn = 0;
-      for (const p of outfield) {
-        const ov = moved.get(p.id);
-        const baseX = ov ? ov[0] : p.x;
-        const baseY = ov ? ov[1] : p.y;
-        const px = baseX + p.vx * 0.45;
-        const py = baseY + p.vy * 0.45;
-        const d2 = (cx - px) ** 2 + (cy - py) ** 2;
-        if (d2 > 400) continue;
-        const weight = Math.exp(-d2 / 144) * (0.55 + Math.min(0.75, p.speed_kmh / 45));
-        if (p.team === defendingTeam) dfn += weight;
-        else att += weight;
-      }
-      if (att > dfn * 1.02) usable += 1;
-    }
+  for (let i = 0; i < nla.length; i += 1) {
+    const cx = GRID_CX[i];
+    if (!(cx >= PITCH_L * 0.33 && cx <= PITCH_L * 0.67)) continue;
+    const n = nla[i];
+    const m = mcs[i];
+    const attacker = defendingTeam === "NLA" ? m : n;
+    const defender = defendingTeam === "NLA" ? n : m;
+    if (attacker > defender * 1.02) usable += 1;
   }
   return usable;
 }
@@ -1355,6 +1343,50 @@ export function evaluateDefensiveLineShift(
 }
 
 /** Browser-native mirror of the Stage B 16x12 territory attribution. */
+/**
+ * Cell-centre grid for the 16x12 xT surface, pre-computed once.
+ * Flat index `i` maps to row = floor(i / XT_COLS), col = i % XT_COLS.
+ */
+const GRID_CX = Array.from({ length: XT_ROWS * XT_COLS }, (_, i) =>
+  ((i % XT_COLS) + 0.5) * (PITCH_L / XT_COLS),
+);
+const GRID_CY = Array.from({ length: XT_ROWS * XT_COLS }, (_, i) =>
+  (Math.floor(i / XT_COLS) + 0.5) * (PITCH_W / XT_ROWS),
+);
+
+/**
+ * Per-team influence over the 16x12 grid.
+ *
+ * Vectorised the same way as the Stage B engine: one flat pass per player
+ * with the reach test before the exponential. The browser twin runs at 12 Hz
+ * while a judge drags a player, so this is on the critical path for the
+ * 60 FPS claim.
+ */
+function influenceSurface(
+  players: MatchTick["players"],
+  moved?: { playerId: string; x: number; y: number },
+): { nla: Float64Array; mcs: Float64Array } {
+  const cells = XT_ROWS * XT_COLS;
+  const nla = new Float64Array(cells);
+  const mcs = new Float64Array(cells);
+  for (const p of players) {
+    if (p.role === "GK") continue;
+    const isMoved = moved !== undefined && p.id === moved.playerId;
+    const px = (isMoved ? moved.x : p.x) + p.vx * 0.45;
+    const py = (isMoved ? moved.y : p.y) + p.vy * 0.45;
+    const factor = 0.55 + Math.min(0.75, p.speed_kmh / 45);
+    const target = p.team === "NLA" ? nla : mcs;
+    for (let i = 0; i < cells; i += 1) {
+      const dx = GRID_CX[i] - px;
+      const dy = GRID_CY[i] - py;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > 400) continue;
+      target[i] += Math.exp(-d2 / 144) * factor;
+    }
+  }
+  return { nla, mcs };
+}
+
 export function computePitchControlSplit(
   tick: MatchTick,
   override?: { playerId: string; x: number; y: number },
@@ -1363,34 +1395,21 @@ export function computePitchControlSplit(
   if (!players.length) {
     return { nla_territory_pct: 50, mcs_territory_pct: 50, neutral_pct: 0 };
   }
-  let nla = 0;
-  let mcs = 0;
+  const { nla, mcs } = influenceSurface(players, override);
+  let nlaCells = 0;
+  let mcsCells = 0;
   let neutral = 0;
-  for (let row = 0; row < XT_ROWS; row++) {
-    for (let col = 0; col < XT_COLS; col++) {
-      const cx = (col + 0.5) * (PITCH_L / XT_COLS);
-      const cy = (row + 0.5) * (PITCH_W / XT_ROWS);
-      let nlaInfluence = 0;
-      let mcsInfluence = 0;
-      for (const p of players) {
-        const moved = override && p.id === override.playerId;
-        const px = (moved ? override.x : p.x) + p.vx * 0.45;
-        const py = (moved ? override.y : p.y) + p.vy * 0.45;
-        const d2 = (cx - px) ** 2 + (cy - py) ** 2;
-        if (d2 > 400) continue;
-        const weight = Math.exp(-d2 / 144) * (0.55 + Math.min(0.75, p.speed_kmh / 45));
-        if (p.team === "NLA") nlaInfluence += weight;
-        else mcsInfluence += weight;
-      }
-      if (nlaInfluence > mcsInfluence * 1.02) nla += 1;
-      else if (mcsInfluence > nlaInfluence * 1.02) mcs += 1;
-      else neutral += 1;
-    }
+  for (let i = 0; i < nla.length; i += 1) {
+    const n = nla[i];
+    const m = mcs[i];
+    if (n > m * 1.02) nlaCells += 1;
+    else if (m > n * 1.02) mcsCells += 1;
+    else neutral += 1;
   }
-  const total = Math.max(1, nla + mcs + neutral);
+  const total = Math.max(1, nlaCells + mcsCells + neutral);
   return {
-    nla_territory_pct: Number(((nla / total) * 100).toFixed(1)),
-    mcs_territory_pct: Number(((mcs / total) * 100).toFixed(1)),
+    nla_territory_pct: Number(((nlaCells / total) * 100).toFixed(1)),
+    mcs_territory_pct: Number(((mcsCells / total) * 100).toFixed(1)),
     neutral_pct: Number(((neutral / total) * 100).toFixed(1)),
   };
 }

@@ -25,7 +25,9 @@ from fastapi import HTTPException
 from content_safety import ContentSafetyClient, content_safety_status
 from rai_shield import check_club_neutrality, check_numeric_grounding, detect_prompt_risk
 from stage_a_synthetic_engine import MATCH_METADATA, PitchForgeEngine
-from stage_b_math_engine import TacticalMathEngine, XT_MAX, XT_MIN
+from stage_b_math_engine import (
+    PITCH_L, PITCH_W, TacticalMathEngine, XT_COLS, XT_MAX, XT_MIN, XT_ROWS,
+)
 from stage_c_foundry_agents import FoundryRouter
 from stage_d_e_personalizer import Personalizer
 from config import settings
@@ -1133,6 +1135,54 @@ def main() -> int:
           state_endpoint["state"].get("clock") is not None
           and state_endpoint["metrics"].get("chaos_index") is not None,
           "state and metrics served from the same publish")
+
+    # ---- vectorised territory attribution must equal the scalar reference --
+    import math as _pymath
+
+    def _scalar_split(state: dict) -> dict:
+        """The pre-optimisation scalar implementation, kept as a reference."""
+        nla_cells = mcs_cells = neutral_cells = 0
+        for row in range(XT_ROWS):
+            for col in range(XT_COLS):
+                cx = (col + 0.5) * PITCH_L / XT_COLS
+                cy = (row + 0.5) * PITCH_W / XT_ROWS
+                nla = mcs = 0.0
+                for pl in state["players"]:
+                    if pl.get("role") == "GK":
+                        continue
+                    px = float(pl.get("x", 0.0)) + float(pl.get("vx", 0.0)) * 0.45
+                    py = float(pl.get("y", 0.0)) + float(pl.get("vy", 0.0)) * 0.45
+                    d2 = (cx - px) ** 2 + (cy - py) ** 2
+                    if d2 > 400.0:
+                        continue
+                    weight = _pymath.exp(-d2 / 144.0) * (
+                        0.55 + min(0.75, float(pl.get("speed_kmh", 0.0)) / 45.0))
+                    if pl.get("team") == "NLA":
+                        nla += weight
+                    else:
+                        mcs += weight
+                if nla > mcs * 1.02:
+                    nla_cells += 1
+                elif mcs > nla * 1.02:
+                    mcs_cells += 1
+                else:
+                    neutral_cells += 1
+        total = max(1, nla_cells + mcs_cells + neutral_cells)
+        return {
+            "nla_territory_pct": round(nla_cells / total * 100.0, 1),
+            "mcs_territory_pct": round(mcs_cells / total * 100.0, 1),
+            "neutral_pct": round(neutral_cells / total * 100.0, 1),
+        }
+
+    parity_ok = True
+    for _ in range(40):
+        st_par, raw_par = eng.tick(0.1)
+        math.update(st_par, raw_par, st_par["t_match"], st_par.get("scenario"), 0.1)
+        if _scalar_split(st_par) != math.pitch_control_split(st_par):
+            parity_ok = False
+            break
+    check("Stage b: vectorised territory split equals the scalar reference",
+          parity_ok, "192-cell x 22-player attribution")
 
     # ---- model-output boundary + preference normalisation ---------------
     parse = FoundryRouter._parse_agent_json
