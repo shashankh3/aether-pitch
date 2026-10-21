@@ -82,6 +82,37 @@ The project was built for the **Microsoft Premier League Hackathon ("Inside the 
 - **Responsive studio layout** — compact mobile dock, icon-first scenario controls, scroll-safe overlays, and reduced-motion support.
 - **Resilient match engine** that switches to a browser-native 10 Hz simulation during backend or Azure failures.
 
+## Phase 2 — Agentic Studio Co-pilot & Counterfactuals (v6.1)
+
+### Interactive "Ask The 12th Man" co-pilot
+- **Agentic tool-calling UI**: quick-prompt chips (ghost pass, defensive gap, chaos spike, recap), typed/voice queries, Azure AI Foundry routing with deterministic fallback.
+- **Specialist routing**: every question is classified (Spatial Analyst, Ghost-Pass Counterfactual, Match Analyst, Story Director) with a 3-step reasoning chain, localized answer (EN/ES/AR/HI), commentator cue, and grounded citations (2–3 numeric facts from Stage B).
+- **Action buttons**: Focus Gap → camera directive, Lock Player → spotlight, Show Ghost Pass → animate counterfactual arc, Generate Recap → open 3-act storyboard.
+- **Offline resilience**: if Azure or WebSocket fails, the EdgeEngine produces the same specialist/citation/action schema locally.
+
+### Ghost-Pass counterfactual simulator (Stage B + 3D)
+- **Backend**: `ghost_pass()` now returns `actual_delta_xt`, `ghost_delta_xt`, `net_xt_gain`, `completion_probability` (18–97%), `receiver_target_xy`, `distance_m`, `openness_m`.
+- **Telemetry**: `GhostSample` and ball state carry all counterfactual fields; DVR circular buffer records them for 15 s.
+- **DVR UI**: comparison strip shows Actual ΔxT → Ghost ΔxT → Net ΔxT + completion % when a ghost lane is live; “Play counterfactual” button triggers the 3D arc.
+- **3D visualization**: `PassVectors3D` badge shows Ghost ΔxT, Net ΔxT, completion %; `Telestrator3DOverlays` animates a pulsing cyan target ring at the ghost receiver when the ghost replay is active.
+
+### Mute-proof broadcast captions
+- **LiveCaptionStrip** (fixed bottom bar): 4 animated waveform bars, active locale tag (EN/ES/AR/HI), “CC · LIVE / MUTED / READY” status.
+- **Zero-overlap speech controller**: cancel-before-queue, `stopSpeaking()` on autopilot step changes, language switches, and mute toggle; captions persist when muted.
+- **Alpha-mode clean**: caption bar auto-hides when `?overlay=alpha` or Cinema Mode (`H`) is active.
+
+### Exportable audit dossier
+- **MatchRecapStudioModal** adds “Dossier JSON” and “Dossier MD” buttons.
+- **JSON dossier** includes: match summary (fixture, score, provenance), deterministic Stage B dossier (peak chaos, PPDA, top 3 ΔxT, ghost counterfactual), 3-act storyboard, Foundry multi-agent trace (handoff chain, grounding, guardrail, P95 latency), compliance attestation.
+- **Markdown dossier**: human-readable version of the same sections for reviewers.
+
+### Expanded automated tests
+- `backend/test_pipeline.py` now asserts:
+  - Studio query schema for all 4 specialist types with `answer`, `agent_specialist`, 2–3 `grounding_citations`, 2–3 `suggested_actions` (valid types).
+  - Ghost counterfactual payload completeness and `net_xt_gain` formula.
+  - Pipeline audit includes `stage_b_summary`, `match_summary`, and `synthetic_data_compliance`.
+  - All four God Mode scenarios (`chaos_counter`, `high_press_turnover`, `tactical_inversion`, `halftime_recap`) execute without error.
+
 ## Architecture
 
 ```mermaid

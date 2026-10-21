@@ -34,6 +34,11 @@ Judges usually see a highlight reel. AETHER PITCH lets them **drive the broadcas
 | 5 | Resilient Match Engine | `frontend/src/hooks/useResilientMatchEngine.ts`, `frontend/src/lib/edgeEngine.ts` | 10 Hz edge fallback, seamless WebSocket hot-swap, live/edge status pill |
 | 6 | Grounded Agent Trace | `backend/agent_trace.py`, `frontend/src/components/PipelineInspector.tsx`, `frontend/src/lib/types.ts`, `frontend/src/lib/edgeEngine.ts` | 4-node handoff DAG, gate economy, measured handoff latency, numeric grounding result, edge fallback trace |
 | 7 | Submission Package | this guide + `frontend/src/components/three/RecapPassTubes.tsx`, `PipelineInspector` status | Complete architecture, math appendix, and sub-two-minute demo script |
+| 8 | **Agentic Studio Co-pilot** | `backend/stage_c_foundry_agents.py` (studio_query), `frontend/src/components/StudioProducer.tsx`, `frontend/src/lib/types.ts` (`StudioSuggestedAction`) | Quick-prompt chips, typed/voice query, specialist routing, 3-step reasoning, grounded citations, action buttons (Focus Gap, Lock Player, Show Ghost, Generate Recap), offline fallback |
+| 9 | **Ghost-Pass Counterfactual Simulator** | `backend/stage_b_math_engine.py` (ghost_pass), `backend/main.py` (telemetry), `frontend/src/lib/telemetry.ts`, `frontend/src/components/TelestratorDVRBar.tsx`, `frontend/src/components/three/PassVectors3D.tsx`, `frontend/src/components/three/Telestrator3DOverlays.tsx` | Actual vs Ghost ΔxT, Net ΔxT, completion %, receiver target, DVR comparison strip, 3D animated arc + pulsing target ring |
+| 10 | **Mute-Proof Broadcast Captions** | `frontend/src/hooks/useSpeechController.ts`, `frontend/src/components/LiveCaptionStrip.tsx`, `frontend/src/app/globals.css` | 4-bar waveform, locale tag EN/ES/AR/HI, CC status, persists when muted, clears on step/lang change, hides in alpha/cinema |
+| 11 | **Exportable Audit Dossier** | `frontend/src/components/MatchRecapStudioModal.tsx` (export buttons), `frontend/src/lib/types.ts` (`PipelineAudit`, `StageBSummary`) | JSON + Markdown dossier: match summary, Stage B dossier, 3-act storyboard, Foundry trace, compliance attestation |
+| 12 | **Expanded Automated Tests** | `backend/test_pipeline.py` (studio schema, ghost fields, audit, 4 God Modes) | All assertions pass offline; validates Phase 2 contracts |
 
 The live HUD stays deliberately calm: the 3D pitch, scorebug, and five primary actions are visible by default. One **Controls** button opens a **Control Center** containing the A–E PipelineRibbon, MatchIntelPanel, camera director, AI voices, fan personalization, co-pilot, CV view, payload inspector, and production tools. Judges can therefore inspect stage latency and match intelligence on demand without the broadcast view becoming a command centre.
 
@@ -498,6 +503,87 @@ Expected backend result:
 RESULT: ALL PIPELINE TESTS PASSED
 ```
 
+**Phase 2 contract checks** (run after `python test_pipeline.py`):
+
+```bash
+# Studio query schema: answer, agent_specialist, grounding_citations (2-3), suggested_actions (2-3, valid types)
+python -c "
+import asyncio, main as app_main
+from stage_a_synthetic_engine import PitchForgeEngine
+from stage_b_math_engine import TacticalMathEngine
+from stage_c_foundry_agents import FoundryRouter
+from config import settings
+eng = PitchForgeEngine(seed=11, start_minute=62.0)
+math = TacticalMathEngine(window_s=30.0)
+for _ in range(100):
+    st, raw = eng.tick(0.1)
+    math.update(st, raw, st['t_match'], st.get('scenario'), 0.1)
+router = FoundryRouter(settings)
+spatial = {'team':'NLA','chaos_index':0.5,'backline_stretch_m':38,'widest_gap_m':21,
+           'gap_center':{'x':78,'y':12},'gap_defender':{'id':'NLA_2','name':'D. Keswick'},
+           'fastest_sprinter':{'id':'MCS_7','name':'C. Ambrose','shirt_number':7,'speed_kmh':31.8},
+           'ghost':{'x':82,'y':48.5,'delta_xt':0.214,'target_id':'NLA_11'}}
+for prompt in ['Spot the tactical weakness','Analyze the ghost pass','Explain why chaos is spiking','Build a three-act recap']:
+    q = asyncio.run(router.studio_query({'query':prompt,'language':'en','persona':'analyst','locked_player_id':None,'spatial':spatial}))
+    assert all(k in q for k in ('answer','agent_specialist','grounding_citations','suggested_actions','scene_directive'))
+    assert 2 <= len(q['grounding_citations']) <= 3
+    assert 2 <= len(q['suggested_actions']) <= 3
+    assert all(a['type'] in ('FOCUS_GAP','LOCK_PLAYER','SHOW_GHOST_PASS','GENERATE_RECAP') for a in q['suggested_actions'])
+    print(f'OK: {q[\"agent_specialist\"]} -> {len(q[\"suggested_actions\"])} actions')
+print('All studio query contracts passed')
+"
+```
+
+**Ghost counterfactual payload check:**
+
+```bash
+python -c "
+from stage_b_math_engine import TacticalMathEngine
+from stage_a_synthetic_engine import PitchForgeEngine
+eng = PitchForgeEngine(seed=11, start_minute=62.0)
+math = TacticalMathEngine(window_s=30.0)
+st, _ = eng.tick(0.1)
+carrier = next(p for p in st['players'] if p['role']!='GK')
+actual = math.delta_xt(carrier['team'], (carrier['x'],carrier['y']), (carrier['x']+8,carrier['y']+2))
+g = math.ghost_pass(st, carrier['team'], None, (carrier['x'],carrier['y']), actual_delta_xt=actual)
+for k in ('delta_xt','actual_delta_xt','ghost_delta_xt','net_xt_gain','completion_probability','receiver_target_xy'):
+    assert k in g, f'missing {k}'
+assert g['actual_delta_xt'] == round(actual,3)
+assert g['net_xt_gain'] == round(g['delta_xt']-actual,3)
+assert 18 <= g['completion_probability'] <= 97
+print('Ghost counterfactual payload OK')
+"
+```
+
+**Pipeline audit includes Stage B dossier:**
+
+```bash
+python -c "
+import asyncio, copy, main as app_main
+from stage_a_synthetic_engine import PitchForgeEngine
+from stage_b_math_engine import TacticalMathEngine
+eng = PitchForgeEngine(seed=11, start_minute=62.0)
+math = TacticalMathEngine(window_s=30.0)
+for _ in range(100):
+    st, raw = eng.tick(0.1)
+    math.update(st, raw, st['t_match'], st.get('scenario'), 0.1)
+app_main.last_state = copy.deepcopy(st)
+app_main.last_metrics = copy.deepcopy(math.snapshot(st))
+app_main.math = math
+carrier = next(p for p in st['players'] if p['role']!='GK')
+actual = math.delta_xt(carrier['team'], (carrier['x'],carrier['y']), (carrier['x']+8,carrier['y']+2))
+g = math.ghost_pass(st, carrier['team'], None, (carrier['x'],carrier['y']), actual_delta_xt=actual)
+app_main.last_ghost = (st['t_match']+4.0, [g['x'],g['y']], g['delta_xt'], g['actual_delta_xt'], g['target_id'], g['completion_probability'], g['net_xt_gain'])
+app_main.latest_ghost_counterfactual = {'clock':st['clock'],'team':carrier['team'],'player_id':carrier['id'],'player_name':carrier['name'],'target_id':g['target_id'],'actual_delta_xt':g['actual_delta_xt'],'ghost_delta_xt':g['ghost_delta_xt'],'net_xt_gain':g['net_xt_gain'],'completion_probability':g['completion_probability'],'receiver_target_xy':g['receiver_target_xy']}
+app_main.recap_archive.clear()
+audit = asyncio.run(app_main.pipeline_audit())
+assert audit['status']=='ok'
+assert 'stage_b_summary' in audit and 'peak_chaos_index' in audit['stage_b_summary']
+assert 'match_summary' in audit and audit['match_summary']['synthetic_provenance'] is True
+print('Pipeline audit Stage B dossier OK')
+"
+```
+
 New API smoke tests:
 
 ```bash
@@ -518,32 +604,41 @@ Responsive screenshots (1366×768, 1920×1080):
 
 ---
 
-## 11. Repository Map (v6 additions included)
+## 11. Repository Map (v6.1 additions included)
 
 ```text
 backend/
   stage_a_synthetic_engine.py      # 10 Hz engine + MilestoneTracker
   stage_b_math_engine.py           # chaos / PDR / xT / ghost / gate
-  stage_c_foundry_agents.py        # Azure AI Foundry + recap_storyboard
+  stage_c_foundry_agents.py        # Azure AI Foundry + recap_storyboard + studio_query
   stage_d_e_personalizer.py        # overlays + personalization + i18n
   agent_trace.py                   # grounded 4-node handoff + numeric cross-check
-  main.py                          # WS hub, recap archive, v5 REST
+  main.py                          # WS hub, recap archive, v5 REST + studio-query
   test_pipeline.py
 
 frontend/src/
-  app/page.tsx                     # v5 integration + autopilot wiring
+  app/page.tsx                     # v5 integration + autopilot wiring + caption strip
+  app/globals.css                  # caption-bar keyframes
   hooks/useResilientMatchEngine.ts # WS + edge hot-swap
-  lib/edgeEngine.ts                # 10 Hz browser fallback engine
+  hooks/useSpeechController.ts     # zero-overlap speech + captions
+  lib/edgeEngine.ts                # 10 Hz browser fallback engine + ghost fields
+  lib/types.ts                     # StudioSuggestedAction, GroundingCitation, StageBSummary, PipelineAudit
   components/
     FanPersonalizationTuner.tsx    # persona / metric / club / language
-    MatchRecapStudioModal.tsx      # 3-act recap + time travel + export
+    MatchRecapStudioModal.tsx      # 3-act recap + time travel + dossier export
     JudgeAutopilotTour.tsx         # 80 s / 6-step rubric tour
     TwinCastHUD.tsx                # metric-lock + club-lens badges
     PipelineInspector.tsx          # 4-node trace DAG + gate + grounding
     VisionAutoEventerHUD.tsx       # external expanded override
+    StudioProducer.tsx             # co-pilot UI + quick chips + voice + actions
+    LiveCaptionStrip.tsx           # waveform bars + locale tag + CC status
+    TelestratorDVRBar.tsx          # ghost comparison strip + counterfactual toggle
     three/
       SpatialControlSurface3D.tsx  # 21×14 control surface + pass network
       RecapPassTubes.tsx           # actual gold + ghost cyan tubes
+      PassVectors3D.tsx            # ghost badge + actual/net ΔxT + completion %
+      Telestrator3DOverlays.tsx    # pulsing ghost target ring + ghost replay ball
+      HoloPitch3D.tsx              # stadium + avatars + overlays
 ```
 
 ---
