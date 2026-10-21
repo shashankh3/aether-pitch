@@ -11,6 +11,7 @@ import json
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -1121,10 +1122,71 @@ def main() -> int:
           and len(arbiter_calls) == 1,
           "no extra model call")
 
+    # ---- hub resilience: a slow peer must not stall the 10 Hz engine ----
+    class SlowSocket:
+        def __init__(self, delay):
+            self.delay = delay
+            self.sent = 0
+
+        async def accept(self):
+            return None
+
+        async def send_json(self, packet):
+            await asyncio.sleep(self.delay)
+            self.sent += 1
+
+    class DeadSocket:
+        def __init__(self):
+            self.sent = 0
+
+        async def accept(self):
+            return None
+
+        async def send_json(self, packet):
+            self.sent += 1
+            raise RuntimeError("socket closed")
+
+    async def probe_hub() -> None:
+        hub = app_main.Hub()
+        fast = SlowSocket(0.0)
+        slow = SlowSocket(5.0)
+        dead = DeadSocket()
+        for client in (fast, slow, dead):
+            await hub.join(client)
+        started = time.perf_counter()
+        await hub.broadcast({"type": "tick", "data": {}})
+        elapsed = (time.perf_counter() - started) * 1000.0
+        check("Hub: enqueueing never blocks on a slow peer",
+              elapsed < 250.0,
+              f"broadcast returned in {elapsed:.1f}ms with a 5s peer")
+        check("Hub: every client is queued",
+              len(hub.queues) == 3 and all(
+                  q.qsize() == 1 for q in hub.queues.values()),
+              f"queues={len(hub.queues)}")
+        # A full queue drops the oldest frame instead of stalling.
+        for _ in range(app_main.QUEUE_MAX + 4):
+            await hub.broadcast({"type": "tick", "data": {}})
+        check("Hub: a slow client drops frames instead of blocking",
+              all(q.qsize() <= app_main.QUEUE_MAX for q in hub.queues.values()),
+              f"queue depth <= {app_main.QUEUE_MAX}")
+        # Let the writers run: the healthy client is served, the dead one and
+        # the stalled one are pruned.
+        await asyncio.sleep(0.4)
+        check("Hub: a healthy client keeps receiving",
+              fast.sent >= 1 and fast in hub.clients,
+              f"sent={fast.sent}")
+        await asyncio.sleep(app_main.SEND_TIMEOUT_S + 0.4)
+        check("Hub: dead and stalled peers are pruned",
+              dead not in hub.clients and slow not in hub.clients,
+              f"clients={len(hub.clients)}")
+        for client in list(hub.clients):
+            await hub.leave(client)
+
+    asyncio.get_event_loop().run_until_complete(probe_hub())
+
     # ---- v6.2 TASK 4: collective defensive line shift -------------------
     check("Line shift: Stage B evaluator exposes the full contract",
-          all(hasattr(math, "evaluate_defensive_line_shift")
-              for _ in [0]))
+          hasattr(math, "evaluate_defensive_line_shift"))
     line_eval = math.evaluate_defensive_line_shift(st, "NLA", 45.0)
     check("Line shift: returns every required field",
           all(k in line_eval for k in (
