@@ -1,5 +1,5 @@
 # Autonomous Improvement Backlog
-Last Updated: 2026-10-21T21:46:05Z
+Last Updated: 2026-10-21T21:52:26Z
 Was Updated: 2026-10-22T00:00:00Z
 
 Scope: AETHER PITCH (Premier League × Azure "Inside the Game" hackathon).
@@ -13,7 +13,6 @@ Verification gate (all must pass before a commit):
 - [ ] [Track C] Replace the `any` casts in `frontend/scripts/logic-check.ts` with typed helpers so the logic suite is type-safe rather than `any`-driven
 - [ ] [Track C] `frontend/src/lib/types.ts` has drifted to 825 lines of mixed contracts — split the v6.x payload types into a dedicated `types/spatial.ts` and re-export from the barrel so imports stay stable
 - [ ] [Track C] Tighten `backend/main.py` typing: `Dict[str, Any]` responses are unchecked — add `TypedDict` shapes for the audit and counterfactual payloads
-- [ ] [Track D] `PlayerAvatar3D` allocates `new THREE.Plane` / `Vector3` refs per avatar; hoist the shared ground plane to a module constant
 - [ ] [Track E] Split the 1,623-line `frontend/src/lib/edgeEngine.ts` into `edgeEngine/` (simulation, math, war-room, bio-load) with a barrel re-export so imports stay stable
 - [ ] [Track E] Split the 1,408-line `backend/stage_c_foundry_agents.py` — extract the war-room, counterfactual arbiter and RAI shield into focused modules
 - [ ] [Track E] Split the 1,301-line `backend/main.py` — extract the counterfactual, war-room and compliance routers into a `routers/` package
@@ -23,6 +22,9 @@ Verification gate (all must pass before a commit):
 - None
 
 ## Completed
+- [x] [Track D] `PlayerAvatar3D` allocates `new THREE.Plane` / `Vector3` refs per avatar; hoist the shared ground plane to a module constant
+  - files: frontend/src/components/three/PlayerAvatar3D.tsx
+  - note: Hoisted the immutable ground plane and the drag scratch vector to module scope — 22 avatars no longer each allocate their own
 - [x] [Track A] `Stage C` `_chat()` retry loop re-sends the same request on 429/5xx without honouring `Retry-After`, and a 4xx is retried once unnecessarily
   - files: backend/stage_c_foundry_agents.py, backend/test_pipeline.py
   - note: Honour Retry-After (delta-seconds or HTTP-date, capped at 5s) and fail fast on non-retryable 4xx — a bad key or bad request no longer costs a second round trip. 4 new assertions

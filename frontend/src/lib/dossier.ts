@@ -4,8 +4,96 @@
 // Kept out of the modal so it can be unit-tested headlessly: the dossier is
 // the artifact a judge exports, so its shape matters as much as the UI.
 
-import type { MatchRecapStoryboard, MatchTick, PipelineAudit } from "./types";
+import type {
+  MatchRecapStoryboard, MatchTick, PipelineAudit, StageBSummary,
+} from "./types";
 import { counterfactualLedger, type LedgerExperiment } from "./ledgerStore";
+
+export interface DossierLabEntry {
+  id: string;
+  kind: string;
+  at: string;
+  clock: string;
+  minute: number;
+  summary: string;
+  deltaXT: number;
+  deltaControlPct: number;
+  displacementM: number;
+  vulnerabilityIndex: number | null;
+  throughBallExposureXt: number | null;
+  pressCompressionGainPct: number | null;
+  offsideTrapCatchPct: number | null;
+  scenarioId: string | null;
+  traceId: string | null;
+  numericGroundingVerified: boolean | null;
+  team: string | null;
+}
+
+export interface DossierLab {
+  experiment_count: number;
+  player_drags: number;
+  line_shifts: number;
+  grounded_experiments: number;
+  experiments: DossierLabEntry[];
+}
+
+export interface MatchDossier {
+  schema_version: string;
+  artifact: string;
+  generated_at: string;
+  provenance: {
+    league: string;
+    teams: string[];
+    data_path: string;
+    synthetic: boolean;
+    no_external_video: boolean;
+  };
+  match_summary: {
+    home: string;
+    away: string;
+    competition: string;
+    venue: string;
+    clock: string | null;
+    score: { NLA: number; MCS: number } | null;
+    synthetic_provenance: boolean;
+    data_source: string;
+    provenance: string;
+  };
+  stage_b: StageBSummary | Record<string, unknown>;
+  storyboard: {
+    title: string;
+    subtitle: string;
+    timecode: string;
+    score: { NLA: number; MCS: number };
+    model: string;
+    milestones: unknown[];
+    acts: unknown[];
+  };
+  foundry_execution: {
+    trace_id: string;
+    mode: string;
+    model: string;
+    anchor_clock: string;
+    gate: unknown;
+    handoff_chain: unknown[];
+    grounding: unknown;
+    guardrail: unknown;
+    latency_p95: Record<string, number>;
+    handoff_counts: unknown;
+    gate_efficiency: unknown;
+    stage_timings: unknown;
+    stage_modes: Record<string, string>;
+    azure: unknown;
+  };
+  counterfactual_lab: DossierLab;
+  compliance: {
+    synthetic_data_compliance: boolean;
+    no_external_video: boolean;
+    fictional_entities: boolean;
+    disclaimer: string;
+    human_review: string;
+  };
+}
 
 export interface DossierInput {
   data: MatchRecapStoryboard;
@@ -14,7 +102,7 @@ export interface DossierInput {
   ledger?: LedgerExperiment[];
 }
 
-export function buildDossier(input: DossierInput): Record<string, unknown> | null {
+export function buildDossier(input: DossierInput): MatchDossier | null {
   const { data, tick, audit } = input;
   if (!data) return null;
   const metadata = tick?.match_metadata;
@@ -133,14 +221,14 @@ export function buildDossier(input: DossierInput): Record<string, unknown> | nul
 
 /** The Markdown rendering of the dossier. */
 export function dossierToMarkdown(
-  dossier: Record<string, unknown>,
+  dossier: MatchDossier,
   lang: "en" | "es" | "ar" | "hi" = "en",
 ): string {
-  const storyboard = dossier.storyboard as Record<string, unknown>;
+  const storyboard = dossier.storyboard;
   const stageB = dossier.stage_b as Record<string, unknown>;
-  const foundry = dossier.foundry_execution as Record<string, unknown>;
-  const compliance = dossier.compliance as Record<string, unknown>;
-  const match = dossier.match_summary as Record<string, unknown>;
+  const foundry = dossier.foundry_execution;
+  const compliance = dossier.compliance;
+  const match = dossier.match_summary;
   const lab = dossier.counterfactual_lab as {
     experiment_count: number;
     player_drags: number;

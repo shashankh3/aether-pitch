@@ -29,6 +29,18 @@ import {
 import { clamp, lerpAngle } from "@/lib/utils";
 import type { Team } from "@/lib/types";
 
+/**
+ * The ground plane used to project a pointer drag onto the grass, and a
+ * scratch vector for the hit point.
+ *
+ * Both are shared: the plane is immutable, and the scratch vector is written
+ * and read inside a single synchronous handler, so only one avatar can be
+ * dragging at a time. Hoisting them keeps 22 avatars from each allocating
+ * their own copy.
+ */
+const GROUND_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const DRAG_SCRATCH = new THREE.Vector3();
+
 /* ------------------------------------------- shared singleton geometry pool */
 export const TORSO_GEO = new THREE.CylinderGeometry(0.25, 0.20, 0.60, 12);
 export const SHOULDER_GEO = new THREE.CapsuleGeometry(0.11, 0.34, 8, 12);
@@ -96,8 +108,6 @@ interface Props {
 function PlayerAvatar3D({ id, locked, showPill, alphaOnly, onLock }: Props) {
   const root = useRef<THREE.Group>(null);
   const dragRef = useRef(false);
-  const groundPlaneRef = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
-  const dragPointRef = useRef(new THREE.Vector3());
   const body = useRef<THREE.Group>(null);
   const torsoGroup = useRef<THREE.Group>(null);
   const headGroup = useRef<THREE.Group>(null);
@@ -326,8 +336,8 @@ function PlayerAvatar3D({ id, locked, showPill, alphaOnly, onLock }: Props) {
       onPointerMove={(e) => {
         if (!sandbox.dragging || sandbox.playerId !== id) return;
         e.stopPropagation();
-        const point = dragPointRef.current;
-        if (!e.ray.intersectPlane(groundPlaneRef.current, point)) return;
+        const point = DRAG_SCRATCH;
+        if (!e.ray.intersectPlane(GROUND_PLANE, point)) return;
         moveSandboxPlayer(
           Math.max(1, Math.min(104, point.x + 52.5)),
           Math.max(1, Math.min(67, point.z + 34)),

@@ -42,6 +42,9 @@ import {
   logExperiment,
 } from "../src/lib/ledgerStore";
 import { buildDossier, dossierToMarkdown } from "../src/lib/dossier";
+import type {
+  MatchRecapStoryboard, MatchTick, PlayerTick, RecapAct,
+} from "../src/lib/types";
 
 let failures = 0;
 let checks = 0;
@@ -59,8 +62,8 @@ function check(name: string, cond: boolean, detail = "") {
 // A live synthetic frame
 // ---------------------------------------------------------------------------
 const engine = new EdgeEngine(19);
-let tick: any = null;
-for (let i = 0; i < 300; i += 1) tick = engine.step(0.1).tick;
+let tick = engine.step(0.1).tick as MatchTick;
+for (let i = 1; i < 300; i += 1) tick = engine.step(0.1).tick as MatchTick;
 
 // --- Stage B twins ----------------------------------------------------------
 const split = computePitchControlSplit(tick);
@@ -83,7 +86,7 @@ check(
   `${edges.length} edges`,
 );
 
-const rb = tick.players.find((p: any) => p.id === "NLA_2");
+const rb = tick.players.find((p) => p.id === "NLA_2")!;
 const liveBaseline = computePitchControlSplit(tick);
 const zeroMove = evaluateSimulatedPitchControl(tick, "NLA_2", rb.x, rb.y);
 const after = evaluateSimulatedPitchControl(tick, "NLA_2", rb.x - 15, rb.y);
@@ -103,10 +106,10 @@ check(
 
 // --- the vectorised browser twin must equal the scalar reference -----------
 function scalarSplit(
-  t: any,
+  t: MatchTick,
   override?: { playerId: string; x: number; y: number },
 ) {
-  const players = t.players.filter((p: any) => p.role !== "GK");
+  const players = t.players.filter((p) => p.role !== "GK");
   if (!players.length) return { nla_territory_pct: 50, mcs_territory_pct: 50, neutral_pct: 0 };
   let nla = 0;
   let mcs = 0;
@@ -118,7 +121,7 @@ function scalarSplit(
       let ni = 0;
       let mi = 0;
       for (const p of players) {
-        const moved = override && p.id === override.playerId;
+        const moved = override !== undefined && p.id === override.playerId;
         const px = (moved ? override.x : p.x) + p.vx * 0.45;
         const py = (moved ? override.y : p.y) + p.vy * 0.45;
         const d2 = (cx - px) ** 2 + (cy - py) ** 2;
@@ -143,7 +146,7 @@ function scalarSplit(
 let parityOk = true;
 for (let i = 0; i < 40 && parityOk; i += 1) {
   const frame = engine.step(0.1);
-  const live = frame.tick;
+  const live = frame.tick as MatchTick;
   if (JSON.stringify(scalarSplit(live)) !== JSON.stringify(computePitchControlSplit(live))) {
     parityOk = false;
   }
@@ -206,8 +209,8 @@ check(
 // Publish the shift the way the scrubber does, then check the 3D relocation.
 setLineShift(line);
 const shiftedPlayers = lineShiftedPlayers(tick.players);
-const movedBackline = shiftedPlayers.find((p: any) => p.id === line.backline_player_ids[0])!;
-const liveBackline = tick.players.find((p: any) => p.id === line.backline_player_ids[0])!;
+const movedBackline = shiftedPlayers.find((p) => p.id === line.backline_player_ids[0])!;
+const liveBackline = tick.players.find((p) => p.id === line.backline_player_ids[0])!;
 check(
   "the shifted backline is actually relocated for the 3D overlays",
   Math.abs(movedBackline.x - liveBackline.x - line.delta_m) < 0.001,
@@ -345,7 +348,7 @@ check(
 );
 
 // --- dossier serialization --------------------------------------------------
-const storyboard: any = {
+const storyboard: MatchRecapStoryboard = {
   title: "The Championship Finale",
   subtitle: "Three acts",
   timecode: "78:00",
@@ -389,7 +392,7 @@ const storyboard: any = {
     },
   ],
 };
-const dossier: any = buildDossier({ data: storyboard, tick, audit: null });
+const dossier = buildDossier({ data: storyboard, tick, audit: null })!;
 check(
   "the dossier carries the counterfactual lab",
   dossier != null

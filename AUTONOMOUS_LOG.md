@@ -42,3 +42,7 @@ Base commit: `d28ccdf`
 ### 2026-10-21T21:46:05Z — Track A — fix the Foundry retry policy
 - Files: backend/stage_c_foundry_agents.py, backend/test_pipeline.py
 - Verification: 135 backend assertions; ARM valid; tsc clean; build ok; SSR smoke ok; 22 logic checks ok
+
+### 2026-10-21T21:52:26Z — Track C/D — type the logic suite, type the dossier, hoist the drag allocations
+- Files: frontend/scripts/logic-check.ts, frontend/src/lib/dossier.ts, frontend/src/components/three/PlayerAvatar3D.tsx
+- Verification: 135 backend assertions; ARM valid; tsc clean; build ok; SSR smoke ok; 22 logic checks ok
