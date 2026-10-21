@@ -22,3 +22,7 @@ Base commit: `d28ccdf`
 ### 2026-10-21T20:48:45Z — Track A — hub broadcast no longer blocks the 10 Hz engine
 - Files: backend/main.py, backend/test_pipeline.py
 - Verification: 116 backend assertions; tsc clean; build ok; SSR smoke ok; 21 logic checks ok
+
+### 2026-10-21T20:55:59Z — Track A — publish the live (state, metrics) pair atomically
+- Files: backend/main.py, backend/test_pipeline.py
+- Verification: 118 backend assertions; tsc clean; build ok; SSR smoke ok; 21 logic checks ok

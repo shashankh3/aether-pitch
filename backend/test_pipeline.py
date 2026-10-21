@@ -523,8 +523,7 @@ def main() -> int:
     check("Stage d: recap packet", len(recap["items"]) == 3)
 
     # ---- runtime audit + all God Mode scenarios -------------------------
-    app_main.last_state = copy.deepcopy(st)
-    app_main.last_metrics = copy.deepcopy(bs)
+    app_main.LIVE = (copy.deepcopy(st), copy.deepcopy(bs))
     app_main.math = math
     app_main.last_ghost = (
         st["t_match"] + 4.0, [ghost["x"], ghost["y"]], ghost["delta_xt"],
@@ -1121,6 +1120,19 @@ def main() -> int:
               })).get("mode") == "shield"
           and len(arbiter_calls) == 1,
           "no extra model call")
+
+    # ---- the live (state, metrics) pair is published atomically ---------
+    check("Live snapshot: state and metrics are published as one pair",
+          isinstance(app_main.LIVE, tuple) and len(app_main.LIVE) == 2
+          and app_main.LIVE[0].get("clock") == st.get("clock")
+          and app_main.LIVE[1].get("chaos_index") == bs.get("chaos_index"),
+          f"clock={app_main.LIVE[0].get('clock')} "
+          f"chaos={app_main.LIVE[1].get('chaos_index')}")
+    state_endpoint = asyncio.get_event_loop().run_until_complete(app_main.state())
+    check("Live snapshot: /api/state returns a matched pair",
+          state_endpoint["state"].get("clock") is not None
+          and state_endpoint["metrics"].get("chaos_index") is not None,
+          "state and metrics served from the same publish")
 
     # ---- hub resilience: a slow peer must not stall the 10 Hz engine ----
     class SlowSocket:

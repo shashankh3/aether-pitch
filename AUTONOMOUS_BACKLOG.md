@@ -1,5 +1,5 @@
 # Autonomous Improvement Backlog
-Last Updated: 2026-10-21T20:48:43Z
+Last Updated: 2026-10-21T20:55:58Z
 Was Updated: 2026-10-22T00:00:00Z
 
 Scope: AETHER PITCH (Premier League × Azure "Inside the Game" hackathon).
@@ -10,7 +10,6 @@ Verification gate (all must pass before a commit):
 
 ## Pending Tasks
 - [ ] [Track A] `StadiumEnvironment3D` builds instanced crowd/star geometry in `useMemo` without disposal — add the same unmount cleanup
-- [ ] [Track A] `backend/main.py` `match_loop` mutates module globals (`last_state`, `last_metrics`, `last_ghost`) without a lock while REST handlers read them concurrently — a torn read can pair a state from tick N with metrics from tick N+1
 - [ ] [Track A] `useResilientMatchEngine` drill timers are not cleared when a second drill is requested mid-outage, allowing two overlapping drills to fight over `failoverDrillState`
 - [ ] [Track A] `Stage C` `_chat()` retry loop re-sends the same request on 429/5xx without honouring `Retry-After`, and a 4xx is retried once unnecessarily
 - [ ] [Track B] Add Python tests for `FoundryRouter._parse_agent_json` (malformed / fenced / non-dict payloads) and for the `content_safety` error branch
@@ -34,6 +33,9 @@ Verification gate (all must pass before a commit):
 - None
 
 ## Completed
+- [x] [Track A] `backend/main.py` `match_loop` mutates module globals (`last_state`, `last_metrics`, `last_ghost`) without a lock while REST handlers read them concurrently — a torn read can pair a state from tick N with metrics from tick N+1
+  - files: backend/main.py, backend/test_pipeline.py
+  - note: Replaced last_state/last_metrics with an atomically published LIVE (state, metrics) pair — a REST reader can no longer pair a clock from tick N with metrics from tick N-1
 - [x] [Track A] `hub.broadcast()` in `backend/main.py` swallows per-client send failures one client at a time but never removes a dead socket from `hub.clients` — add dead-peer pruning so a dropped judge browser cannot leak a slot
   - files: backend/main.py
   - note: Replaced the awaited sequential send with per-client bounded queues + writer tasks: broadcast now returns in 0.0ms instead of 5000ms; slow peers drop frames and are pruned

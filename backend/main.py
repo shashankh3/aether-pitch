@@ -207,8 +207,9 @@ class Hub:
 
 
 hub = Hub()
-last_state: dict = {}
-last_metrics: dict = {}
+#: The live (state, metrics) pair, published together so a reader can
+#: never pair a state from tick N with metrics from tick N-1.
+LIVE: Tuple[dict, dict] = ({}, {})
 last_ghost: Optional[tuple] = None    # expire, target xy, ghost ΔxT, actual ΔxT, target id, completion %, net gain
 latest_ghost_counterfactual: Optional[dict] = None
 insights: deque = deque(maxlen=40)
@@ -346,11 +347,11 @@ async def build_match_recap() -> dict:
         entry = _pick_act(entries, used, preferred)
         if entry:
             used.add(id(entry))
-        state = copy.deepcopy(entry["state"]) if entry else copy.deepcopy(last_state)
+        state = copy.deepcopy(entry["state"]) if entry else copy.deepcopy(LIVE[0])
         if not state:
             state = engine.state()
         used_ev = (entry or {}).get("ev", {})
-        metrics = (entry or {}).get("metrics", {}) or last_metrics or {}
+        metrics = (entry or {}).get("metrics", {}) or LIVE[1] or {}
         pair = _fallback_pass(state)
         ev_start = used_ev.get("start")
         ev_end = used_ev.get("end")
@@ -442,12 +443,12 @@ async def build_match_recap() -> dict:
     storyboard = await foundry.recap_storyboard({
         "acts": acts,
         "milestones": milestones,
-        "clock": last_state.get("clock", "—"),
-        "score": last_state.get("score", {"NLA": 1, "MCS": 1}),
+        "clock": LIVE[0].get("clock", "—"),
+        "score": LIVE[0].get("score", {"NLA": 1, "MCS": 1}),
         "personalization": active_personalization,
     })
-    storyboard["score"] = last_state.get("score", {"NLA": 1, "MCS": 1})
-    storyboard["timecode"] = last_state.get("clock", "—")
+    storyboard["score"] = LIVE[0].get("score", {"NLA": 1, "MCS": 1})
+    storyboard["timecode"] = LIVE[0].get("clock", "—")
     return storyboard
 
 
@@ -530,7 +531,7 @@ async def make_insight(ev: dict, metrics: dict, state: dict) -> None:
 
 async def make_recap(state: dict) -> dict:
     ctx = {"top_inflections": top_inflections, "clock": state["clock"],
-           "score": state["score"], "metrics": last_metrics}
+           "score": state["score"], "metrics": LIVE[1]}
     recap = await foundry.recap(ctx)
     packet = personalizer.build_recap_packet(recap, state["score"], state["clock"])
     packet["id"] = f"recap_{int(time.time())}"
@@ -569,7 +570,7 @@ def _record_inflection(ev: dict) -> None:
 
 async def match_loop() -> None:
     """The heartbeat: 10Hz Stage (a) ticks; 2Hz metrics/pipeline packets."""
-    global last_state, last_metrics, last_insight_real_ts, last_insight_priority, last_ghost
+    global LIVE, last_insight_real_ts, last_insight_priority, last_ghost
     global latest_ghost_counterfactual
     next_real_metrics = time.perf_counter()
     math.scenario_active = None
@@ -582,7 +583,6 @@ async def match_loop() -> None:
         # ---- Stage (a): synthetic ingest --------------------------------
         t0 = time.perf_counter()
         state, raw_events = engine.tick(TICK_DT)
-        last_state = state
         _stamp_pipeline("a", (time.perf_counter() - t0) * 1000.0,
                         {"clock": state["clock"], "possession": state["possession"],
                          "events": len(raw_events), "players": len(state["players"])})
@@ -591,7 +591,7 @@ async def match_loop() -> None:
         t0 = time.perf_counter()
         metrics = math.update(state, raw_events, state["t_match"],
                               state.get("scenario"), TICK_DT)
-        last_metrics = metrics
+        LIVE = (state, metrics)
         enriched = []
         for ev in raw_events:
             event_seq += 1
@@ -712,7 +712,7 @@ async def startup() -> None:
 # --------------------------------------------------------------------- REST
 def _spatial_context(team: Optional[str] = None) -> dict:
     """Live 60s spatial state for the bi-directional studio co-pilot."""
-    st = last_state or {}
+    st = LIVE[0] or {}
     players = st.get("players", [])
     if not players:
         return {}
@@ -734,7 +734,7 @@ def _spatial_context(team: Optional[str] = None) -> dict:
     fastest = max(sprinters, key=lambda p: p["speed_kmh"], default=None)
     return {
         "team": team,
-        "chaos_index": last_metrics.get("chaos_index", 0.5) if last_metrics else 0.5,
+        "chaos_index": LIVE[1].get("chaos_index", 0.5) if LIVE[1] else 0.5,
         "backline_stretch_m": round(stretch, 1),
         "widest_gap_m": round(gap_m, 1),
         "gap_center": gap_center,
@@ -747,8 +747,8 @@ def _spatial_context(team: Optional[str] = None) -> dict:
                    "target_id": last_ghost[4], "completion_probability": last_ghost[5],
                    "net_xt_gain": last_ghost[6]}
                   if last_ghost and st.get("t_match", 0) < last_ghost[0] else None),
-        "def_lines": last_metrics.get("def_lines", {}) if last_metrics else {},
-        "ppda": last_metrics.get("ppda", {}) if last_metrics else {},
+        "def_lines": LIVE[1].get("def_lines", {}) if LIVE[1] else {},
+        "ppda": LIVE[1].get("ppda", {}) if LIVE[1] else {},
     }
 
 
@@ -770,10 +770,10 @@ async def _studio_query_handler(body: dict) -> dict:
         "persona": persona if isinstance(persona, str) else "analyst",
         "locked_player_id": locked_id or None,
         "spatial": _spatial_context(locked_team if locked_team in ("NLA", "MCS") else None),
-        "metrics": last_metrics,
+        "metrics": LIVE[1],
         "recent_events": [e for e in list(math.stream) if e[1] not in ("_tick",)][-8:],
         "top_inflections": top_inflections,
-        "match_metadata": (last_state or {}).get("match_metadata"),
+        "match_metadata": (LIVE[0] or {}).get("match_metadata"),
         "personalization": active_personalization,
     }
     result = await foundry.studio_query(ctx)
@@ -790,7 +790,7 @@ def _resolve_sandbox_player(
     The wire contract carries the shirt number; the engine speaks canonical
     ids such as ``NLA_2``. A canonical id is preferred when supplied.
     """
-    st = last_state or {}
+    st = LIVE[0] or {}
     players = st.get("players", [])
     if canonical:
         for p in players:
@@ -810,8 +810,8 @@ def _evaluate_counterfactual(req: CounterfactualRequest) -> dict:
     request cannot inflate the result. The client baseline is only used as a
     cross-check.
     """
-    st = last_state or {}
-    metrics = last_metrics or {}
+    st = LIVE[0] or {}
+    metrics = LIVE[1] or {}
     if not st:
         raise HTTPException(503, "Match engine not started yet")
     if not req.displacements and req.defensive_line_override is None:
@@ -1040,7 +1040,7 @@ async def counterfactual_query(payload: CounterfactualRequest) -> dict:
         "persona": "analyst",
         "locked_player_id": None,
         "spatial": _spatial_context(None),
-        "metrics": last_metrics,
+        "metrics": LIVE[1],
         "evaluation": evaluation,
     }
     result = await foundry.counterfactual_query(ctx)
@@ -1059,7 +1059,7 @@ async def counterfactual_query(payload: CounterfactualRequest) -> dict:
         "y": (evaluation["displacements"] or [{}])[0].get("displaced_coords", [0, 0])[1],
     }
     critic_metrics = {
-        **(last_metrics or {}),
+        **(LIVE[1] or {}),
         "pitch_control_split": evaluation["simulated_pitch_control"],
     }
     grounding = verify_grounding(
@@ -1077,14 +1077,14 @@ async def counterfactual_query(payload: CounterfactualRequest) -> dict:
         },
         critic_event,
         critic_metrics,
-        last_state if last_state else {},
+        LIVE[0] if LIVE[0] else {},
     )
     verified = grounding.get("status") != "review"
 
     trace = build_agent_trace(
         critic_event,
         critic_metrics,
-        last_state if last_state else {},
+        LIVE[0] if LIVE[0] else {},
         {
             "mode": result.get("mode", "fallback"),
             "stage_c_explainability": {
@@ -1095,7 +1095,7 @@ async def counterfactual_query(payload: CounterfactualRequest) -> dict:
             },
         },
         {
-            "stage_d_broadcast_overlay": {"timecode": (last_state or {}).get("clock", "-"),
+            "stage_d_broadcast_overlay": {"timecode": (LIVE[0] or {}).get("clock", "-"),
                                           "overlay_type": "COUNTERFACTUAL"},
             "camera_directive": {
                 "recommended_mode": "TACTICAL_DRONE",
@@ -1145,10 +1145,10 @@ async def _tactical_war_room_handler(body: dict) -> dict:
         "persona": "analyst",
         "locked_player_id": body.get("locked_player_id") or None,
         "spatial": _spatial_context(team),
-        "metrics": last_metrics,
+        "metrics": LIVE[1],
         "recent_events": [e for e in list(math.stream) if e[1] not in ("_tick",)][-8:],
         "top_inflections": top_inflections,
-        "match_metadata": (last_state or {}).get("match_metadata"),
+        "match_metadata": (LIVE[0] or {}).get("match_metadata"),
         "personalization": active_personalization,
         "counterfactual": counterfactual,
     }
@@ -1280,8 +1280,8 @@ async def pipeline_audit() -> dict:
         stage_e_ms=t_e / reps,
         gate_stats=gate_stats,
     )
-    live_metrics = last_metrics or mets
-    live_state = last_state or st
+    live_metrics = LIVE[1] or mets
+    live_state = LIVE[0] or st
     metadata = live_state.get("match_metadata") or {}
     match_summary = {
         "home": metadata.get("home", "NLA"),
@@ -1372,32 +1372,32 @@ async def health() -> dict:
         },
         "stage_c": foundry.status(),
         "clients": len(hub.clients),
-        "clock": last_state.get("clock"), "score": last_state.get("score"),
+        "clock": LIVE[0].get("clock"), "score": LIVE[0].get("score"),
         "match": {
-            "id": (last_state.get("match_metadata") or {}).get("match_id"),
-            "competition": (last_state.get("match_metadata") or {}).get("competition"),
-            "venue": (last_state.get("match_metadata") or {}).get("venue"),
+            "id": (LIVE[0].get("match_metadata") or {}).get("match_id"),
+            "competition": (LIVE[0].get("match_metadata") or {}).get("competition"),
+            "venue": (LIVE[0].get("match_metadata") or {}).get("venue"),
             "synthetic": True,
         },
-        "team_stats": (last_metrics or {}).get("team_stats", {}),
+        "team_stats": (LIVE[1] or {}).get("team_stats", {}),
     }
 
 
 @app.get("/api/state")
 async def state() -> dict:
-    return {"state": last_state, "metrics": last_metrics, "pipeline": pipeline}
+    return {"state": LIVE[0], "metrics": LIVE[1], "pipeline": pipeline}
 
 
 @app.get("/api/match-stats")
 async def match_stats() -> dict:
     """Machine-readable synthetic match metadata, team stats and player leaders."""
     return {
-        "match": (last_state or {}).get("match_metadata"),
-        "team_stats": (last_metrics or {}).get("team_stats", {}),
-        "player_stats": (last_metrics or {}).get("player_stats", {}),
-        "leaders": (last_metrics or {}).get("leaders", {}),
-        "clock": (last_state or {}).get("clock"),
-        "score": (last_state or {}).get("score"),
+        "match": (LIVE[0] or {}).get("match_metadata"),
+        "team_stats": (LIVE[1] or {}).get("team_stats", {}),
+        "player_stats": (LIVE[1] or {}).get("player_stats", {}),
+        "leaders": (LIVE[1] or {}).get("leaders", {}),
+        "clock": (LIVE[0] or {}).get("clock"),
+        "score": (LIVE[0] or {}).get("score"),
         "synthetic": True,
     }
 
@@ -1424,7 +1424,7 @@ async def set_personalization(body: dict) -> dict:
 
 @app.get("/api/match-recap")
 async def match_recap() -> dict:
-    if not last_state:
+    if not LIVE[0]:
         raise HTTPException(503, "Match engine not started yet")
     return await build_match_recap()
 
@@ -1436,9 +1436,9 @@ async def match_recap_post() -> dict:
 
 async def _handle_scenario(name: str) -> dict:
     if name == "halftime_recap":
-        if not last_state:
+        if not LIVE[0]:
             raise HTTPException(503, "Match engine not started yet")
-        packet = await make_recap(last_state)
+        packet = await make_recap(LIVE[0])
         return {"status": "ok", "scenario": name, "recap": packet}
     try:
         ack = engine.inject(name)
@@ -1465,7 +1465,7 @@ async def ws_endpoint(ws: WebSocket) -> None:
         hello = {
             "type": "hello",
             "data": {
-                "state": last_state, "metrics": last_metrics, "pipeline": pipeline,
+                "state": LIVE[0], "metrics": LIVE[1], "pipeline": pipeline,
                 "insights": list(insights)[-8:],
             },
         }
