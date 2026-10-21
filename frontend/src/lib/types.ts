@@ -665,6 +665,77 @@ export interface WarRoomAgentCall {
   total_tokens?: number | null;
 }
 
+/* ------------------------------------- v6.2 interactive counterfactual API */
+export interface CounterfactualDisplacement {
+  /** Shirt number of the displaced player. */
+  player_id: number;
+  /** Resolved engine id (e.g. "NLA_2"). Preferred by the server. */
+  canonical_player_id?: string | null;
+  team: Team;
+  role: string;
+  /** Absolute pitch metres (x, y). */
+  original_coords: [number, number];
+  /** Absolute pitch metres (x, y). */
+  displaced_coords: [number, number];
+  delta_distance_m: number;
+}
+
+export interface CounterfactualRequest {
+  match_id: string;
+  minute: number;
+  displacements: CounterfactualDisplacement[];
+  baseline_xt: number;
+  baseline_pitch_control: Record<string, number>;
+  current_chaos_index: number;
+}
+
+export interface CounterfactualEvaluation {
+  scenario_id: string;
+  projected_xt_shift: number;
+  pitch_control_shift_pct: Record<string, number>;
+  structural_vulnerability_index: number;
+  arbiter_verdict: string;
+  recommended_compensation_move: {
+    player_id: number;
+    target_xy: [number, number];
+    label?: string;
+  };
+  numeric_grounding_verified: boolean;
+  trace_id: string;
+  grounding?: {
+    status: string;
+    score: number;
+    checked_numbers: number;
+    unmatched_numbers: string[];
+    source: string;
+    note: string;
+  };
+  agent_call?: {
+    id: string;
+    agent: string;
+    role: string;
+    deployment: string;
+    tools: string[];
+    latency_ms: number;
+    total_tokens?: number | null;
+  } | null;
+  displacements?: {
+    player_id: number;
+    canonical_player_id: string;
+    player_name: string;
+    team: Team;
+    role: string;
+    original_coords: [number, number];
+    displaced_coords: [number, number];
+    delta_distance_m: number;
+    xt_before: number;
+    xt_after: number;
+    xt_shift: number;
+  }[];
+  mode?: string;
+  model?: string;
+}
+
 export interface WarRoomPrefill {
   query: string;
   counterfactual: {

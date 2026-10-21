@@ -57,6 +57,7 @@ Judges usually see a highlight reel. AETHER PITCH lets them **drive the broadcas
 | 26 | **Measured Render Telemetry** | `frontend/src/hooks/useRenderTelemetry.ts`, `frontend/src/components/hud/TopBar.tsx` | Live frame-rate and frame-time chip sampled from the real rAF loop |
 | 27 | **Top xT Zones** | `backend/stage_b_math_engine.py` (`top_xt_zones`) | The highest-Expected-Threat cells for both attacking directions — the agents' ground truth |
 | 28 | **Interactive What-If Sandbox** | `frontend/src/lib/sandboxStore.ts`, `frontend/src/components/three/CounterfactualDragLayer.tsx`, `frontend/src/components/hud/CounterfactualDeltaHUD.tsx`, `frontend/src/lib/edgeEngine.ts` (`calculateXTAtCoord`, `evaluateSimulatedPitchControl`) | Pause, grab an avatar and drag it: the live Stage B twin recomputes ΔxT and pitch control at 60 FPS with a ghost anchor, displacement tether and real-time delta badges — then hands the counterfactual to the war-room |
+| 29 | **Counterfactual Arbiter API** | `backend/main.py` (`CounterfactualDisplacement` / `CounterfactualRequest` / `CounterfactualEvaluation`, `POST /api/counterfactual-query`), `backend/stage_c_foundry_agents.py` (`counterfactual_query`, `COUNTERFACTUAL_ARBITER`) | Pydantic-validated what-if contract adjudicated by the `SpatialArbiterAgent` with a `structural_vulnerability_index`, a recommended compensation move, and numeric-critic verification. The server recomputes every number from live Stage B, so a manipulated client baseline cannot inflate the result |
 
 The live HUD stays deliberately calm: the 3D pitch, scorebug, and five primary actions are visible by default. One **Controls** button opens a **Control Center** containing the A–E PipelineRibbon, MatchIntelPanel, camera director, AI voices, fan personalization, co-pilot, CV view, payload inspector, and production tools. Judges can therefore inspect stage latency and match intelligence on demand without the broadcast view becoming a command centre.
 
@@ -493,7 +494,7 @@ The cut below is built so that **every scoring criterion is demonstrated on scre
 |------|-----------|-----|
 | **0:00–0:15**<br>*The Hook* | Open in Cinema Mode (`H`) — camera sweeping the procedural night stadium. Press `H` to reveal the HUD; point briefly at the live FPS chip and the scorebug. | "Live sports AI has a trust problem: black-box models invent stats. This is AETHER PITCH — a live 3D football broadcast studio where every metric is computed by deterministic math, graded by a numeric critic, and rendered in real time." |
 | **0:15–0:40**<br>*Stage A & B* | Press `1` (God-Mode: Chaos Counter). Open the **Replay** popover on the bottom dock and show the **Ghost Pass comparison strip** (Actual ΔxT → Ghost ΔxT → Net ΔxT + completion %). Point at the parabolic pass tube and the ghost lane on the pitch. | "Under the hood, a 10 Hz physics engine drives 22 articulated players with cubic metabolic bio-load twins. Stage B is pure NumPy: Expected Threat, Pass Difficulty, Pitch Control. The Ghost Pass engine scans all ten teammates in real time and proves this attack had a better lane — here it is, with the net Expected Threat gain and the completion probability." |
-| **0:40–0:55**<br>*The sandbox* | Open the **Replay** popover → click **What-If Sandbox**. Grab the NLA right-back (#2) and drag him ~15 m into the half-space. The tether, the anchor ring and the live Δ badges appear. | "Pause the live match and move a player yourself. This is not a replay — it is a live counterfactual. Our browser-native Stage B twin recomputes Expected Threat and pitch control against the relocated player at 60 frames per second: the channel he vacated is worth 3.2 points of territory, and the arbiter can now judge the structural consequence." |
+| **0:40–0:55**<br>*The sandbox* | Open the **Replay** popover → click **What-If Sandbox**. Grab the NLA right-back (#2) and drag him ~15 m into the half-space. The tether, the anchor ring and the live Δ badges appear. Then press **Submit to Arbiter**. | "Pause the live match and move a player yourself. This is not a replay — it is a live counterfactual. Our browser-native Stage B twin recomputes Expected Threat and pitch control against the relocated player at 60 frames per second: the channel he vacated is worth territory, and the spatial arbiter — with a numeric critic checking every number — issues a verdict and a compensation move." |
 | **0:55–1:20**<br>*Stage C: the war-room* | Open **Controls → Studio**; the war-room is already running from the sandbox hand-off. Let the three agent cards show their model deployment, latency, token count and tool bundle. Then click **Project Tactical Shift on 3D Pitch**. | "For reasoning we use Azure AI Foundry — not as a chatbot, but as a sequential three-agent adversarial war-room. The NLA manager queries Stage B spatial tools. The opposition scout counters using PPDA and press telemetry, reading the manager's turn. The spatial arbiter weighs both against the Expected Threat tensor — and can adjudicate the counterfactual we just built. The prescription projects straight onto the 3D pitch." |
 | **1:20–1:40**<br>*Co-pilot + RAI* | Switch to **Controls → Ask AI**; click a preset question and watch the camera physically pan to the spotlighted player. Then **Controls → Data** to show the Foundry Route card and the RAI scorecard. | "When fans ask a question in four languages, the co-pilot doesn't just reply — it issues scene directives that physically drive the broadcast camera. Every response passes a pre-flight prompt shield and a post-flight numeric critic that cross-checks every number against live Stage B state. Zero hallucinations reach the screen." |
 | **1:40–2:00**<br>*Failover + close* | In **Controls → Data**, click **Simulate 6s Cloud Outage**. The stream must not stutter; the ribbon badge flips to amber and then emerald. End on the rubric verifier. | "Finally, broadcast television cannot drop frames. Watch what happens when we sever the cloud connection for six seconds: the browser-native edge engine hot-swaps in, holding full 3D simulation and spatial math until the cloud reconciles. Click the autopilot in the top bar to see the whole tour yourself." |
@@ -691,6 +692,34 @@ curl -X POST http://127.0.0.1:8000/api/studio-query \
 # Foundry Eval & RAI scorecard
 curl http://127.0.0.1:8000/api/health/pipeline-audit
 ```
+
+**Phase 4 smoke test (interactive counterfactual arbiter):**
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/counterfactual-query \
+  -H "Content-Type: application/json" -d '{
+    "match_id": "SYN-PL-2026-1019-NLA-MCS",
+    "minute": 62.5,
+    "displacements": [{
+      "player_id": 2,
+      "canonical_player_id": "NLA_2",
+      "team": "NLA",
+      "role": "DEF",
+      "original_coords": [29.4, 55.1],
+      "displaced_coords": [14.4, 55.1],
+      "delta_distance_m": 15.0
+    }],
+    "baseline_xt": 0.0276,
+    "baseline_pitch_control": {"nla_territory_pct": 35.9, "mcs_territory_pct": 30.7},
+    "current_chaos_index": 0.52
+  }'
+```
+
+Expected: `scenario_id`, `projected_xt_shift`, `pitch_control_shift_pct`,
+`structural_vulnerability_index` in `[0, 1]`, an `arbiter_verdict` of at most
+three sentences, a `recommended_compensation_move`, `numeric_grounding_verified:
+true` and a `trace_id`. The shift is recomputed server-side from the live Stage
+B engine, so the `baseline_xt` you send only affects the cross-check.
 
 Expected: the war-room returns `agent_debate_transcript` with
 `manager_proposal`, `scout_counter`, `arbiter_verdict` plus

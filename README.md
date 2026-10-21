@@ -201,7 +201,39 @@ Prefer to be driven? **Controls → Autopilot** runs the full 80-second guided t
 - **Live Stage B recomputation:** the browser-native twin re-evaluates the *same* `xtValue` surface and the *same* 16×12 territory attribution used by the live pipeline, so the deltas are the pipeline's own numbers — not an approximation. Moving the NLA right-back 15 m inside shifts NLA territory −0.5 pts and hands MCS +3.2 pts, and the xT at that position drops 0.028 → 0.022.
 - **Broadcast-grade feedback:** a ghost anchor ring stays at the original telemetry position, a glowing tether measures the displacement, a pulsing target ring marks the drop point, and a glass HUD reports Δ Expected Threat, Δ Pitch Control and the opponent's territory in real time.
 - **60 FPS by construction:** the drag state lives in a mutable store (like the telemetry store) and the HUD subscribes to it directly, so neither the page nor the React tree re-renders during a drag — the avatar interpolates its position inside its own `useFrame`.
-- **Hand it to the agents:** **"Send to War-Room"** posts the relocation to `POST /api/tactical-war-room`, where the `SpatialArbiterAgent` receives it as a Stage B tool and adjudicates the structural consequence.
+- **Hand it to the agents:** **"Send to War-Room"** posts the relocation to `POST /api/tactical-war-room`, where the `SpatialArbiterAgent` receives it as a Stage B tool and adjudicates the structural consequence. **"Submit to Arbiter"** posts it to `POST /api/counterfactual-query` for a focused, numeric-critic-verified verdict with a `structural_vulnerability_index` and a recommended compensation move.
+
+#### `POST /api/counterfactual-query` — the arbiter contract
+
+Pydantic-validated request and response, defined in `backend/main.py`:
+
+```text
+CounterfactualRequest
+  match_id: str
+  minute: float
+  displacements: List[CounterfactualDisplacement]
+      player_id: int                 # shirt number
+      canonical_player_id: str?      # engine id, e.g. "NLA_2"
+      team: str · role: str
+      original_coords: (x, y)        # absolute pitch metres
+      displaced_coords: (x, y)
+      delta_distance_m: float
+  baseline_xt: float
+  baseline_pitch_control: {"nla_territory_pct": float, "mcs_territory_pct": float}
+  current_chaos_index: float
+
+CounterfactualEvaluation
+  scenario_id: str
+  projected_xt_shift: float
+  pitch_control_shift_pct: {"nla_territory_pct": float, "mcs_territory_pct": float}
+  structural_vulnerability_index: float      # [0.0, 1.0]
+  arbiter_verdict: str                       # max 3 sentences
+  recommended_compensation_move: {"player_id": int, "target_xy": [x, y]}
+  numeric_grounding_verified: bool
+  trace_id: str
+```
+
+**The server never trusts the client's arithmetic.** Every shift is recomputed from the live Stage B engine; the client baseline is only used as a cross-check, and an unresolvable player is rejected with a `404` rather than scored.
 
 ### Predictive Bio-Load Digital Twin
 - **Stage A** accumulates a rolling high-intensity metabolic load per player and publishes a `bio_load_profile` on every tick: `sprint_load_index` (0–100), `projected_stamina_10m`, `fatigue_pdr_penalty`, `high_intensity_seconds`, `stamina_now`, `relief_required`, and a role-specific `tactical_relief_directive` (e.g. *"Shift #7 to a compact mid-block; delegate the wide pressing trigger to the inverted fullback"*).
@@ -489,6 +521,7 @@ Base URL: `http://localhost:8000` · WebSocket: `ws://localhost:8000/ws`
 | `GET` / `POST` | `/api/scenario/{name}` | Inject `chaos_counter`, `high_press_turnover`, `tactical_inversion`, or `halftime_recap` |
 | `POST` | `/api/studio-query` | Ask the tactical co-pilot a question (returns `foundry_safety_shield` metadata) |
 | `POST` | `/api/tactical-war-room` | Run the 3-agent adversarial Bench War-Room (manager → scout → arbiter) |
+| `POST` | `/api/counterfactual-query` | Adjudicate an interactive what-if scenario with the `SpatialArbiterAgent` (numeric-critic verified) |
 
 ### Studio query example
 

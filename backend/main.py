@@ -19,15 +19,16 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import hashlib
 import json
 import time
 from collections import deque
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-
+from pydantic import BaseModel, Field
 from agent_trace import build_agent_trace, gate_snapshot, p95, verify_grounding
 from config import settings
 from content_safety import ContentSafetyClient, content_safety_status
@@ -51,6 +52,59 @@ engine = PitchForgeEngine(seed=settings.seed, start_minute=settings.match_start_
 math = TacticalMathEngine(window_s=settings.chaos_window_s)
 foundry = FoundryRouter(settings)
 personalizer = Personalizer(settings)
+
+
+# ---------------------------------------------------------------------------
+# v6.2 — Interactive Counterfactual "What-If" Spatial Sandbox contracts
+# ---------------------------------------------------------------------------
+
+class CounterfactualDisplacement(BaseModel):
+    """One player relocated by the interactive sandbox."""
+
+    player_id: int = Field(
+        description="Shirt number of the displaced player.",
+        ge=0, le=99,
+    )
+    canonical_player_id: Optional[str] = Field(
+        default=None,
+        description="Resolved engine id (e.g. 'NLA_2'). Preferred over player_id.",
+    )
+    team: str = Field(description="NLA or MCS.")
+    role: str = Field(description="GK | DEF | MID | FWD.")
+    original_coords: Tuple[float, float] = Field(
+        description="Where the player stood, in absolute pitch metres (x, y).")
+    displaced_coords: Tuple[float, float] = Field(
+        description="Where the judge dragged them to, in absolute pitch metres (x, y).")
+    delta_distance_m: float = Field(
+        description="Euclidean displacement in metres.", ge=0.0)
+
+
+class CounterfactualRequest(BaseModel):
+    """A full sandbox scenario submitted for arbitration."""
+
+    match_id: str = Field(description="Synthetic match id.")
+    minute: float = Field(description="Match minute of the scenario.")
+    displacements: List[CounterfactualDisplacement] = Field(
+        description="Every player relocated in this scenario.")
+    baseline_xt: float = Field(
+        description="Client-side xT at the original position.")
+    baseline_pitch_control: Dict[str, float] = Field(
+        description="Client-side baseline territory split.")
+    current_chaos_index: float = Field(
+        description="Chaos Index at the moment of the scenario.", ge=0.0, le=1.0)
+
+
+class CounterfactualEvaluation(BaseModel):
+    """The SpatialArbiterAgent's adjudicated verdict."""
+
+    scenario_id: str
+    projected_xt_shift: float
+    pitch_control_shift_pct: Dict[str, float]
+    structural_vulnerability_index: float = Field(ge=0.0, le=1.0)
+    arbiter_verdict: str
+    recommended_compensation_move: Dict[str, Any]
+    numeric_grounding_verified: bool
+    trace_id: str
 
 
 class Hub:
@@ -656,6 +710,266 @@ async def _studio_query_handler(body: dict) -> dict:
     }
     result = await foundry.studio_query(ctx)
     return result
+
+
+def _resolve_sandbox_player(
+    player_id: int,
+    canonical: Optional[str],
+    team: str,
+) -> Optional[dict]:
+    """Resolve a sandbox displacement to a live player.
+
+    The wire contract carries the shirt number; the engine speaks canonical
+    ids such as ``NLA_2``. A canonical id is preferred when supplied.
+    """
+    st = last_state or {}
+    players = st.get("players", [])
+    if canonical:
+        for p in players:
+            if p.get("id") == canonical:
+                return p
+    for p in players:
+        if p.get("team") == team and int(p.get("shirt_number", -1)) == int(player_id):
+            return p
+    return None
+
+
+def _evaluate_counterfactual(req: CounterfactualRequest) -> dict:
+    """Server-authoritative Stage B evaluation of a what-if scenario.
+
+    The client's baseline values are never trusted for the arithmetic: every
+    number is recomputed here from the live Stage B engine, so a manipulated
+    request cannot inflate the result. The client baseline is only used as a
+    cross-check.
+    """
+    st = last_state or {}
+    metrics = last_metrics or {}
+    if not st:
+        raise HTTPException(503, "Match engine not started yet")
+    if not req.displacements:
+        raise HTTPException(400, "at least one displacement is required")
+
+    resolved: List[dict] = []
+    overrides: List[dict] = []
+    for d in req.displacements:
+        player = _resolve_sandbox_player(d.player_id, d.canonical_player_id, d.team)
+        if player is None:
+            raise HTTPException(
+                404,
+                f"player {d.player_id} ({d.team}) not found in the live state",
+            )
+        ox, oy = float(d.original_coords[0]), float(d.original_coords[1])
+        nx, ny = float(d.displaced_coords[0]), float(d.displaced_coords[1])
+        team = player.get("team") or d.team
+        xt_before = float(math.xt_value(team, ox, oy))
+        xt_after = float(math.xt_value(team, nx, ny))
+        resolved.append({
+            "player_id": int(player.get("shirt_number", d.player_id)),
+            "canonical_player_id": player.get("id"),
+            "player_name": player.get("name"),
+            "team": team,
+            "role": player.get("role") or d.role,
+            "original_coords": [round(ox, 2), round(oy, 2)],
+            "displaced_coords": [round(nx, 2), round(ny, 2)],
+            "delta_distance_m": round(((nx - ox) ** 2 + (ny - oy) ** 2) ** 0.5, 2),
+            "xt_before": round(xt_before, 4),
+            "xt_after": round(xt_after, 4),
+            "xt_shift": round(xt_after - xt_before, 4),
+        })
+        overrides.append({"player_id": player.get("id"), "x": nx, "y": ny})
+
+    baseline_control = math.pitch_control_split(st)
+    simulated_control = math.pitch_control_split(st, overrides)
+    control_shift = {
+        "nla_territory_pct": round(
+            simulated_control["nla_territory_pct"] - baseline_control["nla_territory_pct"], 1),
+        "mcs_territory_pct": round(
+            simulated_control["mcs_territory_pct"] - baseline_control["mcs_territory_pct"], 1),
+    }
+    projected_xt_shift = round(sum(r["xt_shift"] for r in resolved), 4)
+
+    # -- structural vulnerability index [0, 1] ---------------------------
+    # A transparent composite: how much territory the relocating side gives
+    # up, how much xT it surrenders by vacating the space, and how stretched
+    # the structure becomes.
+    territory_loss = 0.0
+    xt_surrendered = 0.0
+    stretch = 0.0
+    for r in resolved:
+        key = "nla_territory_pct" if r["team"] == "NLA" else "mcs_territory_pct"
+        territory_loss += max(0.0, -float(control_shift.get(key, 0.0)))
+        xt_surrendered += max(0.0, -r["xt_shift"])
+        stretch += r["delta_distance_m"]
+    vulnerability = round(min(
+        1.0,
+        0.45 * min(1.0, territory_loss / 8.0)
+        + 0.35 * min(1.0, xt_surrendered / 0.06)
+        + 0.20 * min(1.0, stretch / 40.0),
+    ), 4)
+
+    compensation = _compensation_move(resolved, st)
+
+    scenario_id = "cf_" + hashlib.sha1(
+        (
+            f"{req.match_id}:{req.minute}:"
+            + ";".join(f"{r['canonical_player_id']}@{r['displaced_coords']}" for r in resolved)
+        ).encode("utf-8")
+    ).hexdigest()[:10]
+
+    return {
+        "scenario_id": scenario_id,
+        "match_id": req.match_id,
+        "minute": req.minute,
+        "displacements": resolved,
+        "displaced_team": resolved[0]["team"] if resolved else "NLA",
+        "projected_xt_shift": projected_xt_shift,
+        "pitch_control_shift_pct": control_shift,
+        "baseline_pitch_control": baseline_control,
+        "simulated_pitch_control": simulated_control,
+        "structural_vulnerability_index": vulnerability,
+        "recommended_compensation_move": compensation,
+        "current_chaos_index": round(float(metrics.get("chaos_index") or 0.0), 3),
+        "client_baseline_xt": round(float(req.baseline_xt), 4),
+        "client_baseline_pitch_control": req.baseline_pitch_control or {},
+        "baseline_matched": (
+            abs(float(req.baseline_xt) - projected_xt_shift) < 0.25
+            and abs(
+                float((req.baseline_pitch_control or {}).get("nla_territory_pct", 0.0))
+                - control_shift.get("nla_territory_pct", 0.0)
+            ) < 6.0
+        ),
+    }
+
+
+def _compensation_move(resolved: List[dict], state: dict) -> dict:
+    """Propose who should cover the vacated channel, and where."""
+    if not resolved:
+        return {"player_id": 0, "target_xy": [0.0, 0.0]}
+    primary = resolved[0]
+    vacated = primary["original_coords"]
+    team = primary["team"]
+    team_players = [
+        p for p in state.get("players", [])
+        if p.get("team") == team and p.get("role") != "GK"
+        and p.get("id") != primary["canonical_player_id"]
+    ]
+    if not team_players:
+        return {
+            "player_id": primary["player_id"],
+            "target_xy": [float(vacated[0]), float(vacated[1])],
+        }
+    coverer = min(
+        team_players,
+        key=lambda p: ((float(p.get("x", 0.0)) - float(vacated[0])) ** 2
+                       + (float(p.get("y", 0.0)) - float(vacated[1])) ** 2) ** 0.5,
+    )
+    return {
+        "player_id": int(coverer.get("shirt_number", 0)),
+        "target_xy": [float(vacated[0]), float(vacated[1])],
+        "label": "COVER VACATED CHANNEL",
+    }
+
+
+@app.post("/api/counterfactual-query")
+async def counterfactual_query(payload: CounterfactualRequest) -> dict:
+    """Adjudicate an interactive what-if scenario with the SpatialArbiterAgent."""
+    evaluation = _evaluate_counterfactual(payload)
+    ctx = {
+        "query": (
+            f"Adjudicate the counterfactual scenario {evaluation['scenario_id']} "
+            f"for {payload.match_id} at minute {payload.minute:.1f}."
+        ),
+        "language": "en",
+        "persona": "analyst",
+        "locked_player_id": None,
+        "spatial": _spatial_context(None),
+        "metrics": last_metrics,
+        "evaluation": evaluation,
+    }
+    result = await foundry.counterfactual_query(ctx)
+
+    # -- numeric critic: cross-check the arbiter's numbers against Stage B --
+    critic_event = {
+        "id": evaluation["scenario_id"],
+        "type": "COUNTERFACTUAL",
+        "player_id": (evaluation["displacements"] or [{}])[0].get("canonical_player_id"),
+        "delta_xt": evaluation["projected_xt_shift"],
+        "delta_distance_m": sum(
+            d["delta_distance_m"] for d in evaluation["displacements"]
+        ),
+        "vulnerability": evaluation["structural_vulnerability_index"],
+        "x": (evaluation["displacements"] or [{}])[0].get("displaced_coords", [0, 0])[0],
+        "y": (evaluation["displacements"] or [{}])[0].get("displaced_coords", [0, 0])[1],
+    }
+    critic_metrics = {
+        **(last_metrics or {}),
+        "pitch_control_split": evaluation["simulated_pitch_control"],
+    }
+    grounding = verify_grounding(
+        {
+            "mode": result.get("mode", "fallback"),
+            "stage_c_explainability": {
+                "arbiter_verdict": result.get("arbiter_verdict", ""),
+                "projected_xt_shift": str(evaluation["projected_xt_shift"]),
+                "vulnerability": str(evaluation["structural_vulnerability_index"]),
+                "nla_territory_shift": str(
+                    evaluation["pitch_control_shift_pct"].get("nla_territory_pct", 0.0)),
+                "mcs_territory_shift": str(
+                    evaluation["pitch_control_shift_pct"].get("mcs_territory_pct", 0.0)),
+            },
+        },
+        critic_event,
+        critic_metrics,
+        last_state if last_state else {},
+    )
+    verified = grounding.get("status") != "review"
+
+    trace = build_agent_trace(
+        critic_event,
+        critic_metrics,
+        last_state if last_state else {},
+        {
+            "mode": result.get("mode", "fallback"),
+            "stage_c_explainability": {
+                "moment_headline": "Interactive counterfactual adjudicated",
+                "why_it_matters_causal": result.get("arbiter_verdict", ""),
+                "tactical_catalyst": "RELOCATION",
+                "commentator_talking_point": "A judge moved a player; the maths moved with them.",
+            },
+        },
+        {
+            "stage_d_broadcast_overlay": {"timecode": (last_state or {}).get("clock", "-"),
+                                          "overlay_type": "COUNTERFACTUAL"},
+            "camera_directive": {
+                "recommended_mode": "TACTICAL_DRONE",
+                "focus_target_id": critic_event.get("player_id"),
+                "cinematic_slow_mo": False,
+                "ar_highlight_zone": "COUNTERFACTUAL",
+            },
+            "stage_e_personalization": {
+                "translations": {"en": result.get("arbiter_verdict", "")}
+            },
+        },
+        gate_stats=gate_stats,
+    )
+
+    evaluation_out = CounterfactualEvaluation(
+        scenario_id=evaluation["scenario_id"],
+        projected_xt_shift=evaluation["projected_xt_shift"],
+        pitch_control_shift_pct=evaluation["pitch_control_shift_pct"],
+        structural_vulnerability_index=evaluation["structural_vulnerability_index"],
+        arbiter_verdict=result.get("arbiter_verdict", ""),
+        recommended_compensation_move=evaluation["recommended_compensation_move"],
+        numeric_grounding_verified=verified,
+        trace_id=trace["trace_id"],
+    )
+    payload_out = evaluation_out.model_dump()
+    payload_out["grounding"] = grounding
+    payload_out["agent_call"] = result.get("agent_call")
+    payload_out["displacements"] = evaluation["displacements"]
+    payload_out["mode"] = result.get("mode", "fallback")
+    payload_out["model"] = result.get("model")
+    return payload_out
 
 
 async def _tactical_war_room_handler(body: dict) -> dict:

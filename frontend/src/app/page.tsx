@@ -1252,6 +1252,7 @@ function StudioOrchestrator() {
       {!alphaMode && !cinemaMode && (
         <CounterfactualDeltaHUD
           tick={tick}
+          metrics={metrics}
           active={sandboxActive}
           onReset={resetSandbox}
           onClose={closeSandbox}

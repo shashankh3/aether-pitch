@@ -393,16 +393,29 @@ class TacticalMathEngine:
                 out[team] = round(PITCH_L - max(p["x"] for p in dfs), 1)
         return out
 
-    def pitch_control_split(self, state: dict) -> Dict[str, float]:
+    def pitch_control_split(
+        self,
+        state: dict,
+        overrides: Optional[List[dict]] = None,
+    ) -> Dict[str, float]:
         """Territory ownership across the 16x12 xT grid.
 
         Each grid cell is attributed to whichever team has the stronger
         proximity + velocity-weighted influence around it. The result is the
         share of pitch territory currently controlled by NLA vs MCS.
+
+        `overrides` relocates players before the attribution, which is how the
+        interactive what-if sandbox evaluates a counterfactual against exactly
+        the same surface the live pipeline uses.
         """
+        moved = {
+            o.get("player_id"): (float(o.get("x", 0.0)), float(o.get("y", 0.0)))
+            for o in (overrides or [])
+        }
         players = [p for p in state.get("players", []) if p.get("role") != "GK"]
         if not players:
-            return {"nla_territory_pct": 50.0, "mcs_territory_pct": 50.0}
+            return {"nla_territory_pct": 50.0, "mcs_territory_pct": 50.0,
+                    "neutral_pct": 0.0}
         nla_cells = 0
         mcs_cells = 0
         neutral_cells = 0
@@ -413,14 +426,18 @@ class TacticalMathEngine:
                 nla = 0.0
                 mcs = 0.0
                 for p in players:
-                    px = p["x"] + float(p.get("vx", 0.0)) * 0.45
-                    py = p["y"] + float(p.get("vy", 0.0)) * 0.45
+                    override = moved.get(p.get("id"))
+                    base_x = override[0] if override else float(p.get("x", 0.0))
+                    base_y = override[1] if override else float(p.get("y", 0.0))
+                    px = base_x + float(p.get("vx", 0.0)) * 0.45
+                    py = base_y + float(p.get("vy", 0.0)) * 0.45
                     d2 = (cx - px) ** 2 + (cy - py) ** 2
                     if d2 > 400.0:  # 20 m reach
                         continue
                     weight = math.exp(-d2 / 144.0) * (
-                        0.55 + min(0.75, float(p.get("speed_kmh", 0.0)) / 45.0))
-                    if p["team"] == "NLA":
+                        0.55 + min(0.75, float(p.get("speed_kmh", 0.0)) / 45.0)
+                    )
+                    if p.get("team") == "NLA":
                         nla += weight
                     else:
                         mcs += weight

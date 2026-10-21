@@ -10,7 +10,7 @@
 // the override directly inside their own `useFrame`.
 
 import { calculateXTAtCoord, computePitchControlSplit, evaluateSimulatedPitchControl } from "./edgeEngine";
-import type { MatchTick, Team } from "./types";
+import type { CounterfactualRequest, MatchTick, Team } from "./types";
 
 export interface SandboxDelta {
   playerId: string;
@@ -110,6 +110,42 @@ export function sandboxOverrideFor(
 ): { x: number; y: number } | null {
   if (!sandbox.active || sandbox.playerId !== playerId) return null;
   return { x: sandbox.x, y: sandbox.y };
+}
+
+/**
+ * Build the wire payload for `POST /api/counterfactual-query`.
+ *
+ * The client sends its own baseline for cross-checking, but the server
+ * recomputes every number from the live Stage B engine — the client can
+ * never inflate its own result.
+ */
+export function buildCounterfactualRequest(
+  tick: MatchTick | null,
+  delta: SandboxDelta | null,
+  chaosIndex: number,
+): CounterfactualRequest | null {
+  if (!tick || !delta || !sandbox.playerId) return null;
+  return {
+    match_id: tick.match_metadata?.match_id ?? "SYN-PL-2026-1019-NLA-MCS",
+    minute: Number((tick.t_match / 60).toFixed(2)),
+    displacements: [
+      {
+        player_id: delta.shirtNumber,
+        canonical_player_id: delta.playerId,
+        team: delta.team,
+        role: "DEF",
+        original_coords: [delta.originX, delta.originY],
+        displaced_coords: [delta.x, delta.y],
+        delta_distance_m: delta.displacementM,
+      },
+    ],
+    baseline_xt: delta.originalXT,
+    baseline_pitch_control: {
+      nla_territory_pct: delta.originalControlPct,
+      mcs_territory_pct: 100 - delta.originalControlPct,
+    },
+    current_chaos_index: Number(chaosIndex.toFixed(3)),
+  };
 }
 
 /**

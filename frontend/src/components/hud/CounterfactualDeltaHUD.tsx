@@ -2,22 +2,28 @@
 // AETHER PITCH — Interactive Spatial "What-If" Counterfactual Sandbox HUD.
 //
 // A broadcast-calibrated glass panel that floats above the pitch while a judge
-// relocates a player. It reports the live Stage B deltas and can hand the
-// counterfactual straight to the Stage C war-room.
+// relocates a player. It reports the live Stage B deltas, can hand the
+// counterfactual to the Stage C war-room, and can submit it to the
+// SpatialArbiterAgent via `POST /api/counterfactual-query`.
 //
 // The panel subscribes to the sandbox store and re-renders on its own, so the
 // page and the 3D scene never re-render during a 60 fps drag.
 
 import { useEffect, useState } from "react";
-import { Crosshair, GitCompareArrows, Send, Undo2, X, TrendingUp, TrendingDown } from "lucide-react";
 import {
-  evaluateSandbox, subscribeSandbox, type SandboxDelta,
+  Crosshair, GitCompareArrows, Send, Undo2, X, TrendingUp, TrendingDown, Gavel,
+  ShieldCheck, Loader2,
+} from "lucide-react";
+import {
+  buildCounterfactualRequest, evaluateSandbox, subscribeSandbox, type SandboxDelta,
 } from "@/lib/sandboxStore";
-import type { MatchTick } from "@/lib/types";
+import { API_BASE } from "@/lib/api";
+import type { CounterfactualEvaluation, MatchTick } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface Props {
   tick: MatchTick | null;
+  metrics: { chaos_index?: number } | null;
   active: boolean;
   onReset: () => void;
   onClose: () => void;
@@ -25,13 +31,18 @@ interface Props {
 }
 
 export default function CounterfactualDeltaHUD({
-  tick, active, onReset, onClose, onSubmit,
+  tick, metrics, active, onReset, onClose, onSubmit,
 }: Props) {
   const [delta, setDelta] = useState<SandboxDelta | null>(null);
+  const [evaluation, setEvaluation] = useState<CounterfactualEvaluation | null>(null);
+  const [adjudicating, setAdjudicating] = useState(false);
+  const [adjudicationError, setAdjudicationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!active) {
       setDelta(null);
+      setEvaluation(null);
+      setAdjudicationError(null);
       return;
     }
     const refresh = () => setDelta(evaluateSandbox(tick));
@@ -45,6 +56,32 @@ export default function CounterfactualDeltaHUD({
       clearInterval(timer);
     };
   }, [active, tick]);
+
+  const adjudicate = async () => {
+    const payload = buildCounterfactualRequest(tick, delta, metrics?.chaos_index ?? 0.5);
+    if (!payload) {
+      setAdjudicationError("Select a player before adjudicating.");
+      return;
+    }
+    setAdjudicating(true);
+    setAdjudicationError(null);
+    try {
+      const r = await fetch(`${API_BASE}/api/counterfactual-query`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = (await r.json()) as CounterfactualEvaluation;
+      setEvaluation(data);
+    } catch (err) {
+      setAdjudicationError(
+        `Arbiter unreachable (${err instanceof Error ? err.message : "network error"}).`
+      );
+    } finally {
+      setAdjudicating(false);
+    }
+  };
 
   if (!active) return null;
 
@@ -170,9 +207,18 @@ export default function CounterfactualDeltaHUD({
               <button
                 onClick={() => onSubmit(delta)}
                 className="clip-skew flex items-center gap-1 bg-cyan-300/20 px-2 py-1 font-tech text-[9.5px] font-bold uppercase tracking-wider text-cyan-300 transition hover:bg-cyan-300/35"
-                title="Hand this counterfactual to the Stage C war-room for adjudication"
+                title="Hand this counterfactual to the Stage C war-room for full debate"
               >
                 <Send size={11} /> Send to War-Room
+              </button>
+              <button
+                onClick={adjudicate}
+                disabled={adjudicating}
+                className="clip-skew flex items-center gap-1 bg-gold/20 px-2 py-1 font-tech text-[9.5px] font-bold uppercase tracking-wider text-gold transition hover:bg-gold/35 disabled:opacity-50"
+                title="Submit to POST /api/counterfactual-query for SpatialArbiterAgent adjudication"
+              >
+                {adjudicating ? <Loader2 size={11} className="animate-spin" /> : <Gavel size={11} />}
+                {adjudicating ? "Adjudicating" : "Submit to Arbiter"}
               </button>
               <button
                 onClick={onReset}
@@ -181,6 +227,47 @@ export default function CounterfactualDeltaHUD({
                 <Undo2 size={11} /> Revert
               </button>
             </div>
+
+            {adjudicationError && (
+              <p className="mt-1.5 font-tech text-[9px] uppercase tracking-wider text-crimson">
+                {adjudicationError}
+              </p>
+            )}
+
+            {evaluation && (
+              <div className="mt-2 border border-gold/35 bg-gold/[0.06] px-2 py-1.5">
+                <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                  <span className="flex items-center gap-1 font-tech text-[8.5px] font-bold uppercase tracking-wider text-gold">
+                    <Gavel size={10} /> SpatialArbiterAgent
+                  </span>
+                  <span
+                    className={cn(
+                      "clip-skew px-1 py-0.5 font-tech text-[7.5px] font-bold uppercase tracking-wider",
+                      evaluation.numeric_grounding_verified
+                        ? "bg-pitch/20 text-pitch"
+                        : "bg-crimson/20 text-crimson",
+                    )}
+                  >
+                    {evaluation.numeric_grounding_verified ? "Grounded" : "Review"}
+                  </span>
+                  <span className="font-tech text-[7.5px] uppercase tracking-wider text-slate-500">
+                    vuln {evaluation.structural_vulnerability_index.toFixed(2)}
+                    {" · "}xt {evaluation.projected_xt_shift >= 0 ? "+" : ""}
+                    {evaluation.projected_xt_shift.toFixed(3)}
+                    {" · "}trace {evaluation.trace_id.slice(-6)}
+                  </span>
+                </div>
+                <p className="text-[10.5px] leading-relaxed text-slate-200">
+                  {evaluation.arbiter_verdict}
+                </p>
+                <p className="mt-1 flex items-center gap-1 font-tech text-[8.5px] uppercase tracking-wider text-slate-500">
+                  <ShieldCheck size={9} className="text-pitch" />
+                  Compensation: #{evaluation.recommended_compensation_move.player_id} → (
+                  {evaluation.recommended_compensation_move.target_xy[0].toFixed(1)},{" "}
+                  {evaluation.recommended_compensation_move.target_xy[1].toFixed(1)})
+                </p>
+              </div>
+            )}
           </>
         )}
       </div>
