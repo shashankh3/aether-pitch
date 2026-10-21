@@ -85,6 +85,10 @@ export interface MatchTick {
     is_lofted: boolean;
     ghost_end?: [number, number] | null;
     ghost_delta_xt?: number | null;
+    ghost_actual_delta_xt?: number | null;
+    ghost_target_id?: string | null;
+    ghost_completion_probability?: number | null;
+    ghost_net_xt_gain?: number | null;
   };
   carrier: string | null;
   scenario: string | null;
@@ -148,6 +152,12 @@ export interface GhostPass {
   delta_xt: number;
   target_id: string;
   openness_m?: number;
+  distance_m?: number;
+  actual_delta_xt?: number | null;
+  ghost_delta_xt?: number | null;
+  net_xt_gain?: number | null;
+  completion_probability?: number | null;
+  receiver_target_xy?: Vec2 | null;
 }
 
 export interface CameraDirective {
@@ -239,6 +249,11 @@ export interface RecapGhostPass extends RecapPass {
   delta_xt: number;
   target_id: string | null;
   openness_m: number;
+  actual_delta_xt?: number | null;
+  ghost_delta_xt?: number | null;
+  net_xt_gain?: number | null;
+  completion_probability?: number | null;
+  receiver_target_xy?: Vec2 | null;
 }
 
 export interface MilestoneEvent {
@@ -321,6 +336,7 @@ export interface Insight {
     lower_third_title: string;
     lower_third_subtitle: string;
   };
+  agent_trace?: AgentTrace | null;
   stage_e_personalization: {
     analyst_mode: {
       metrics_summary: string;
@@ -341,10 +357,72 @@ export interface Insight {
   personalization?: PersonalizationState;
 }
 
+export type AgentTraceMode = "azure" | "fallback" | "edge";
+export type AgentTraceStatus = "completed" | "fallback" | "review";
+
+export interface AgentTraceSpan {
+  id: "sentinel" | "triage" | "analyst" | "director";
+  agent: string;
+  role: string;
+  status: AgentTraceStatus;
+  latency_ms: number;
+  summary: string;
+  detail: string;
+}
+
+export interface AgentTraceGrounding {
+  status: "verified" | "fallback_verified" | "review";
+  score: number;
+  checked_numbers: number;
+  unmatched_numbers: string[];
+  source: string;
+  note: string;
+}
+
+export interface AgentTraceCompute {
+  considered_events: number;
+  gated_events: number;
+  filtered_events: number;
+  filter_ratio: number;
+  ticks: number;
+  insights: number;
+  ticks_per_insight: number;
+}
+
+export interface AgentTrace {
+  trace_id: string;
+  event_id: string | null;
+  anchor_clock: string;
+  created_at: string;
+  mode: AgentTraceMode;
+  archetype: string;
+  model: string;
+  gate: {
+    should_explain: boolean;
+    reasons: string[];
+    pdr: number | null;
+    delta_xt: number | null;
+    delta_chaos: number | null;
+  };
+  handoff_chain: AgentTraceSpan[];
+  grounding: AgentTraceGrounding;
+  guardrail?: {
+    triggered: boolean;
+    action: string;
+    unmatched_numbers: string[];
+    attempted_mode: string;
+  } | null;
+  compute: AgentTraceCompute;
+  languages: string[];
+}
+
 export interface Pipeline {
   stages: Record<"a" | "b" | "c" | "d" | "e", { latency_ms: number }>;
   payloads: Record<"a" | "b" | "c" | "d" | "e", string>;
   updated_at: string | null;
+  agent_trace?: AgentTrace | null;
+  gate?: AgentTraceCompute;
+  latency_p95?: Record<"a" | "b" | "c" | "d" | "e", number>;
 }
 
 export interface Recap {
@@ -424,8 +502,34 @@ export interface StudioSceneDirective {
   highlight_pitch_zone: HighlightZone | null;
 }
 
+export interface GroundingCitation {
+  label: string;
+  value: string;
+  source: string;
+  detail?: string;
+}
+
+export interface StudioSuggestedAction {
+  id: string;
+  label: string;
+  type: "FOCUS_GAP" | "LOCK_PLAYER" | "SHOW_GHOST_PASS" | "GENERATE_RECAP" | string;
+  payload?: {
+    enabled?: boolean;
+    player_id?: string;
+    player_name?: string;
+    camera_mode?: CameraMode;
+    zone?: { x: number; y: number };
+    focus?: string;
+  };
+  reason?: string;
+}
+
 export interface StudioQueryResponse {
   query: string;
+  answer: string;
+  agent_specialist: string;
+  grounding_citations: GroundingCitation[];
+  suggested_actions: StudioSuggestedAction[];
   agent_reasoning_chain: string[];
   studio_answer_localized: string;
   commentator_cue_15s: string;
@@ -434,9 +538,49 @@ export interface StudioQueryResponse {
 }
 
 /* ------------------------------------------------ v4.0 rubric audit */
+export interface StageBSummary {
+  peak_chaos_index: number;
+  team_ppda: Record<string, unknown>;
+  top_delta_xt: {
+    clock: string;
+    player: string;
+    team: Team | null;
+    type: string | null;
+    delta_xt: number;
+    pdr: number | null;
+    ghost_delta_xt: number | null;
+  }[];
+  ghost_counterfactual: {
+    clock: string;
+    team: Team | null;
+    player_id: string | null;
+    player_name: string | null;
+    target_id: string | null;
+    actual_delta_xt: number;
+    ghost_delta_xt: number;
+    net_xt_gain: number;
+    completion_probability: number | null;
+    receiver_target_xy: Vec2 | null;
+  } | null;
+}
+
+export interface AuditMatchSummary {
+  home: string;
+  away: string;
+  competition: string;
+  venue: string;
+  clock: string | null;
+  score: { NLA: number; MCS: number } | null;
+  synthetic_provenance: boolean;
+  data_source: string;
+  provenance: string;
+}
+
 export interface PipelineAudit {
   status: string;
   synthetic_data_compliance: boolean;
+  match_summary?: AuditMatchSummary;
+  stage_b_summary?: StageBSummary;
   audit: {
     stage_a_ingest_ms: number;
     stage_b_interpret_ms: number;
@@ -445,6 +589,15 @@ export interface PipelineAudit {
     stage_e_personalize_ms: number;
   };
   live_pipeline: Record<string, number | null>;
+  latency_p95?: Record<string, number>;
+  agent_trace?: AgentTrace;
+  gate_efficiency?: AgentTraceCompute;
+  handoff_counts?: {
+    insights: number;
+    azure: number;
+    fallback: number;
+    grounding_pass: number;
+  };
   stage_modes?: Record<string, string>;
   stage_c_audit_mode?: string;
   azure?: {

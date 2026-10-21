@@ -6,6 +6,7 @@ Exits non-zero on any failed assertion. Runs fully offline (deterministic
 fallbacks), no Azure credentials required.
 """
 import asyncio
+import copy
 import sys
 
 # Windows consoles default to cp1252 and crash on Δ / — in check details.
@@ -13,11 +14,13 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
+from agent_trace import build_agent_trace, gate_snapshot, p95, verify_grounding
 from stage_a_synthetic_engine import PitchForgeEngine
 from stage_b_math_engine import TacticalMathEngine, XT_MAX, XT_MIN
 from stage_c_foundry_agents import FoundryRouter
 from stage_d_e_personalizer import Personalizer
 from config import settings
+import main as app_main
 
 
 def main() -> int:
@@ -100,8 +103,19 @@ def main() -> int:
     check("Stage b: xT grid 16x12 in range", g.shape == (12, 16)
           and abs(g.min() - XT_MIN) < 1e-6 and abs(g.max() - XT_MAX) < 1e-6)
     carrier = next((pl for pl in st["players"] if pl["role"] != "GK"), st["players"][0])
-    ghost = math.ghost_pass(st, carrier["team"], None, (carrier["x"], carrier["y"]))
-    check("Stage b: ghost pass scan", ghost is not None and "delta_xt" in ghost)
+    actual_ghost_xt = math.delta_xt(
+        carrier["team"], (carrier["x"], carrier["y"]),
+        (carrier["x"] + 8.0, carrier["y"] + 2.0))
+    ghost = math.ghost_pass(
+        st, carrier["team"], None, (carrier["x"], carrier["y"]),
+        actual_delta_xt=actual_ghost_xt)
+    check("Stage b: ghost counterfactual payload",
+          ghost is not None and all(k in ghost for k in
+          ("delta_xt", "actual_delta_xt", "ghost_delta_xt", "net_xt_gain",
+           "completion_probability", "receiver_target_xy"))
+          and ghost["actual_delta_xt"] == round(actual_ghost_xt, 3)
+          and ghost["net_xt_gain"] == round(ghost["delta_xt"] - actual_ghost_xt, 3)
+          and 18.0 <= ghost["completion_probability"] <= 97.0)
     bs = math.snapshot(st)
     ts = bs.get("team_stats", {})
     check("Stage b: team match stats", all(k in ts for k in ("NLA", "MCS")) and all(
@@ -160,6 +174,32 @@ def main() -> int:
           and len(sd["spotlight_player_ids"]) <= 3
           and all(k in sd["highlight_pitch_zone"] for k in ("x_min", "x_max", "y_min", "y_max", "label")))
 
+    studio_prompts = [
+        ("Spot the tactical weakness in NLA's defensive line", "Spatial Analyst"),
+        ("Analyze the ghost pass alternative", "Ghost-Pass Counterfactual"),
+        ("Explain why chaos is spiking", "Match Analyst"),
+        ("Build a three-act recap of the match", "Story Director"),
+    ]
+    for prompt, specialist in studio_prompts:
+        sq = asyncio.get_event_loop().run_until_complete(router.studio_query(
+            {"query": prompt, "language": "en", "persona": "analyst",
+             "locked_player_id": None, "spatial": spatial}))
+        check(f"Stage c: {specialist} tool response",
+              all(k in sq for k in
+                  ("answer", "agent_specialist", "grounding_citations",
+                   "suggested_actions", "scene_directive"))
+              and sq["agent_specialist"] == specialist
+              and sq["answer"] == sq["studio_answer_localized"]
+              and 2 <= len(sq["grounding_citations"]) <= 3
+              and 2 <= len(sq["suggested_actions"]) <= 3
+              and all(a.get("type") in
+                      ("FOCUS_GAP", "LOCK_PLAYER", "SHOW_GHOST_PASS", "GENERATE_RECAP")
+                      for a in sq["suggested_actions"]))
+    sq_es = asyncio.get_event_loop().run_until_complete(router.studio_query(
+        {"query": "Spot the tactical weakness in NLA's defensive line", "language": "es",
+         "persona": "analyst", "locked_player_id": None, "spatial": spatial}))
+    check("Stage c: localized answer fallback", sq_es["answer"] != q["answer"])
+
     # ---- Stage (d)+(e): render + personalize -----------------------------
     pers = Personalizer(settings)
     packet = pers.build(c_res, enriched, math.snapshot(st), st["score"])
@@ -173,11 +213,102 @@ def main() -> int:
               ("analyst_mode", "casual_fan_mode", "player_lock_insight", "translations"))
           and all(l in packet["stage_e_personalization"]["translations"] for l in ("en", "es", "ar", "hi")))
 
+    trace = build_agent_trace(
+        enriched, math.snapshot(st), st, c_wrapped, packet,
+        stage_b_ms=1.2, stage_d_ms=0.4, stage_e_ms=0.2,
+        gate_stats={"ticks": 900, "events_considered": 120, "events_gated": 8, "insights": 4},
+    )
+    check("Agent trace: 4-node handoff",
+          [s["id"] for s in trace["handoff_chain"]] == ["sentinel", "triage", "analyst", "director"])
+    check("Agent trace: fallback grounding",
+          trace["grounding"]["status"] == "fallback_verified"
+          and trace["grounding"]["score"] == 1.0)
+    check("Agent trace: gate economy",
+          trace["compute"]["filtered_events"] == 112
+          and trace["compute"]["filter_ratio"] == 0.933
+          and trace["compute"]["ticks_per_insight"] == 225.0)
+    check("Agent trace: deterministic id", trace["trace_id"].startswith("trace_")
+          and len(trace["trace_id"]) == 18)
+    check("Agent trace: p95 helper", p95([1, 2, 3, 4, 5]) == 5.0
+          and gate_snapshot({})["filter_ratio"] == 0.0)
+    unsafe = {
+        **c_res,
+        "mode": "azure",
+        "stage_c_explainability": {
+            **c_res["stage_c_explainability"],
+            "commentator_talking_point": "A fabricated 999.9 xT claim.",
+        },
+    }
+    unsafe_check = verify_grounding(unsafe, enriched, math.snapshot(st), st)
+    check("Agent trace: numeric guard flags unsupported claims",
+          unsafe_check["status"] == "review" and "999.9" in unsafe_check["unmatched_numbers"])
+
     recap = router._fallback_recap({"top_inflections": [
         {"clock": "63:11", "headline": "Shot — V. Sorensen", "detail": "PDR 96%"},
         {"clock": "63:44", "headline": "Pass — B. Kovac", "detail": "PDR 99%"},
         {"clock": "64:02", "headline": "Trap — MCS", "detail": "3 defenders < 6m"}]})
     check("Stage d: recap packet", len(recap["items"]) == 3)
+
+    # ---- runtime audit + all God Mode scenarios -------------------------
+    app_main.last_state = copy.deepcopy(st)
+    app_main.last_metrics = copy.deepcopy(bs)
+    app_main.math = math
+    app_main.last_ghost = (
+        st["t_match"] + 4.0, [ghost["x"], ghost["y"]], ghost["delta_xt"],
+        ghost["actual_delta_xt"], ghost["target_id"],
+        ghost["completion_probability"], ghost["net_xt_gain"],
+    )
+    app_main.latest_ghost_counterfactual = {
+        "clock": st["clock"], "team": carrier["team"],
+        "player_id": carrier["id"], "player_name": carrier["name"],
+        "target_id": ghost["target_id"],
+        "actual_delta_xt": ghost["actual_delta_xt"],
+        "ghost_delta_xt": ghost["ghost_delta_xt"],
+        "net_xt_gain": ghost["net_xt_gain"],
+        "completion_probability": ghost["completion_probability"],
+        "receiver_target_xy": ghost["receiver_target_xy"],
+    }
+    app_main.recap_archive.clear()
+    for i in range(3):
+        archive_event = {
+            **copy.deepcopy(enriched),
+            "id": f"test_ev_{i + 1}",
+            "clock": f"70:{i + 1:02d}",
+            "player_name": carrier["name"],
+            "delta_xt": round(ghost["delta_xt"] - i * 0.012, 3),
+        }
+        app_main.recap_archive.append({
+            "ev": archive_event,
+            "state": copy.deepcopy(st),
+            "metrics": copy.deepcopy(bs),
+            "clock": archive_event["clock"],
+            "t_match": st["t_match"],
+            "score": st["score"],
+        })
+    spatial_live = app_main._spatial_context("NLA")
+    check("Audit: spatial context includes xt_at_gap",
+          "xt_at_gap" in spatial_live
+          and all(k in (spatial_live.get("ghost") or {}) for k in
+                  ("actual_delta_xt", "ghost_delta_xt", "net_xt_gain",
+                   "completion_probability", "target_id")))
+    audit_packet = asyncio.get_event_loop().run_until_complete(app_main.pipeline_audit())
+    stage_b_audit = audit_packet.get("stage_b_summary") or {}
+    check("Audit: stage B dossier fields",
+          audit_packet.get("status") == "ok"
+          and audit_packet.get("synthetic_data_compliance") is True
+          and audit_packet.get("match_summary", {}).get("synthetic_provenance") is True
+          and "peak_chaos_index" in stage_b_audit
+          and "team_ppda" in stage_b_audit
+          and len(stage_b_audit.get("top_delta_xt", [])) > 0
+          and stage_b_audit.get("ghost_counterfactual", {}).get("net_xt_gain") is not None)
+    for scenario in ("chaos_counter", "high_press_turnover",
+                     "tactical_inversion", "halftime_recap"):
+        scenario_ack = asyncio.get_event_loop().run_until_complete(
+            app_main._handle_scenario(scenario))
+        check(f"God Mode: {scenario} executes",
+              scenario_ack.get("status") == "ok"
+              and scenario_ack.get("scenario") == scenario
+              and (scenario != "halftime_recap" or "recap" in scenario_ack))
 
     # ---- synthetic compliance -------------------------------------------
     check("Compliance: 100% synthetic squads",

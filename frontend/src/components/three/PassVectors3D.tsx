@@ -111,6 +111,7 @@ export default function PassVectors3D({ showGhost }: { showGhost: boolean }) {
 function GhostBadge() {
   const holder = useRef<THREE.Group>(null);
   const label = useRef<HTMLSpanElement>(null);
+  const detail = useRef<HTMLSpanElement>(null);
   const shown = useRef<object | null>(null);
   useFrame(() => {
     const g = telemetry.ghost;
@@ -118,9 +119,22 @@ function GhostBadge() {
     if (g && performance.now() - g.at < 4200) {
       holder.current.visible = true;
       holder.current.position.set(g.x - 52.5, 1.4, g.y - 34);
-      if (label.current && shown.current !== g) {
+      if (shown.current !== g) {
         shown.current = g;
-        label.current.textContent = `OPTIMAL GHOST PASS: +${g.delta_xt.toFixed(2)} xT`;
+        if (label.current) {
+          const target = g.target_id ? ` · ${g.target_id}` : "";
+          label.current.textContent = `GHOST ${g.delta_xt >= 0 ? "+" : ""}${g.delta_xt.toFixed(2)} xT${target}`;
+        }
+        if (detail.current) {
+          const actual = g.actual_delta_xt;
+          const net = g.net_xt_gain ?? (actual != null ? g.delta_xt - actual : null);
+          const completion = g.completion_probability != null
+            ? ` · ${g.completion_probability.toFixed(0)}% COMP`
+            : "";
+          detail.current.textContent = actual == null
+            ? "ACTUAL ΔxT PENDING"
+            : `ACTUAL ${actual >= 0 ? "+" : ""}${actual.toFixed(2)} xT · NET ${net != null && net >= 0 ? "+" : ""}${net?.toFixed(2) ?? "—"}${completion}`;
+        }
       }
     } else {
       holder.current.visible = false;
@@ -130,8 +144,13 @@ function GhostBadge() {
   return (
     <group ref={holder} visible={false}>
       <Html center distanceFactor={40} zIndexRange={[15, 0]}>
-        <div className="pointer-events-none whitespace-nowrap border border-tactical/60 bg-slate-950/85 px-2 py-0.5 font-tech text-[11px] font-bold tracking-wide text-tactical">
-          <span ref={label}>OPTIMAL GHOST PASS</span>
+        <div className="pointer-events-none whitespace-nowrap border border-tactical/60 bg-slate-950/85 px-2 py-0.5 font-tech tracking-wide">
+          <div className="text-[11px] font-bold text-tactical">
+            <span ref={label}>OPTIMAL GHOST PASS</span>
+          </div>
+          <div className="text-[9px] font-semibold text-slate-300">
+            <span ref={detail}>ACTUAL ΔxT PENDING</span>
+          </div>
         </div>
       </Html>
     </group>

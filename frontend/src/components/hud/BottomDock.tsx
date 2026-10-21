@@ -1,20 +1,19 @@
 "use client";
-// AETHER PITCH v6.0 — unified bottom dock, one bar for every live control:
-// [player chip → hologram popover] · [DVR + telestrator] · [God-Mode
-// scenarios] · [pipeline chip → payload popover]. The broadcast lower-third
-// floats above the dock exactly as before.
+// AETHER PITCH v6.1 — a five-button fan dock. The full DVR, telestrator and
+// God Mode decks are still here, but they open only when someone asks for
+// them. Everything is one tap away; nothing crowds the match by default.
 
 import { useEffect } from "react";
-import { Crosshair } from "lucide-react";
+import {
+  BarChart3, Crosshair, History, SlidersHorizontal, Sparkles, X,
+} from "lucide-react";
 import PlayerLock360 from "@/components/PlayerLock360";
 import TelestratorDVRBar from "@/components/TelestratorDVRBar";
 import PitchForgeDeck from "@/components/PitchForgeDeck";
-import { PipelineChip, PipelinePanel } from "@/components/PipelineInspector";
 import type {
-  EngineStatus, Insight, LangCode, MatchEvent, MatchTick, Pipeline,
-  TelestratorState,
+  Insight, LangCode, MatchEvent, MatchTick, TelestratorState,
 } from "@/lib/types";
-import { useHud } from "@/lib/hudContext";
+import { useHud, type DockTool } from "@/lib/hudContext";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -34,65 +33,48 @@ interface Props {
   events: MatchEvent[];
   lang: LangCode;
   insightLine: string | null;
-  pipeline: Pipeline | null;
-  connected: boolean;
-  status: EngineStatus;
   lowerThird: Insight | null;
 }
+
+const TOOLS: { id: Exclude<DockTool, null>; label: string; icon: typeof Crosshair }[] = [
+  { id: "player", label: "Players", icon: Crosshair },
+  { id: "replay", label: "Replay", icon: History },
+  { id: "moments", label: "Moments", icon: Sparkles },
+];
 
 export default function BottomDock(props: Props) {
   const {
     tick, busy, inject, isDvrPaused, dvrOffsetTicks, pausedClock, togglePause, scrub,
     telestrator, toggleTelestrator, autoSpotlight, lockedId, onLock, events, lang, insightLine,
-    pipeline, connected, status, lowerThird,
+    lowerThird,
   } = props;
-  const { playerPanelOpen, setPlayerPanelOpen, pipelinePanelOpen, setPipelinePanelOpen } = useHud();
+  const { dockTool, setDockTool, openControlCenter } = useHud();
 
   const player = tick?.players.find((p) => p.id === lockedId) ?? null;
+  const momentLive = !!tick?.scenario || !!busy;
 
-  // click-outside closes the dock popovers (Escape handled in HudProvider)
+  // Click-outside closes an open dock popover. Escape is handled centrally.
   useEffect(() => {
-    if (!playerPanelOpen && !pipelinePanelOpen) return;
+    if (!dockTool) return;
     const onPointerDown = (e: PointerEvent) => {
       const t = e.target as HTMLElement;
       if (t.closest("[data-dock-popover]") || t.closest("[data-dock-trigger]")) return;
-      setPlayerPanelOpen(false);
-      setPipelinePanelOpen(false);
+      setDockTool(null);
     };
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [playerPanelOpen, pipelinePanelOpen, setPlayerPanelOpen, setPipelinePanelOpen]);
+  }, [dockTool, setDockTool]);
+
+  const toggleTool = (id: Exclude<DockTool, null>) => {
+    setDockTool((current) => (current === id ? null : id));
+  };
 
   const lt = lowerThird?.stage_d_broadcast_overlay;
   const ltIsAlert =
     lt?.overlay_type === "CHAOS_OVERLOAD_ALERT" || lt?.overlay_type === "PRESSING_TRAP_ALERT";
 
   return (
-    <div className="pointer-events-auto relative">
-      {/* ---------- player hologram popover ---------- */}
-      {playerPanelOpen && (
-        <div data-dock-popover className="panel-enter absolute bottom-full left-0 z-[35] mb-2 hidden xl:block">
-          <PlayerLock360
-            tick={tick}
-            lockedId={lockedId}
-            onLock={onLock}
-            events={events}
-            lang={lang}
-            insightLine={insightLine}
-          />
-        </div>
-      )}
-
-      {/* ---------- pipeline payload popover ---------- */}
-      {pipelinePanelOpen && (
-        <div
-          data-dock-popover
-          className="panel-enter absolute bottom-full right-0 z-[35] mb-2 hidden w-[min(880px,calc(100vw-40px))] xl:block"
-        >
-          <PipelinePanel pipeline={pipeline} />
-        </div>
-      )}
-
+    <div className="pointer-events-auto relative w-full">
       {/* ---------- broadcast lower-third ---------- */}
       {lt && lowerThird && (
         <div
@@ -136,76 +118,163 @@ export default function BottomDock(props: Props) {
         </div>
       )}
 
-      {/* ---------- the dock bar ---------- */}
-      <div className="clip-ea glass flex items-center gap-1.5 p-1.5">
-        {/* player chip → hologram popover */}
+      {/* ---------- player hologram ---------- */}
+      {dockTool === "player" && (
+        <div
+          data-dock-popover
+          className="panel-enter absolute bottom-full left-0 z-[35] mb-2 w-[min(360px,calc(100vw-16px))] sm:left-1/2 sm:-translate-x-1/2"
+        >
+          <div className="clip-ea panel-lux mb-1 flex items-center justify-between px-2.5 py-1.5">
+            <span className="font-tech text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400">
+              PlayerLock 360
+            </span>
+            <button
+              onClick={() => setDockTool(null)}
+              className="text-slate-500 transition hover:text-white"
+              aria-label="Close player panel"
+            >
+              <X size={13} />
+            </button>
+          </div>
+          <PlayerLock360
+            tick={tick}
+            lockedId={lockedId}
+            onLock={onLock}
+            events={events}
+            lang={lang}
+            insightLine={insightLine}
+          />
+        </div>
+      )}
+
+      {/* ---------- replay + telestrator ---------- */}
+      {dockTool === "replay" && (
+        <div data-dock-popover className="panel-enter absolute bottom-full left-0 right-0 z-[35] mb-2">
+          <div className="clip-ea panel-lux p-2">
+            <div className="mb-2 flex items-center justify-between gap-2 px-0.5">
+              <div>
+                <div className="font-display text-[11px] font-bold uppercase tracking-[0.2em] text-slate-300">
+                  Replay & Telestrate
+                </div>
+                <div className="mt-0.5 font-tech text-[8.5px] uppercase tracking-[0.14em] text-slate-500">
+                  15-second buffer · freeze, scrub, draw
+                </div>
+              </div>
+              <button
+                onClick={() => setDockTool(null)}
+                className="shrink-0 text-slate-500 transition hover:text-white"
+                aria-label="Close replay controls"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <TelestratorDVRBar
+              isDvrPaused={isDvrPaused}
+              dvrOffsetTicks={dvrOffsetTicks}
+              pausedClock={pausedClock}
+              onTogglePause={togglePause}
+              onScrub={scrub}
+              telestrator={telestrator}
+              onToggleTelestrator={toggleTelestrator}
+              onToggleSpotlight={autoSpotlight}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ---------- God Mode moments ---------- */}
+      {dockTool === "moments" && (
+        <div data-dock-popover className="panel-enter absolute bottom-full left-0 right-0 z-[35] mb-2">
+          <div className="clip-ea panel-lux p-2">
+            <div className="mb-1 flex items-center justify-between gap-2 px-0.5">
+              <div>
+                <div className="font-display text-[11px] font-bold uppercase tracking-[0.2em] text-slate-300">
+                  God Mode moments
+                </div>
+                <div className="mt-0.5 font-tech text-[8.5px] uppercase tracking-[0.14em] text-slate-500">
+                  Optional match scenarios · AI recaps
+                </div>
+              </div>
+              <button
+                onClick={() => setDockTool(null)}
+                className="shrink-0 text-slate-500 transition hover:text-white"
+                aria-label="Close moments"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <PitchForgeDeck
+              variant="deck"
+              tick={tick}
+              busy={busy}
+              onInject={(name) => {
+                inject(name);
+                setDockTool(null);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ---------- the calm dock ---------- */}
+      <div className="clip-ea glass grid grid-cols-5 gap-1 p-1.5">
+        {TOOLS.map((tool) => {
+          const Icon = tool.icon;
+          const selected = dockTool === tool.id;
+          const hasPlayer = tool.id === "player" && !!player;
+          return (
+            <button
+              key={tool.id}
+              data-dock-trigger
+              onClick={() => toggleTool(tool.id)}
+              aria-expanded={selected}
+              className={cn(
+                "clip-skew relative flex min-h-[48px] flex-col items-center justify-center gap-0.5 border px-1 py-1.5 font-tech text-[9.5px] font-bold uppercase tracking-[0.08em] transition",
+                selected
+                  ? "border-tactical/45 bg-tactical/15 text-tactical"
+                  : "border-white/[0.07] bg-white/[0.025] text-slate-400 hover:border-white/15 hover:bg-white/[0.06] hover:text-white",
+              )}
+              title={
+                tool.id === "player"
+                  ? "PlayerLock 360 — roster, kit, speed, stamina and live voice"
+                  : tool.id === "replay"
+                    ? "Replay time-machine and telestrator"
+                    : "God Mode match scenarios and recap"
+              }
+            >
+              <Icon size={16} />
+              {tool.label}
+              {hasPlayer && (
+                <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center bg-crimson px-1 font-tech text-[8px] font-bold text-white">
+                  {player.shirt_number}
+                </span>
+              )}
+              {tool.id === "moments" && momentLive && (
+                <span className="absolute right-2 top-2 h-1.5 w-1.5 animate-breathe rounded-full bg-gold" />
+              )}
+            </button>
+          );
+        })}
+
         <button
           data-dock-trigger
-          onClick={() => setPlayerPanelOpen((o) => !o)}
-          aria-expanded={playerPanelOpen}
-          className={cn(
-            "hidden min-w-0 shrink-0 items-center gap-2 border px-2 py-1 text-left transition xl:flex",
-            playerPanelOpen
-              ? "border-tactical/50 bg-tactical/15"
-              : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]",
-          )}
-          title="PlayerLock 360 — roster, kit, speed dial, stamina, Live Voice"
+          onClick={() => openControlCenter("stats")}
+          className="clip-skew flex min-h-[48px] flex-col items-center justify-center gap-0.5 border border-white/[0.07] bg-white/[0.025] px-1 py-1.5 font-tech text-[9.5px] font-bold uppercase tracking-[0.08em] text-slate-400 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
+          title="Match intelligence: possession, xT, pressing, player stats"
         >
-          {player ? (
-            <>
-              <span
-                className={cn(
-                  "clip-skew flex h-7 w-8 shrink-0 items-center justify-center font-tech text-[13px] font-bold text-white",
-                  player.team === "NLA" ? "bg-crimson/50" : "bg-tactical/40",
-                )}
-              >
-                {player.shirt_number}
-              </span>
-              <span className="min-w-0 leading-none">
-                <span className="block max-w-[110px] truncate font-display text-[13px] font-bold uppercase tracking-wide text-white">
-                  {player.name}
-                </span>
-                <span className="font-tech text-[9px] uppercase tracking-wider text-slate-500">
-                  {player.team} · {player.speed_kmh.toFixed(1)} km/h
-                </span>
-              </span>
-            </>
-          ) : (
-            <span className="flex items-center gap-1.5 font-tech text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              <Crosshair size={13} className="text-tactical" /> Lock Player
-            </span>
-          )}
+          <BarChart3 size={16} />
+          Stats
         </button>
 
-        <span className="hidden h-6 w-px shrink-0 bg-white/10 xl:block" />
-
-        {/* DVR time-machine + telestrator */}
-        <TelestratorDVRBar
-          isDvrPaused={isDvrPaused}
-          dvrOffsetTicks={dvrOffsetTicks}
-          pausedClock={pausedClock}
-          onTogglePause={togglePause}
-          onScrub={scrub}
-          telestrator={telestrator}
-          onToggleTelestrator={toggleTelestrator}
-          onToggleSpotlight={autoSpotlight}
-        />
-
-        <span className="hidden h-6 w-px shrink-0 bg-white/10 min-[1440px]:block" />
-
-        {/* God-Mode scenarios */}
-        <PitchForgeDeck variant="dock" tick={tick} busy={busy} onInject={inject} />
-
-        <span className="h-6 w-px shrink-0 bg-white/10" />
-
-        {/* pipeline status chip → payload popover */}
-        <PipelineChip
-          pipeline={pipeline}
-          connected={connected}
-          status={status}
-          open={pipelinePanelOpen}
-          onToggle={() => setPipelinePanelOpen((o) => !o)}
-        />
+        <button
+          data-dock-trigger
+          onClick={() => openControlCenter()}
+          className="clip-skew flex min-h-[48px] flex-col items-center justify-center gap-0.5 border border-white/[0.07] bg-white/[0.025] px-1 py-1.5 font-tech text-[9.5px] font-bold uppercase tracking-[0.08em] text-slate-400 transition hover:border-tactical/30 hover:bg-tactical/10 hover:text-white"
+          title="Open all controls"
+        >
+          <SlidersHorizontal size={16} />
+          Controls
+        </button>
       </div>
     </div>
   );

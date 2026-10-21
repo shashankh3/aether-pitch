@@ -132,7 +132,7 @@ SCENARIO_DESCRIPTIONS = {
 # broadcast metadata a studio graphics system needs. 100% synthetic.
 MATCH_METADATA = {
     "match_id": "SYN-PL-2026-1019-NLA-MCS",
-    "competition": "Synthetic Premier League",
+    "competition": "AETHER Synthetic League",
     "season": "2026/27",
     "matchday": 9,
     "venue": "Aether Arena",

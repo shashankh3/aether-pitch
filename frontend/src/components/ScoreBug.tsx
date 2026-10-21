@@ -30,7 +30,7 @@ export default function ScoreBug({ tick, metrics }: Props) {
       <div className="hairline absolute inset-x-0 top-0 h-px opacity-70" />
       <div className="flex items-center justify-between border-x border-t border-white/15 bg-slate-950/80 px-2 py-0.5 backdrop-blur-xl">
         <span className="truncate font-display text-[7.5px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-          {meta?.competition ?? "Synthetic Premier League"} · MD {meta?.matchday ?? 9}
+          {meta?.competition ?? "AETHER Synthetic League"} · MD {meta?.matchday ?? 9}
         </span>
         <span className="truncate font-tech text-[7.5px] uppercase tracking-[0.1em] text-slate-500">
           {meta?.venue ?? "Aether Arena"}

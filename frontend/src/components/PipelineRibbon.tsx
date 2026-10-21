@@ -1,11 +1,9 @@
 "use client";
-// AETHER PITCH — always-visible five-stage proof strip.
-// The bottom-dock chip is easy to miss on a projector; this ribbon keeps
-// Stage A→E names, live latencies and health in the judge's eyeline.
+// AETHER PITCH — five-stage proof strip, shown inside the Control Center's
+// Data tab directly above the full payload inspector.
 
-import { Activity, ChevronRight } from "lucide-react";
+import { Activity, ChevronRight, GitBranch } from "lucide-react";
 import type { EngineStatus, Pipeline } from "@/lib/types";
-import { useHud } from "@/lib/hudContext";
 import { PIPELINE_STAGES } from "@/components/PipelineInspector";
 import { cn } from "@/lib/utils";
 
@@ -16,19 +14,15 @@ interface Props {
 }
 
 export default function PipelineRibbon({ pipeline, connected, status }: Props) {
-  const { pipelinePanelOpen, setPipelinePanelOpen } = useHud();
   const live = status === "CONNECTED_PIPELINE_LIVE";
+  const trace = pipeline?.agent_trace;
+  const grounded = trace ? trace.grounding.status !== "review" : false;
 
   return (
-    <button
-      type="button"
-      data-dock-trigger
-      onClick={() => setPipelinePanelOpen((o) => !o)}
-      aria-expanded={pipelinePanelOpen}
-      title="Open the full five-stage payload inspector"
+    <div
       className={cn(
-        "clip-ea pointer-events-auto flex w-full items-center gap-1 overflow-hidden border px-2 py-1 backdrop-blur-xl transition",
-        "border-white/10 bg-slate-950/78 hover:border-tactical/35 hover:bg-slate-950/92",
+        "clip-ea flex w-full items-center gap-1 overflow-hidden border px-2 py-1 backdrop-blur-xl",
+        "border-white/10 bg-slate-950/78",
       )}
     >
       <span className="flex shrink-0 items-center gap-1">
@@ -47,6 +41,7 @@ export default function PipelineRibbon({ pipeline, connected, status }: Props) {
       <span className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden">
         {PIPELINE_STAGES.map((s, i) => {
           const ms = pipeline?.stages[s.id]?.latency_ms;
+          const p95 = pipeline?.latency_p95?.[s.id];
           const seen = pipeline?.payloads?.[s.id];
           return (
             <span key={s.id} className="flex min-w-0 items-center gap-0.5">
@@ -56,7 +51,7 @@ export default function PipelineRibbon({ pipeline, connected, status }: Props) {
                   "flex min-w-0 items-center gap-1 border border-white/10 bg-black/35 px-1.5 py-0.5",
                   seen ? s.color : "text-slate-600",
                 )}
-                title={`${s.sub}${ms != null ? ` · ${ms.toFixed(2)}ms` : ""}`}
+                title={`${s.sub}${ms != null ? ` · now ${ms.toFixed(2)}ms` : ""}${p95 != null ? ` · p95 ${p95.toFixed(2)}ms` : ""}`}
               >
                 <span className={cn("h-1 w-1 shrink-0 rounded-full", seen ? "animate-breathe bg-pitch" : "bg-slate-700")} />
                 <span className="font-display text-[8.5px] font-bold tracking-wider">{s.id.toUpperCase()}</span>
@@ -72,9 +67,16 @@ export default function PipelineRibbon({ pipeline, connected, status }: Props) {
         })}
       </span>
 
-      <span className="hidden shrink-0 font-tech text-[8px] font-bold uppercase tracking-[0.16em] text-slate-600 xl:inline">
-        Click for payloads
+      <span
+        className={cn(
+          "hidden shrink-0 items-center gap-1 font-tech text-[8px] font-bold uppercase tracking-[0.12em] xl:flex",
+          grounded ? "text-pitch" : "text-crimson",
+        )}
+        title={trace ? `${trace.trace_id} · ${trace.grounding.note}` : "Trace appears on the first gated insight"}
+      >
+        <GitBranch size={9} />
+        {trace ? `${trace.handoff_chain.length}/4 · ${grounded ? "GROUNDED" : "CHECK"}` : "NO TRACE"}
       </span>
-    </button>
+    </div>
   );
 }

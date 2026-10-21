@@ -1,65 +1,62 @@
 "use client";
-// AETHER PITCH v6.0 — HUD shell state.
-// Broadcast mode (LIVE / ANALYSIS / STUDIO), the active right-dock tab,
-// dock popover visibility, the mobile panel sheet and the shortcuts overlay.
-// Kept in a small context so layout components read/write it without
-// threading props through the page orchestrator.
+// AETHER PITCH v6.1 - HUD shell state.
+// A calm fan-first surface by default, with every advanced tool living inside
+// one control center. This keeps the pitch readable while preserving all
+// broadcast, analytics and judge controls behind explicit buttons.
 
 import {
-  createContext, useContext, useEffect, useMemo, useState,
+  createContext, useCallback, useContext, useEffect, useMemo, useState,
   type Dispatch, type ReactNode, type SetStateAction,
 } from "react";
 
 export type HudMode = "live" | "analysis" | "studio";
-export type DockTab = "voices" | "copilot" | "fan";
-export type SheetTab = "cams" | "voices" | "copilot" | "fan" | "radar" | "cv" | "telestrate" | "prod";
+export type ControlTab =
+  | "cams"
+  | "stats"
+  | "voices"
+  | "fan"
+  | "copilot"
+  | "cv"
+  | "data"
+  | "prod";
+export type DockTool = "player" | "replay" | "moments" | null;
 
 interface HudContextValue {
   hudMode: HudMode;
   setHudMode: (m: HudMode) => void;
-  dockTab: DockTab;
-  setDockTab: (t: DockTab) => void;
-  sheetTab: SheetTab;
-  setSheetTab: (t: SheetTab) => void;
-  playerPanelOpen: boolean;
-  setPlayerPanelOpen: Dispatch<SetStateAction<boolean>>;
-  pipelinePanelOpen: boolean;
-  setPipelinePanelOpen: Dispatch<SetStateAction<boolean>>;
+  controlCenterOpen: boolean;
+  setControlCenterOpen: Dispatch<SetStateAction<boolean>>;
+  controlTab: ControlTab;
+  setControlTab: (t: ControlTab) => void;
+  openControlCenter: (tab?: ControlTab) => void;
+  dockTool: DockTool;
+  setDockTool: Dispatch<SetStateAction<DockTool>>;
   shortcutsOpen: boolean;
   setShortcutsOpen: Dispatch<SetStateAction<boolean>>;
-  mobileSheetOpen: boolean;
-  setMobileSheetOpen: Dispatch<SetStateAction<boolean>>;
-  isDesktop: boolean;
 }
 
 const HudContext = createContext<HudContextValue | null>(null);
 
 export function HudProvider({ children }: { children: ReactNode }) {
   const [hudMode, setHudMode] = useState<HudMode>("live");
-  const [dockTab, setDockTab] = useState<DockTab>("voices");
-  const [sheetTab, setSheetTab] = useState<SheetTab>("cams");
-  const [playerPanelOpen, setPlayerPanelOpen] = useState(false);
-  const [pipelinePanelOpen, setPipelinePanelOpen] = useState(false);
+  const [controlCenterOpen, setControlCenterOpen] = useState(false);
+  const [controlTab, setControlTab] = useState<ControlTab>("cams");
+  const [dockTool, setDockTool] = useState<DockTool>(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
-  const [isDesktop, setIsDesktop] = useState(false);
 
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1280px)");
-    const sync = () => setIsDesktop(mq.matches);
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
+  const openControlCenter = useCallback((tab?: ControlTab) => {
+    if (tab) setControlTab(tab);
+    setDockTool(null);
+    setControlCenterOpen(true);
   }, []);
 
-  // Escape closes transient HUD surfaces (popovers / sheet). Modal Escape is
-  // handled by useModalA11y; cinema-mode Escape by the page orchestrator.
+  // Escape closes transient HUD surfaces. Dialog Escape is handled by
+  // useModalA11y; cinema-mode Escape by the page orchestrator.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      setPlayerPanelOpen(false);
-      setPipelinePanelOpen(false);
-      setMobileSheetOpen(false);
+      setDockTool(null);
+      setControlCenterOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -68,15 +65,16 @@ export function HudProvider({ children }: { children: ReactNode }) {
   const value = useMemo<HudContextValue>(
     () => ({
       hudMode, setHudMode,
-      dockTab, setDockTab,
-      sheetTab, setSheetTab,
-      playerPanelOpen, setPlayerPanelOpen,
-      pipelinePanelOpen, setPipelinePanelOpen,
+      controlCenterOpen, setControlCenterOpen,
+      controlTab, setControlTab,
+      openControlCenter,
+      dockTool, setDockTool,
       shortcutsOpen, setShortcutsOpen,
-      mobileSheetOpen, setMobileSheetOpen,
-      isDesktop,
     }),
-    [hudMode, dockTab, sheetTab, playerPanelOpen, pipelinePanelOpen, shortcutsOpen, mobileSheetOpen, isDesktop],
+    [
+      hudMode, controlCenterOpen, controlTab, openControlCenter, dockTool,
+      shortcutsOpen,
+    ],
   );
 
   return <HudContext.Provider value={value}>{children}</HudContext.Provider>;

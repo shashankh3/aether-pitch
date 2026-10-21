@@ -1,6 +1,6 @@
 "use client";
-// AETHER PITCH v6.0 — keyboard shortcuts overlay (opened with "?" or the
-// TopBar help button). Every shortcut the app honours, documented in-app.
+// AETHER PITCH v6.1 — keyboard shortcuts overlay (opened with "?" or the
+// Control Center footer). Every shortcut the app honours, documented in-app.
 
 import { useRef } from "react";
 import { Keyboard } from "lucide-react";
@@ -9,11 +9,11 @@ import { useModalA11y } from "@/lib/useModalA11y";
 
 const GROUPS: { title: string; rows: [string, string][] }[] = [
   {
-    title: "Broadcast Modes",
+    title: "Control Center",
     rows: [
-      ["L", "Live broadcast view"],
-      ["A", "Analysis view (CV auto-eventer)"],
-      ["S", "Studio view (alpha / JSON / verify)"],
+      ["L", "Watch: cameras and overlays"],
+      ["A", "Match stats and player intelligence"],
+      ["S", "Studio: alpha, recap and pipeline"],
     ],
   },
   {

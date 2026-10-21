@@ -27,9 +27,10 @@ The project was built for the **Microsoft Premier League Hackathon ("Inside the 
 
 - **Cinematic 3D broadcast** — a procedural night stadium, 22 articulated player rigs, four camera modes, choreographed camera intros, dynamic FOV, score-impact camera shake, volumetric overlays, and broadcast alpha output.
 - **Five-stage pipeline** — synthetic ingest, deterministic tactical math, asynchronous AI explanation, render packets, and personalization.
+- **Grounded agent handoff trace** — deterministic gate → triage → causal analyst/critic → broadcast director, with measured latency, gate economy, P95 audit metrics, and numeric cross-checks of Azure narrative claims.
 - **Explainable analytics** — Pass Difficulty Rating, Expected Threat, Ghost Pass, Chaos Index, pressing metrics, and defensive line analysis.
 - **Fan runtime** — persona modes, metric locking, club bias, locked players, and EN/ES/AR/HI commentary without restarting the stream.
-- **Studio-grade interactions** — focus-managed dialogs, Escape/outside-click dismissal, ARIA live regions, reduced-motion support, and a responsive mobile production dock.
+- **Studio-grade interactions** — focus-managed dialogs, Escape/outside-click dismissal, ARIA live regions, reduced-motion support, and a responsive Control Center bottom sheet.
 - **Resilient by design** — a 10 Hz browser edge engine takes over if the WebSocket or backend pipeline drops, then hot-swaps back when it returns.
 
 ## Contents
@@ -59,13 +60,14 @@ The project was built for the **Microsoft Premier League Hackathon ("Inside the 
 - **Tactical layers** — xT threat grid, defensive laser links, parabolic pass tubes, Ghost Pass counterfactuals, pitch-control surface, and passing network.
 - **Broadcast alpha mode** — open `/?overlay=alpha` for a transparent/chroma-ready AR layer with SMPTE timecode and a machine-readable render-partner packet.
 - **Match chrome** — scorebug, momentum and win-probability bars, tactical pulse, lower thirds, GOAL slam with confetti, and player lock hologram.
-- **Clean-feed presentation** — `H` hides the HUD for a framed cinematic feed, `F` toggles fullscreen, and a compact mobile production dock exposes camera modes and core AR toggles.
+- **Clean-feed presentation** — `H` hides the HUD for a framed cinematic feed, `F` toggles fullscreen, and the Controls drawer exposes camera modes and core AR toggles on mobile.
 
 ### AI and analytics
 
 - **Stage A — ingest:** deterministic 10 Hz PitchForge simulation with match metadata, 3D pose state, ball physics, pass completion, tackles, auto-evented sprint/distance thresholds, and milestone tracking.
 - **Stage B — interpret:** NumPy tactical math for Chaos Index, PDR, 16 × 12 xT, Ghost Pass, AI gating, leverage, PPDA, defensive lines, and team/player match stats (passes, accuracy, shots, tackles, possession, distance).
 - **Stage C — explain:** asynchronous causal narratives and studio answers through Azure AI Foundry-hosted Azure OpenAI deployments (triage → narrative), with a deterministic local fallback.
+- **Agent trace:** every gated insight ships a `trace_id`, four-node handoff chain, gate decision, Stage C route, numeric grounding result, and compute economy; the Data tab renders it as a compact DAG and the audit API reports P95 latency plus live gate efficiency.
 - **Stage D — render:** time-coded overlay packets, highlight zones, and camera directives for the 3D scene.
 - **Stage E — personalize:** analyst/casual/split personas, metric lock, club lens, locked-player context, and localized commentary.
 - **Ask The 12th Man:** ask a tactical question and receive a reasoning chain, localized answer, commentator cue, and a scene directive that moves the camera and overlays.
@@ -75,7 +77,7 @@ The project was built for the **Microsoft Premier League Hackathon ("Inside the 
 
 - **Fan Personalization Tuner** with live persona, metric, club, player, and language controls, pressed-state semantics, Escape dismissal, and outside-click close.
 - **80-second judge autopilot** that runs a six-step guided tour with synchronized voiceover, a sequenced recap-to-rubric finale, and no modal overlap.
-- **Always-visible five-stage pipeline ribbon**, match-intelligence panel, payload inspector, and one-click rubric audit at `GET /api/health/pipeline-audit`.
+- **Fan-first Control Center** that keeps the pitch uncluttered by default and reveals the five-stage pipeline ribbon, match-intelligence panel, payload inspector, and one-click rubric audit from one optional drawer; audit data is also available at `GET /api/health/pipeline-audit`.
 - **Accessible production dialogs** for the overlay packet, rubric audit, three-act recap, and studio recap with focus trap, focus restoration, scroll lock, labelled titles, and live status regions.
 - **Responsive studio layout** — compact mobile dock, icon-first scenario controls, scroll-safe overlays, and reduced-motion support.
 - **Resilient match engine** that switches to a browser-native 10 Hz simulation during backend or Azure failures.
@@ -110,6 +112,8 @@ flowchart LR
 ```
 
 The 10 Hz loop never waits on Stage C. Cloud reasoning is dispatched as an async task, so a slow model cannot stall the match. If Azure credentials are absent, Stage C and Stage E use deterministic local fallbacks and Stage D stays on the local WebSocket transport.
+
+Each gated insight now carries an `agent_trace`: the Stage B gate decision, measured Stage C triage/narrative timings, numeric grounding results, and the Stage D/E broadcast handoff. If an Azure narrative cites a number that cannot be matched to the Stage B snapshot, the guardrail replaces it with the deterministic template and records the unmatched tokens. This is a logical pipeline trace over the shipped router, not a claim that the project runs a separate hosted agent framework.
 
 ### Pipeline contract
 
@@ -242,10 +246,10 @@ Frontend environment variables (set in `frontend/.env.local` or the container en
 ## Using the Studio
 
 1. Open http://localhost:3000 and let the match clock begin at minute 62.
-2. Click **Run 80s Judge Autopilot** for a guided tour of the CV viewport, camera direction, DVR/telestrator, alpha mode, personalization, and the three-act recap.
-3. Use the Camera Director to switch modes and toggle xT, Ghost Pass, defensive lasers, pitch control, and the passing network.
-4. Freeze the DVR to scrub the last 15 seconds; selecting a historical frame pauses live recording until playback resumes.
-5. Open **Overlay JSON** or **Verify** for the render-partner packet and live five-stage audit; every dialog traps focus, closes on `Esc` or backdrop click, and restores the trigger.
+2. Click **Autopilot** for a guided tour of the CV viewport, camera direction, DVR/telestrator, alpha mode, personalization, and the three-act recap.
+3. Open **Controls → Watch** to switch camera modes and toggle xT, Ghost Pass, defensive lasers, pitch control, and the passing network.
+4. Open the bottom **Replay** button to freeze and scrub the last 15 seconds; selecting a historical frame pauses live recording until playback resumes.
+5. Open **Controls → Studio** for the overlay packet and rubric verifier, or **Controls → Data** for stage latency and raw payloads. Every dialog traps focus, closes on `Esc` or backdrop click, and restores the trigger.
 6. Open http://localhost:3000/?overlay=alpha for the transparent broadcast layer.
 
 ### Keyboard shortcuts
@@ -256,9 +260,13 @@ Frontend environment variables (set in `frontend/.env.local` or the container en
 | `2` | Inject `high_press_turnover` |
 | `3` | Inject `tactical_inversion` |
 | `4` | Open the three-act Studio Match Recap |
+| `L` | Open Control Center → Watch |
+| `A` | Open Control Center → Stats |
+| `S` | Open Control Center → Studio |
 | `H` | Toggle the clean broadcast feed |
 | `F` | Toggle fullscreen |
-| `Esc` | Restore the HUD from clean feed |
+| `?` | Show all keyboard shortcuts |
+| `Esc` | Close Control Center, popovers, or the clean feed |
 
 Shortcuts are ignored while typing in inputs, textareas, selects, or editable fields, and while a modal is open.
 
@@ -280,7 +288,7 @@ Base URL: `http://localhost:8000` · WebSocket: `ws://localhost:8000/ws`
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/health` | Service health, active stage backends, connected clients, clock, and score |
-| `GET` | `/api/health/pipeline-audit` | Synchronous five-stage self-test with per-stage timings and sample payloads |
+| `GET` | `/api/health/pipeline-audit` | Synchronous five-stage self-test with per-stage timings, P95 latency, gate economy, agent trace, and sample payloads |
 | `GET` | `/api/state` | Latest match state, metrics, and pipeline trace |
 | `GET` | `/api/match-stats` | Synthetic match metadata, team/player stats, pass accuracy, distance leaders |
 | `GET` | `/api/insights` | Recent Stage C insight packets |
@@ -350,6 +358,7 @@ The frontend interpolates the 10 Hz stream to 60 FPS through a mutable telemetry
 │   ├── stage_b_math_engine.py         # Chaos, PDR, xT, Ghost Pass, gating
 │   ├── stage_c_foundry_agents.py      # Azure AI Foundry narratives and studio queries
 │   ├── stage_d_e_personalizer.py      # Render packets and fan personalization
+│   ├── agent_trace.py                  # Grounded handoff trace + numeric cross-check
 │   ├── test_pipeline.py               # Offline five-stage pipeline self-test
 │   ├── requirements.txt
 │   ├── .env.example
@@ -408,15 +417,27 @@ docker compose up --build
 
 This starts the FastAPI engine on port 8000 and the Next.js studio on port 3000.
 
-### Azure Container Apps
+### Cloud-native Azure topology
 
-`azure.yaml` provides an Azure Developer CLI manifest for the two services. Configure your own `azd` environment and infrastructure, then run:
+The repository ships the application containers and a `azure.yaml` service manifest. It does **not** ship a full infrastructure template or a hosted URL; treat this as the target production topology and supply your own `azd` infrastructure.
+
+| Layer | Azure target | Shipped artifact | Production note |
+|---|---|---|---|
+| Frontend | Azure Static Web Apps (Next.js) or Azure Container Apps | `frontend/Dockerfile`, `azure.yaml` | Set `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` to public backend endpoints. |
+| Backend + WebSocket | Azure Container Apps | `backend/Dockerfile`, `azure.yaml` | External ingress on port 8000; health probe `GET /api/health`; keep one warm replica for the demo. |
+| Reasoning | Azure AI Foundry / Azure OpenAI deployments | `AZURE_OPENAI_*` settings | Triage and narrative deployments are independent; missing credentials fall back locally. |
+| Localization | Azure AI Translator | `AZURE_TRANSLATOR_*` settings | Optional; the deterministic phrase atlas covers EN/ES/AR/HI offline. |
+| Images | Azure Container Registry | Dockerfiles + `azd` | Build once, deploy the same image to the container app. |
+| Observability | Azure Monitor + Application Insights | `/api/health/pipeline-audit`, structured stage payloads | Alert on backend health, p95 Stage C latency, and WebSocket disconnects. |
+| Secrets | Azure Key Vault | `.env.example` contract | Prefer managed identity; do not bake keys into images or `NEXT_PUBLIC_*` values. |
+| Realtime scale | Azure Web PubSub or a Redis backplane | Not wired | The current FastAPI hub is single-process; add a backplane before scaling beyond one replica. |
 
 ```bash
+azd auth login
 azd up
 ```
 
-Set `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` to the public backend endpoints in the deployed frontend environment.
+For a single-host demo, Docker Compose is the supported zero-setup path. For a public judging URL, deploy the two containers, restrict CORS to the frontend origin, and keep the backend's deterministic fallbacks enabled so a model outage cannot take the demo down.
 
 ## Synthetic Data
 

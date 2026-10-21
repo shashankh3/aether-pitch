@@ -1,13 +1,14 @@
 "use client";
-// AETHER PITCH v6.0 — Right dock: one component, two presentations.
-//   xl+  : static grid rail — CameraDirectorBar on top, a 3-tab container
-//          (AI Voices / 12th Man / Fan) and the radar minimap below.
-//   <xl  : fixed bottom sheet opened from the TopBar panels button, with a
-//          full tab strip (CAMS / VOICES / COPILOT / FAN / RADAR / CV /
-//          TELESTRATE / PROD).
-// Sharing one instance set keeps TwinCast auto-speak and co-pilot state
-// single-sourced across breakpoints.
+// AETHER PITCH v6.1 — one calm Control Center for every optional surface:
+// cameras, match stats, AI voices, fan personalization, co-pilot, CV, pipeline
+// data and production tools. Closed by default so the 3D pitch is the hero.
+// The same drawer works as a right rail on desktop and a bottom sheet on mobile.
 
+import { useEffect, useRef } from "react";
+import {
+  BarChart3, Clapperboard, Database, Heart, Radio, ScanEye, Sparkles,
+  Video, X, type LucideIcon,
+} from "lucide-react";
 import CameraDirectorBar from "@/components/CameraDirectorBar";
 import TwinCastHUD from "@/components/TwinCastHUD";
 import StudioProducer from "@/components/StudioProducer";
@@ -16,14 +17,21 @@ import TacticalRadarMiniMap from "@/components/TacticalRadarMiniMap";
 import PlayerLock360 from "@/components/PlayerLock360";
 import VisionAutoEventerHUD from "@/components/VisionAutoEventerHUD";
 import ProductionPanel from "@/components/hud/ProductionPanel";
+import MatchIntelPanel from "@/components/MatchIntelPanel";
+import TacticalPulseBar from "@/components/TacticalPulseBar";
+import PipelineRibbon from "@/components/PipelineRibbon";
+import { PipelinePanel } from "@/components/PipelineInspector";
 import { TelestratorTools } from "@/components/TelestratorDVRBar";
 import type {
   ClubBias, Insight, LangCode, MatchEvent, MatchTick, MetricFocus, Metrics,
-  PersonalizationState, PersonaMode, Recap, StudioQueryResponse, TelestratorState,
+  PersonalizationState, PersonaMode, Recap, StudioQueryResponse, StudioSuggestedAction,
+  TelestratorState,
 } from "@/lib/types";
 import type { OverlayToggles } from "@/components/three/HoloPitch3D";
 import type { CameraMode } from "@/lib/types";
-import { useHud, type DockTab, type SheetTab } from "@/lib/hudContext";
+import { LANG_LABELS } from "@/lib/types";
+import { useHud, type ControlTab } from "@/lib/hudContext";
+import { useModalA11y } from "@/lib/useModalA11y";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -38,6 +46,7 @@ interface Props {
   persona: PersonaMode;
   onPersona: (p: PersonaMode) => void;
   lang: LangCode;
+  onLang: (l: LangCode) => void;
   metrics: Metrics | null;
   tick: MatchTick | null;
   latestEvent: MatchEvent | null;
@@ -49,6 +58,7 @@ interface Props {
   onCloseRecap: () => void;
   lockedId: string | null;
   onStudioDirective: (d: StudioQueryResponse["scene_directive"]) => void;
+  onStudioAction: (action: StudioSuggestedAction) => void;
   // Fan tab
   personalization: PersonalizationState;
   applyPreferences: (next: PersonalizationState) => void;
@@ -56,12 +66,12 @@ interface Props {
   telestrator: TelestratorState;
   onLock: (id: string | null) => void;
   events: MatchEvent[];
-  // telestrate sheet tab
+  // telestrate
   toggleTelestrator: (key: keyof Omit<TelestratorState, "customTacticalArrows" | "spotlightPlayerIds">) => void;
   autoSpotlight: () => void;
-  // cv sheet tab
+  // CV
   cvExpanded: boolean | null;
-  // production sheet tab
+  // production
   alphaMode: boolean;
   alphaBackdrop: "checker" | "green";
   onToggleAlpha: () => void;
@@ -69,40 +79,52 @@ interface Props {
   onShowAlphaModal: () => void;
   onShowRubric: () => void;
   onShowRecap: () => void;
+  // pipeline
+  pipeline: Parameters<typeof PipelineRibbon>[0]["pipeline"];
+  connected: boolean;
+  status: Parameters<typeof PipelineRibbon>[0]["status"];
 }
 
-const DOCK_TABS: { id: DockTab; label: string }[] = [
-  { id: "voices", label: "AI Voices" },
-  { id: "copilot", label: "12th Man" },
-  { id: "fan", label: "Fan" },
-];
-
-const SHEET_TABS: { id: SheetTab; label: string }[] = [
-  { id: "cams", label: "Cams" },
-  { id: "voices", label: "Voices" },
-  { id: "copilot", label: "Co-Pilot" },
-  { id: "fan", label: "Fan" },
-  { id: "radar", label: "Radar" },
-  { id: "cv", label: "CV" },
-  { id: "telestrate", label: "Telestrate" },
-  { id: "prod", label: "Prod" },
+const CONTROL_TABS: { id: ControlTab; label: string; icon: LucideIcon }[] = [
+  { id: "cams", label: "Watch", icon: Video },
+  { id: "stats", label: "Stats", icon: BarChart3 },
+  { id: "voices", label: "Voices", icon: Radio },
+  { id: "fan", label: "Fan", icon: Heart },
+  { id: "copilot", label: "Ask AI", icon: Sparkles },
+  { id: "cv", label: "CV", icon: ScanEye },
+  { id: "data", label: "Data", icon: Database },
+  { id: "prod", label: "Studio", icon: Clapperboard },
 ];
 
 export default function RightDock(props: Props) {
   const {
     camMode, pickCamera, toggles, toggleKey, aiDirected,
-    insights, persona, onPersona, lang, metrics, tick, latestEvent, metricFocus, clubBias,
-    latest, studioRecap, onCloseRecap, lockedId, onStudioDirective,
+    insights, persona, onPersona, lang, onLang, metrics, tick, latestEvent, metricFocus, clubBias,
+    latest, studioRecap, onCloseRecap, lockedId, onStudioDirective, onStudioAction,
     personalization, applyPreferences,
     telestrator, onLock, events, cvExpanded,
     toggleTelestrator, autoSpotlight,
     alphaMode, alphaBackdrop, onToggleAlpha, onToggleBackdrop,
     onShowAlphaModal, onShowRubric, onShowRecap,
+    pipeline, connected, status,
   } = props;
 
-  const { dockTab, setDockTab, sheetTab, setSheetTab, mobileSheetOpen, isDesktop } = useHud();
+  const {
+    controlCenterOpen, setControlCenterOpen, controlTab, setControlTab, openControlCenter,
+    setShortcutsOpen,
+  } = useHud();
+  const panelRef = useRef<HTMLElement>(null);
+  useModalA11y(controlCenterOpen && !alphaMode, () => setControlCenterOpen(false), panelRef);
+
+  // Never leave the drawer open behind a clean alpha feed.
+  useEffect(() => {
+    if (alphaMode) setControlCenterOpen(false);
+  }, [alphaMode, setControlCenterOpen]);
+
+  if (!controlCenterOpen || alphaMode) return null;
 
   const fanActive = metricFocus !== "ALL" || clubBias !== "NEUTRAL";
+  const active = CONTROL_TABS.find((t) => t.id === controlTab) ?? CONTROL_TABS[0];
 
   const voicesPanel = (
     <TwinCastHUD
@@ -118,70 +140,99 @@ export default function RightDock(props: Props) {
     />
   );
 
-  const copilotPanel = (
-    <StudioProducer
-      latest={latest}
-      recap={studioRecap}
-      onCloseRecap={onCloseRecap}
-      lang={lang}
-      lockedId={lockedId}
-      onStudioDirective={onStudioDirective}
-    />
-  );
-
-  const fanPanel = (
-    <FanPersonalizationPanel state={personalization} onChange={applyPreferences} />
-  );
-
   return (
-    <aside
-      aria-label="Studio panels"
-      className={cn(
-        "pointer-events-auto flex-col gap-2",
-        mobileSheetOpen
-          ? "fixed inset-x-2 bottom-2 z-40 flex max-h-[72dvh] animate-slide-up"
-          : "hidden",
-        // desktop: always the static grid rail
-        "xl:static xl:inset-auto xl:z-auto xl:flex xl:max-h-none xl:min-h-0 xl:col-start-3 xl:row-start-2",
-      )}
-    >
-      {/* ---------------- mobile sheet tab strip ---------------- */}
-      {mobileSheetOpen && !isDesktop && (
-        <div className="clip-ea panel-lux shrink-0 p-1">
-          <div className="scroll-slim flex gap-0.5 overflow-x-auto" role="tablist" aria-label="Panel sections">
-            {SHEET_TABS.map((t) => (
-              <button
-                key={t.id}
-                role="tab"
-                aria-selected={sheetTab === t.id}
-                onClick={() => setSheetTab(t.id)}
-                className="dock-tab shrink-0"
-              >
-                {t.label}
-                {t.id === "fan" && fanActive ? " •" : ""}
-              </button>
-            ))}
+    <>
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label="Close control center"
+        onClick={() => setControlCenterOpen(false)}
+        className="fixed inset-0 z-40 cursor-default bg-black/40 backdrop-blur-[1px] sm:bg-black/20"
+      />
+
+      <aside
+        id="control-center"
+        ref={panelRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="control-center-title"
+        className="clip-ea panel-lux animate-slide-up fixed inset-x-2 bottom-2 z-40 flex max-h-[82dvh] flex-col overflow-hidden outline-none sm:inset-x-auto sm:bottom-3 sm:right-3 sm:top-[68px] sm:max-h-none sm:w-[404px]"
+      >
+        {/* header */}
+        <div className="flex shrink-0 items-start justify-between gap-2 border-b border-white/10 px-3 py-2.5">
+          <div className="min-w-0">
+            <h2 id="control-center-title" className="font-display text-[14px] font-bold uppercase tracking-[0.18em] text-white">
+              Control Center
+            </h2>
+            <p className="mt-0.5 font-tech text-[9px] uppercase tracking-[0.16em] text-slate-500">
+              Optional tools · the pitch stays primary
+            </p>
+          </div>
+          <button
+            onClick={() => setControlCenterOpen(false)}
+            className="clip-skew flex h-8 w-8 shrink-0 items-center justify-center border border-white/10 bg-slate-950/75 text-slate-400 transition hover:border-crimson/40 hover:text-white"
+            title="Close (Esc)"
+            aria-label="Close control center"
+          >
+            <X size={15} />
+          </button>
+        </div>
+
+        {/* tab strip: all eight tools visible, no horizontal hunting */}
+        <div className="shrink-0 border-b border-white/10 p-1.5">
+          <div className="grid grid-cols-4 gap-1" role="tablist" aria-label="Control center sections">
+            {CONTROL_TABS.map((t) => {
+              const Icon = t.icon;
+              const selected = controlTab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => setControlTab(t.id)}
+                  className={cn(
+                    "relative flex min-h-[44px] flex-col items-center justify-center gap-1 border px-1 py-1.5 font-tech text-[9.5px] font-bold uppercase tracking-[0.08em] transition",
+                    selected
+                      ? "border-tactical/40 bg-tactical/[0.12] text-tactical"
+                      : "border-transparent text-slate-400 hover:border-white/10 hover:bg-white/[0.04] hover:text-white",
+                  )}
+                >
+                  <Icon size={14} />
+                  {t.label}
+                  {t.id === "fan" && fanActive && (
+                    <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-gold" />
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
-      )}
 
-      {/* ---------------- mobile sheet content ---------------- */}
-      {mobileSheetOpen && !isDesktop && (
-        <div className="clip-ea panel-lux scroll-slim min-h-0 flex-1 overflow-y-auto p-2">
-          {sheetTab === "cams" && (
-            <CameraDirectorBar
-              mode={camMode}
-              onMode={pickCamera}
-              toggles={toggles}
-              onToggle={toggleKey}
-              aiDirected={aiDirected}
-            />
-          )}
-          {sheetTab === "voices" && <div className="h-[56dvh]">{voicesPanel}</div>}
-          {sheetTab === "copilot" && copilotPanel}
-          {sheetTab === "fan" && fanPanel}
-          {sheetTab === "radar" && !isDesktop && (
+        {/* content */}
+        <div className="scroll-slim min-h-0 flex-1 overflow-y-auto p-2">
+          {controlTab === "cams" && (
             <div className="space-y-2">
+              <CameraDirectorBar
+                mode={camMode}
+                onMode={pickCamera}
+                toggles={toggles}
+                onToggle={toggleKey}
+                aiDirected={aiDirected}
+              />
+              <div className="border border-white/[0.07] bg-white/[0.025] px-3 py-2.5">
+                <p className="font-tech text-[9.5px] leading-relaxed text-slate-400">
+                  Click any player on the pitch to lock the 360° hologram. Use the bottom
+                  dock for PlayerLock, replay and God Mode moments.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {controlTab === "stats" && (
+            <div className="space-y-2">
+              <TacticalPulseBar metrics={metrics} compact={false} />
+              <MatchIntelPanel tick={tick} metrics={metrics} />
               <TacticalRadarMiniMap lockedId={lockedId} telestrator={telestrator} onLock={onLock} />
               <PlayerLock360
                 tick={tick}
@@ -193,76 +244,121 @@ export default function RightDock(props: Props) {
               />
             </div>
           )}
-          {sheetTab === "cv" && <VisionAutoEventerHUD events={events} expandedOverride={cvExpanded} />}
-          {sheetTab === "telestrate" && (
-            <div className="clip-ea border border-white/15 bg-slate-950/85 p-2">
-              <div className="mb-1.5 font-display text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">
-                Telestrator Tools
+
+          {controlTab === "voices" && <div className="min-h-[460px]">{voicesPanel}</div>}
+
+          {controlTab === "fan" && (
+            <div className="space-y-2">
+              <div className="border border-white/10 bg-black/25 p-2">
+                <div className="mb-1.5 flex items-center gap-1.5 font-tech text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                  <Radio size={11} className="text-tactical" />
+                  Commentary language
+                </div>
+                <div className="grid grid-cols-4 gap-1" role="group" aria-label="Market language">
+                  {(["en", "es", "ar", "hi"] as LangCode[]).map((l) => (
+                    <button
+                      key={l}
+                      onClick={() => onLang(l)}
+                      aria-pressed={lang === l}
+                      className={cn(
+                        "min-h-[36px] border px-1 font-tech text-[10px] font-bold uppercase tracking-wider transition",
+                        lang === l
+                          ? "border-tactical/50 bg-tactical/15 text-tactical"
+                          : "border-white/10 bg-white/[0.03] text-slate-400 hover:text-white",
+                      )}
+                    >
+                      {LANG_LABELS[l]}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="flex gap-1.5">
-                <TelestratorTools
-                  telestrator={telestrator}
-                  onToggleTelestrator={toggleTelestrator}
-                  onToggleSpotlight={autoSpotlight}
-                />
-              </div>
-              <p className="mt-1.5 font-tech text-[9px] leading-relaxed text-slate-500">
-                Freeze the feed with the DVR button in the bottom dock, then draw.
+              <FanPersonalizationPanel state={personalization} onChange={applyPreferences} />
+            </div>
+          )}
+
+          {controlTab === "copilot" && (
+            <StudioProducer
+              latest={latest}
+              recap={studioRecap}
+              onCloseRecap={onCloseRecap}
+              lang={lang}
+              lockedId={lockedId}
+              onStudioDirective={onStudioDirective}
+              onStudioAction={onStudioAction}
+            />
+          )}
+
+          {controlTab === "cv" && (
+            <div className="space-y-2">
+              <VisionAutoEventerHUD events={events} expandedOverride={cvExpanded} />
+              <p className="px-1 font-tech text-[9px] leading-relaxed text-slate-500">
+                Computer-vision eventing runs on the live 10 Hz spatial feed. It is a
+                transparency view, not a required step for the fan experience.
               </p>
             </div>
           )}
-          {sheetTab === "prod" && (
-            <ProductionPanel
-              alphaMode={alphaMode}
-              alphaBackdrop={alphaBackdrop}
-              onToggleAlpha={onToggleAlpha}
-              onToggleBackdrop={onToggleBackdrop}
-              onShowAlphaModal={onShowAlphaModal}
-              onShowRubric={onShowRubric}
-              onShowRecap={onShowRecap}
-            />
+
+          {controlTab === "data" && (
+            <div className="space-y-2">
+              <PipelineRibbon pipeline={pipeline} connected={connected} status={status} />
+              <PipelinePanel pipeline={pipeline} />
+            </div>
+          )}
+
+          {controlTab === "prod" && (
+            <div className="space-y-2">
+              <ProductionPanel
+                alphaMode={alphaMode}
+                alphaBackdrop={alphaBackdrop}
+                onToggleAlpha={onToggleAlpha}
+                onToggleBackdrop={onToggleBackdrop}
+                onShowAlphaModal={onShowAlphaModal}
+                onShowRubric={onShowRubric}
+                onShowRecap={onShowRecap}
+              />
+              <div className="border border-white/15 bg-slate-950/70 p-2">
+                <div className="mb-1.5 font-tech text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                  Telestrator tools
+                </div>
+                <div className="flex gap-1.5">
+                  <TelestratorTools
+                    telestrator={telestrator}
+                    onToggleTelestrator={toggleTelestrator}
+                    onToggleSpotlight={autoSpotlight}
+                  />
+                </div>
+                <p className="mt-1.5 font-tech text-[9px] leading-relaxed text-slate-500">
+                  Freeze the feed from the bottom Replay button, then draw on the pitch.
+                </p>
+              </div>
+            </div>
           )}
         </div>
-      )}
 
-      {/* ---------------- desktop rail ---------------- */}
-      {isDesktop && (
-        <>
-          <CameraDirectorBar
-            mode={camMode}
-            onMode={pickCamera}
-            toggles={toggles}
-            onToggle={toggleKey}
-            aiDirected={aiDirected}
-          />
-
-          <div className="clip-ea panel-lux flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div className="flex shrink-0 border-b border-white/10" role="tablist" aria-label="Studio panels">
-              {DOCK_TABS.map((t) => (
-                <button
-                  key={t.id}
-                  role="tab"
-                  aria-selected={dockTab === t.id}
-                  onClick={() => setDockTab(t.id)}
-                  className="dock-tab"
-                >
-                  {t.label}
-                  {t.id === "fan" && fanActive ? " •" : ""}
-                </button>
-              ))}
-            </div>
-            <div className="scroll-slim min-h-0 flex-1 overflow-y-auto">
-              {dockTab === "voices" && <div className="h-full">{voicesPanel}</div>}
-              {dockTab === "copilot" && copilotPanel}
-              {dockTab === "fan" && fanPanel}
-            </div>
+        {/* footer */}
+        <div className="flex shrink-0 items-center justify-between gap-2 border-t border-white/10 px-3 py-2">
+          <span className="font-tech text-[8.5px] uppercase tracking-[0.16em] text-slate-600">
+            {active.label} controls
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setControlCenterOpen(false);
+                setShortcutsOpen(true);
+              }}
+              className="font-tech text-[9px] font-bold uppercase tracking-wider text-slate-500 transition hover:text-tactical"
+            >
+              Shortcuts ?
+            </button>
+            <button
+              onClick={() => openControlCenter("stats")}
+              className="font-tech text-[9px] font-bold uppercase tracking-wider text-tactical/80 transition hover:text-tactical"
+            >
+              Match stats
+            </button>
           </div>
-
-          <div className="flex shrink-0 justify-center">
-            <TacticalRadarMiniMap lockedId={lockedId} telestrator={telestrator} onLock={onLock} />
-          </div>
-        </>
-      )}
-    </aside>
+        </div>
+      </aside>
+    </>
   );
 }

@@ -41,7 +41,7 @@ export default function MatchIntelPanel({ tick, metrics }: Props) {
   const farthest = metrics?.leaders?.farthest;
 
   return (
-    <section className="clip-ea panel-lux pointer-events-auto w-[318px] p-2">
+    <section className="clip-ea panel-lux pointer-events-auto w-full p-2">
       <div className="mb-1.5 flex items-center justify-between">
         <h3 className="flex items-center gap-1.5 font-display text-[10px] font-bold uppercase tracking-[0.22em] text-slate-300">
           <Activity size={12} className="text-tactical" /> Match Intelligence

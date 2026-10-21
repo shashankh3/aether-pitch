@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Clapperboard, Download, Loader2, Play, RefreshCw, Sparkles, X,
+  Clapperboard, Download, FileText, Loader2, Play, RefreshCw, Sparkles, X,
 } from "lucide-react";
 import { useModalA11y } from "@/lib/useModalA11y";
 import { API_BASE } from "@/lib/api";
 import type {
-  LangCode, MatchEvent, MatchRecapStoryboard, MatchTick, RecapAct,
+  LangCode, MatchEvent, MatchRecapStoryboard, MatchTick, PipelineAudit, RecapAct,
 } from "@/lib/types";
 
 interface Props {
@@ -64,6 +64,13 @@ function fallbackStoryboard(tick: MatchTick | null, events: MatchEvent[]): Match
         delta_xt: ghost?.delta_xt ?? 0.214,
         target_id: targetId,
         openness_m: ghost?.openness_m ?? 12,
+        actual_delta_xt: ghost?.actual_delta_xt ?? ev?.delta_xt ?? 0.12,
+        ghost_delta_xt: ghost?.ghost_delta_xt ?? ghost?.delta_xt ?? 0.214,
+        net_xt_gain: ghost?.net_xt_gain
+          ?? ((ghost?.delta_xt ?? 0.214) - (ev?.delta_xt ?? 0.12)),
+        completion_probability: ghost?.completion_probability ?? null,
+        receiver_target_xy: ghost?.receiver_target_xy
+          ?? { x: ghost?.x ?? 82, y: ghost?.y ?? 48 },
       },
       key_player_ids: [ev?.player_id, targetId, target?.id].filter(Boolean) as string[],
       highlight_zone: {
@@ -104,6 +111,7 @@ export default function MatchRecapStudioModal({
   open, onClose, onLoadAct, lang, tick, events,
 }: Props) {
   const [data, setData] = useState<MatchRecapStoryboard | null>(null);
+  const [audit, setAudit] = useState<PipelineAudit | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -121,6 +129,7 @@ export default function MatchRecapStudioModal({
     const controller = new AbortController();
     setLoading(true);
     setError(null);
+    setAudit(null);
     fetch(`${API_BASE}/api/match-recap`, { signal: controller.signal })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -136,6 +145,17 @@ export default function MatchRecapStudioModal({
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
+      });
+    fetch(`${API_BASE}/api/health/pipeline-audit`, { signal: controller.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error(`Audit HTTP ${r.status}`);
+        return r.json() as Promise<PipelineAudit>;
+      })
+      .then((packet) => {
+        if (!cancelled) setAudit(packet);
+      })
+      .catch(() => {
+        if (!cancelled) setAudit(null);
       });
     return () => {
       cancelled = true;
@@ -165,15 +185,193 @@ export default function MatchRecapStudioModal({
     return lines.join("\n");
   }, [data, lang]);
 
-  const exportTeleprompter = () => {
-    if (!teleprompter) return;
-    const blob = new Blob([teleprompter], { type: "text/plain;charset=utf-8" });
+  const buildDossier = () => {
+    if (!data) return null;
+    const metadata = tick?.match_metadata;
+    const sorted = [...data.acts].sort((a, b) => b.delta_xt - a.delta_xt);
+    const topDelta = sorted.slice(0, 3).map((act) => ({
+      clock: act.clock,
+      player: act.player_name,
+      team: act.team,
+      type: act.event_type,
+      delta_xt: act.delta_xt,
+      pdr: act.pdr,
+      ghost_delta_xt: act.ghost_pass.delta_xt,
+    }));
+    const ghostAct = data.acts.find((act) => act.ghost_pass) ?? data.acts[0];
+    const stageB = audit?.stage_b_summary ?? {
+      peak_chaos_index: Number(Math.max(...data.acts.map((act) => act.chaos)).toFixed(3)),
+      team_ppda: {},
+      top_delta_xt: topDelta,
+      ghost_counterfactual: ghostAct ? {
+        clock: ghostAct.clock,
+        team: ghostAct.team,
+        player_id: ghostAct.player_id,
+        player_name: ghostAct.player_name,
+        target_id: ghostAct.ghost_pass.target_id,
+        actual_delta_xt: ghostAct.ghost_pass.actual_delta_xt ?? ghostAct.delta_xt,
+        ghost_delta_xt: ghostAct.ghost_pass.ghost_delta_xt ?? ghostAct.ghost_pass.delta_xt,
+        net_xt_gain: ghostAct.ghost_pass.net_xt_gain
+          ?? (ghostAct.ghost_pass.delta_xt - ghostAct.delta_xt),
+        completion_probability: ghostAct.ghost_pass.completion_probability ?? null,
+        receiver_target_xy: ghostAct.ghost_pass.receiver_target_xy
+          ?? ghostAct.ghost_pass.end,
+      } : null,
+    };
+    const trace = audit?.agent_trace;
+    return {
+      schema_version: "aether.audit.dossier.v1",
+      artifact: "AETHER PITCH — Full Match & Foundry Audit Dossier",
+      generated_at: new Date().toISOString(),
+      provenance: {
+        league: "AETHER Synthetic League",
+        teams: ["North Larchmont Athletic (NLA)", "Meridian City SC (MCS)"],
+        data_path: "Stage A 10Hz synthetic feed → Stage B deterministic math → Stage C Foundry router → Stage D WebGL → Stage E Atlas",
+        synthetic: metadata?.synthetic ?? true,
+        no_external_video: true,
+      },
+      match_summary: audit?.match_summary ?? {
+        home: metadata?.home_team.short_name ?? "NLA",
+        away: metadata?.away_team.short_name ?? "MCS",
+        competition: metadata?.competition ?? "AETHER Synthetic League",
+        venue: metadata?.venue ?? "AETHER 3D DIGITAL TWIN",
+        clock: data.timecode,
+        score: data.score,
+        synthetic_provenance: metadata?.synthetic ?? true,
+        data_source: metadata?.data_source ?? "Stage A deterministic 10Hz synthetic engine",
+        provenance: "No real footage, third-party broadcast marks, or external video assets.",
+      },
+      stage_b: stageB,
+      storyboard: {
+        title: data.title,
+        subtitle: data.subtitle,
+        timecode: data.timecode,
+        score: data.score,
+        model: data.model,
+        milestones: data.milestones,
+        acts: data.acts.map((act) => ({
+          act: act.act,
+          title: act.title,
+          subtitle: act.subtitle,
+          clock: act.clock,
+          team: act.team,
+          event_type: act.event_type,
+          player_name: act.player_name,
+          pdr: act.pdr,
+          delta_xt: act.delta_xt,
+          chaos: act.chaos,
+          ghost_pass: act.ghost_pass,
+          camera_mode: act.camera_mode,
+          localized_commentary: act.localized_commentary,
+        })),
+      },
+      foundry_execution: {
+        trace_id: trace?.trace_id ?? "edge-local",
+        mode: trace?.mode ?? "edge",
+        model: trace?.model ?? data.model,
+        anchor_clock: trace?.anchor_clock ?? data.timecode,
+        gate: trace?.gate ?? null,
+        handoff_chain: trace?.handoff_chain ?? [],
+        grounding: trace?.grounding ?? null,
+        guardrail: trace?.guardrail ?? null,
+        latency_p95: audit?.latency_p95 ?? {},
+        handoff_counts: audit?.handoff_counts ?? null,
+        gate_efficiency: audit?.gate_efficiency ?? null,
+        stage_timings: audit?.audit ?? null,
+        stage_modes: audit?.stage_modes ?? {},
+        azure: audit?.azure ?? null,
+      },
+      compliance: {
+        synthetic_data_compliance: audit?.synthetic_data_compliance ?? true,
+        no_external_video: true,
+        fictional_entities: true,
+        disclaimer: metadata?.disclaimer
+          ?? "All teams, players, kits, marks and competition names are fictional.",
+        human_review: "Human-in-the-loop review required before publishing generated commentary.",
+      },
+    };
+  };
+
+  const downloadFile = (name: string, content: string, type: string) => {
+    const blob = new Blob([content], { type });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `aether-pitch-recap-${Date.now()}.txt`;
+    a.download = name;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const exportTeleprompter = () => {
+    if (!teleprompter) return;
+    downloadFile(`aether-pitch-recap-${Date.now()}.txt`, teleprompter, "text/plain;charset=utf-8");
+  };
+
+  const exportDossier = (format: "json" | "md") => {
+    const dossier = buildDossier();
+    if (!dossier) return;
+    const stamp = Date.now();
+    if (format === "json") {
+      downloadFile(
+        `aether-pitch-audit-dossier-${stamp}.json`,
+        JSON.stringify(dossier, null, 2),
+        "application/json;charset=utf-8",
+      );
+      return;
+    }
+    const ghost = dossier.stage_b.ghost_counterfactual;
+    const foundry = dossier.foundry_execution;
+    const lines = [
+      "# AETHER PITCH — Full Match & Foundry Audit Dossier",
+      "",
+      `Generated: ${dossier.generated_at}`,
+      `Schema: ${dossier.schema_version}`,
+      "",
+      "## 1 · Match summary",
+      `- Fixture: ${dossier.match_summary.home} vs ${dossier.match_summary.away}`,
+      `- Competition: ${dossier.match_summary.competition}`,
+      `- Venue: ${dossier.match_summary.venue}`,
+      `- Clock / score: ${dossier.match_summary.clock ?? "n/a"} · NLA ${dossier.storyboard.score.NLA}–${dossier.storyboard.score.MCS} MCS`,
+      `- Synthetic provenance: ${dossier.match_summary.synthetic_provenance ? "yes" : "no"}`,
+      `- Source: ${dossier.match_summary.data_source}`,
+      "",
+      "## 2 · Deterministic Stage B",
+      `- Peak chaos index: ${dossier.stage_b.peak_chaos_index.toFixed(3)}`,
+      `- Team PPDA: ${JSON.stringify(dossier.stage_b.team_ppda)}`,
+      `- Top ΔxT: ${dossier.stage_b.top_delta_xt.map((row) => `${row.clock} ${row.player} ${row.delta_xt.toFixed(3)}`).join("; ") || "n/a"}`,
+      ghost
+        ? `- Ghost counterfactual: ${ghost.player_name ?? ghost.player_id ?? "carrier"} → ${ghost.target_id ?? "target"} · actual ${ghost.actual_delta_xt.toFixed(3)} xT · ghost ${ghost.ghost_delta_xt.toFixed(3)} xT · net ${ghost.net_xt_gain.toFixed(3)} xT · ${ghost.completion_probability?.toFixed(0) ?? "n/a"}% completion`
+        : "- Ghost counterfactual: unavailable",
+      "",
+      "## 3 · Three-act storyboard",
+      ...dossier.storyboard.acts.flatMap((act) => [
+        `### Act ${act.act} — ${act.title} (${act.clock})`,
+        act.subtitle,
+        `PDR ${act.pdr.toFixed(0)}% · Actual ${act.delta_xt.toFixed(2)} xT · Ghost ${act.ghost_pass.delta_xt.toFixed(2)} xT · Net ${(act.ghost_pass.net_xt_gain ?? (act.ghost_pass.delta_xt - act.delta_xt)).toFixed(2)} xT`,
+        act.localized_commentary?.[lang] ?? "",
+        "",
+      ]),
+      "## 4 · Foundry + multi-agent execution",
+      `- Trace: ${foundry.trace_id}`,
+      `- Mode / model: ${foundry.mode} / ${foundry.model}`,
+      `- Anchor: ${foundry.anchor_clock}`,
+      `- Handoffs: ${foundry.handoff_chain.map((span) => `${span.agent} [${span.status}]`).join(" → ") || "edge-local"}`,
+      `- Gate: ${foundry.gate ? `PDR ${foundry.gate.pdr ?? "n/a"} · ΔxT ${foundry.gate.delta_xt ?? "n/a"} · Δchaos ${foundry.gate.delta_chaos ?? "n/a"}` : "n/a"}`,
+      `- Grounding: ${foundry.grounding ? `${foundry.grounding.status} (${foundry.grounding.score.toFixed(0)}%, ${foundry.grounding.checked_numbers} numbers checked)` : "n/a"}`,
+      `- Guardrail: ${foundry.guardrail?.triggered ? `TRIGGERED — ${foundry.guardrail.action}` : "not triggered"}`,
+      `- Handoff counts: ${JSON.stringify(foundry.handoff_counts)}`,
+      `- Latency P95: ${JSON.stringify(foundry.latency_p95)}`,
+      "",
+      "## 5 · Compliance & provenance",
+      ...Object.entries(dossier.compliance).map(([key, value]) => `- ${key}: ${String(value)}`),
+      `- Data lineage: ${dossier.provenance.data_path}`,
+      "",
+    ];
+    downloadFile(
+      `aether-pitch-audit-dossier-${stamp}.md`,
+      lines.join("\n"),
+      "text/markdown;charset=utf-8",
+    );
   };
 
   if (!open) return null;
@@ -204,6 +402,23 @@ export default function MatchRecapStudioModal({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <button
+              onClick={() => exportDossier("json")}
+              disabled={!data || loading}
+              className="modal-action clip-skew"
+              data-tone="gold"
+              aria-label="Export full match and Foundry audit dossier as JSON"
+            >
+              <Download size={12} /> <span className="hidden sm:inline">Dossier</span> JSON
+            </button>
+            <button
+              onClick={() => exportDossier("md")}
+              disabled={!data || loading}
+              className="modal-action clip-skew"
+              aria-label="Export full match and Foundry audit dossier as Markdown"
+            >
+              <FileText size={12} /> <span className="hidden sm:inline">Dossier</span> MD
+            </button>
             <button
               onClick={exportTeleprompter}
               disabled={!teleprompter || loading}

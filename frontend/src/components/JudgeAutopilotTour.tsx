@@ -1,5 +1,5 @@
 "use client";
-// AETHER PITCH v5.0 — Judge Autopilot step banner. The 6-step engine
+// AETHER PITCH v6.1 — Judge Autopilot step banner. The 6-step engine
 // (timers, voiceover, step choreography) lives in the page orchestrator so
 // the TopBar trigger and the banner share one source of truth.
 
@@ -9,6 +9,8 @@ export interface AutopilotStep {
   label: string;
   title: string;
   rubric: string;
+  prizeTrackBadge: string;
+  technicalProof: string;
   voiceover: string;
   at: number;
   duration: number;
@@ -20,7 +22,9 @@ export const AUTOPILOT_STEPS: AutopilotStep[] = [
   {
     label: "LIVE 3D INGEST",
     title: "AI Broadcast Activation",
-    rubric: "10Hz 3D tracking · 22 players",
+    rubric: "10Hz 3D tracking / 22 players",
+    prizeTrackBadge: "Best Real-Time 3D",
+    technicalProof: "22-player 10Hz synthetic twin",
     voiceover: "Welcome to AETHER PITCH. The engine just ingested twenty-two players at ten hertz, and the AI broadcast is live.",
     at: 0,
     duration: 10,
@@ -29,6 +33,8 @@ export const AUTOPILOT_STEPS: AutopilotStep[] = [
     label: "GOD-MODE SCENARIO",
     title: "Chaos Counter Injection",
     rubric: "God Mode scenario + live control surface",
+    prizeTrackBadge: "Best Use of Data",
+    technicalProof: "Deterministic chaos + PDR gate",
     voiceover: "Judge trigger: chaos counter. Watch the control mesh flip, the defensive lasers fire, and the line-breaking pass arrive in under two seconds.",
     at: 10,
     duration: 14,
@@ -36,7 +42,9 @@ export const AUTOPILOT_STEPS: AutopilotStep[] = [
   {
     label: "FREEZE & TELESTRATE",
     title: "Time Machine + Spatial Beam",
-    rubric: "DVR freeze · spotlight · ghost counterfactual",
+    rubric: "DVR freeze / spotlight / ghost counterfactual",
+    prizeTrackBadge: "Best Use of Data",
+    technicalProof: "15s DVR + ghost-pass counterfactual",
     voiceover: "Freeze the live feed. The DVR holds every ten-hertz frame. We spotlight the key players and draw the optimal ghost lane in 3D space.",
     at: 24,
     duration: 12,
@@ -45,22 +53,28 @@ export const AUTOPILOT_STEPS: AutopilotStep[] = [
     label: "BROADCAST ALPHA",
     title: "Transparent AR Compositing",
     rubric: "Chromakey / alpha overlay for live TV",
+    prizeTrackBadge: "Best Azure Cloud-Native",
+    technicalProof: "SMPTE broadcast alpha output",
     voiceover: "This is broadcast alpha. Every opaque surface is stripped away, leaving only the AR layer ready for a real television compositor.",
     at: 36,
     duration: 12,
   },
   {
-    label: "FAN PERSONALIZATION",
-    title: "Metric Lock + Club Lens + i18n",
-    rubric: "Stage E · ES / AR / HI localization",
-    voiceover: "One fan wants pass quality, another wants chaos, another wants their club lens. Stage E adapts the same moment in Spanish, Arabic, and Hindi without freezing the stream.",
+    label: "FOUNDRY + FAN",
+    title: "Grounded Trace + Personalization",
+    rubric: "Stage E / ES, AR, HI localization",
+    prizeTrackBadge: "Best Foundry / Multi-Agent",
+    technicalProof: "Grounded 4-node handoff + 4-language Stage E",
+    voiceover: "Behind this moment, the Data tab records the grounded four-node handoff: gate, triage, narrative, and director. Stage E adapts it for every fan without freezing the stream.",
     at: 48,
     duration: 14,
   },
   {
     label: "3-ACT FINALE",
     title: "Championship Storyboard",
-    rubric: "Milestones · recap · rubric proof",
+    rubric: "Milestones / recap / rubric proof",
+    prizeTrackBadge: "Best in Show",
+    technicalProof: "Full five-stage studio automation",
     voiceover: "And the finale: three acts, full player snapshots, ghost-pass counterfactuals, and a downloadable teleprompter. The rubric proof follows on screen. That is the AETHER PITCH championship cut.",
     at: 62,
     duration: 18,
@@ -89,14 +103,22 @@ export default function JudgeAutopilotTour({ active, currentStep, elapsed }: Pro
       >
         <div className="flex items-center justify-between">
           <span className="font-display text-[9px] font-bold uppercase tracking-[0.28em] text-gold">
-            Rubric {currentStep + 1}/6 · {step.label}
+            Rubric {currentStep + 1}/6 / {step.label}
           </span>
           <span className="font-tech text-[9px] font-bold text-tactical">{step.rubric}</span>
         </div>
         <div className="mt-0.5 font-display text-[15px] font-bold uppercase tracking-wide text-white">
           {step.title}
         </div>
-        <p className="mt-0.5 line-clamp-2 text-[10.5px] leading-snug text-slate-300">
+        <div className="mt-1 flex flex-wrap items-center gap-1">
+          <span className="border border-gold/40 bg-gold/15 px-1.5 py-0.5 font-tech text-[7.5px] font-bold uppercase tracking-[0.12em] text-gold">
+            {step.prizeTrackBadge}
+          </span>
+          <span className="border border-tactical/30 bg-tactical/10 px-1.5 py-0.5 font-tech text-[7.5px] font-bold uppercase tracking-[0.12em] text-tactical">
+            {step.technicalProof}
+          </span>
+        </div>
+        <p className="mt-1 line-clamp-2 text-[10.5px] leading-snug text-slate-300">
           {step.voiceover}
         </p>
         <div className="mt-1.5 h-1 overflow-hidden bg-white/10">

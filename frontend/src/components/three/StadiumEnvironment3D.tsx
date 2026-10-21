@@ -288,7 +288,7 @@ function AdBoard({ pos, rot, w, h = 1.1 }: { pos: [number, number, number]; rot:
         "AZURE AI FOUNDRY",
         "TACTICAL PULSE: CONTROL VS CHAOS",
         "PITCHFORGE",
-        "LENOVO 3D DIGITAL TWIN",
+        "AETHER 3D DIGITAL TWIN",
         "PLAYERLOCK 360",
       ]),
     []

@@ -1,4 +1,4 @@
-# AETHER PITCH v5.0 — Championship Finale & Judge-Domination Upgrade
+# AETHER PITCH v6.1 — Championship Finale & Judge-Domination Upgrade
 
 **Tagline:** *AETHER PITCH — the championship finale, rendered live in 3D and personalized for every fan.*
 
@@ -19,10 +19,11 @@ Judges usually see a highlight reel. AETHER PITCH lets them **drive the broadcas
 4. **A three-act finale** — the milestone engine detects sprint records, five-pass mastery, and 30-second press sieges, then freezes full 22-player snapshots into a downloadable storyboard.
 5. **A judge autopilot** — one click runs an 80-second, six-step rubric tour with synchronized voiceover, then hands off from the recap to the rubric proof without overlapping dialogs.
 6. **A resilient engine** — if Azure or the backend drops, a 10 Hz browser-native synthetic engine takes over immediately and hot-swaps back when the WebSocket returns.
+7. **A grounded handoff trace** — every gated insight records the real gate decision, Stage C route, measured latency, numeric grounding check, and D/E broadcast handoff in one inspectable trace.
 
 ---
 
-## 2. What Is New in v5.0
+## 2. What Is New in v6.1
 
 | # | Module | New files / surfaces | Judge-visible outcome |
 |---|--------|----------------------|-----------------------|
@@ -31,9 +32,10 @@ Judges usually see a highlight reel. AETHER PITCH lets them **drive the broadcas
 | 3 | Spatial Control Surface + Passing Network | `frontend/src/components/three/SpatialControlSurface3D.tsx` | 21×14 Gaussian pitch-control heat surface and elevated 3D pass network |
 | 4 | Judge Autopilot Tour | `frontend/src/components/JudgeAutopilotTour.tsx` | 80-second, six-step demo with rubric callouts, voiceover, and a sequenced recap-to-rubric finale |
 | 5 | Resilient Match Engine | `frontend/src/hooks/useResilientMatchEngine.ts`, `frontend/src/lib/edgeEngine.ts` | 10 Hz edge fallback, seamless WebSocket hot-swap, live/edge status pill |
-| 6 | Submission Package | this guide + `frontend/src/components/three/RecapPassTubes.tsx`, `PipelineInspector` status | Complete architecture, math appendix, and sub-two-minute demo script |
+| 6 | Grounded Agent Trace | `backend/agent_trace.py`, `frontend/src/components/PipelineInspector.tsx`, `frontend/src/lib/types.ts`, `frontend/src/lib/edgeEngine.ts` | 4-node handoff DAG, gate economy, measured handoff latency, numeric grounding result, edge fallback trace |
+| 7 | Submission Package | this guide + `frontend/src/components/three/RecapPassTubes.tsx`, `PipelineInspector` status | Complete architecture, math appendix, and sub-two-minute demo script |
 
-The live HUD also exposes an always-visible A–E **PipelineRibbon** and a **MatchIntelPanel** beneath the scorebug, so judges can see stage latency and match intelligence without opening a modal.
+The live HUD stays deliberately calm: the 3D pitch, scorebug, and five primary actions are visible by default. One **Controls** button opens a **Control Center** containing the A–E PipelineRibbon, MatchIntelPanel, camera director, AI voices, fan personalization, co-pilot, CV view, payload inspector, and production tools. Judges can therefore inspect stage latency and match intelligence on demand without the broadcast view becoming a command centre.
 
 ---
 
@@ -86,7 +88,7 @@ The live HUD also exposes an always-visible A–E **PipelineRibbon** and a **Mat
 | Localization | **Azure AI Translator** | Implemented when `AZURE_TRANSLATOR_*` is set; local phrase atlas otherwise |
 | Compute | **Azure Container Apps** | Deployment option via `backend/Dockerfile`, `frontend/Dockerfile`, and `azure.yaml` |
 | Realtime fan-out | **FastAPI WebSocket hub** | Implemented; Azure Web PubSub is not wired |
-| Observability | **Pipeline Inspector + `/api/health/pipeline-audit`** | Implemented; Azure Monitor is a deployment option |
+| Observability | **Pipeline Inspector + `/api/health/pipeline-audit`** | Implemented with live trace, gate economy, P95 stage latency, and grounding checks; Azure Monitor is a deployment option |
 | Secrets | **`.env` / container environment** | Implemented; Azure Key Vault is a deployment option |
 | Images | **Docker** | Local build path; Azure Container Registry and `azd` are deployment options |
 | IaC | **`docker-compose.yml` + `azure.yaml`** | Compose works today; `azure.yaml` is a service manifest and needs your own `azd` infrastructure |
@@ -117,7 +119,7 @@ Stage B exposes cumulative `team_stats` and `player_stats`: passes and completio
 
 ### 4.2 Audit truthfulness
 
-`GET /api/health/pipeline-audit` returns `stage_modes`, `stage_c_audit_mode`, measured Stage D/E timings, and Azure connection status. The audit's Stage C path is deterministic by design and labels itself `local_fallback`; when Azure credentials are configured, stage modes report `azure_ready` rather than claiming that a live model call completed. The rubric modal renders those labels directly.
+`GET /api/health/pipeline-audit` returns `stage_modes`, `stage_c_audit_mode`, measured Stage A–E timings, P95 latency, gate economy, a sample `agent_trace`, grounding results, handoff counts, and Azure connection status. The audit's Stage C path is deterministic by design and labels itself `local_fallback`; when Azure credentials are configured, stage modes report `azure_ready` rather than claiming that a live model call completed. The rubric modal renders those labels directly. Every gated insight also carries a four-node `agent_trace`; if an Azure narrative cites a number that cannot be matched to the Stage B snapshot, the guardrail swaps in the deterministic template and records the unmatched tokens in the trace.
 
 ---
 
@@ -278,11 +280,11 @@ The two layers are independent toggles (`pitchControl`, `passingNetwork`) in `Ca
 
 | Step | Time | Action | Rubric |
 |------|------|--------|--------|
-| 1 | 0–10 s | Force CV Auto-Eventer open, Tele camera | 10 Hz ingest · 22 players |
-| 2 | 10–24 s | Enable control surface + passing network + lasers; inject `chaos_counter` | God Mode + AI camera |
-| 3 | 24–36 s | Pause DVR, drone orbit, spotlight, offside wall, ghost lane | Freeze + telestrate |
-| 4 | 36–48 s | Resume, enter broadcast alpha for ~6.5 s | Transparent AR compositing |
-| 5 | 48–62 s | Alpha off, Player Lock 3rd person, TwinCast split, `PASS_QUALITY`, ES → HI → AR | Stage E personalization |
+| 1 | 0–10 s | Force the CV Auto-Eventer overlay open, Tele camera | 10 Hz ingest · 22 players |
+| 2 | 10–24 s | Close CV overlay; enable control surface + passing network + lasers; inject `chaos_counter` | God Mode + AI camera |
+| 3 | 24–36 s | Open Replay popover; pause DVR, drone orbit, spotlight, offside wall, ghost lane | Freeze + telestrate |
+| 4 | 36–48 s | Close popover, resume, enter broadcast alpha for ~6.5 s | Transparent AR compositing |
+| 5 | 48–62 s | Alpha off, Player Lock 3rd person + Players popover, TwinCast split, `PASS_QUALITY`, ES → HI → AR | Stage E personalization |
 | 6 | 62–80 s | Open 3-act recap; swap to rubric proof at 70 s | Milestones + proof |
 
 Voiceover uses the same zero-overlap speech controller as the broadcast, which suppresses automatic commentary so the tour never talks over itself. The callout above the pitch shows the current rubric, action, and 80-second progress bar. Pressing the button again stops the tour, clears timers/alpha/CV override, and restores automatic commentary.
@@ -419,6 +421,28 @@ Or launch both with `start_studio.bat` (Windows) / `bash start_studio.sh`.
 
 No credentials? Everything still runs through deterministic fallbacks. Add `AZURE_OPENAI_*` and `AZURE_TRANSLATOR_*` to `backend/.env` for cloud reasoning and translation.
 
+### Cloud-native deployment topology
+
+The repo ships application containers and an `azure.yaml` service manifest, not a turnkey infrastructure template. The target Azure deployment is:
+
+| Layer | Azure target | Shipped artifact | Production note |
+|---|---|---|---|
+| Frontend | Azure Static Web Apps or Azure Container Apps | `frontend/Dockerfile`, `azure.yaml` | Set `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` to the backend ingress. |
+| Backend + WebSocket | Azure Container Apps | `backend/Dockerfile`, `azure.yaml` | Port 8000, `/api/health` probe, one warm replica for the demo. |
+| Reasoning | Azure AI Foundry / Azure OpenAI | `AZURE_OPENAI_*` contract | Triage and narrative deployments; deterministic fallback when unset. |
+| Localization | Azure AI Translator | `AZURE_TRANSLATOR_*` contract | Optional; local EN/ES/AR/HI atlas remains available. |
+| Images | Azure Container Registry | Dockerfiles + `azd` | Build once, deploy the same image. |
+| Observability | Azure Monitor + Application Insights | `/api/health/pipeline-audit` | Alert on health, Stage C P95, and WebSocket disconnects. |
+| Secrets | Azure Key Vault | `.env.example` contract | Prefer managed identity; never expose keys through `NEXT_PUBLIC_*`. |
+| Realtime scale | Azure Web PubSub or Redis backplane | Not wired | Add a backplane before scaling the FastAPI hub past one replica. |
+
+```bash
+azd auth login
+azd up
+```
+
+Use Docker Compose for the zero-setup local demo. For a hosted judging URL, restrict CORS to the frontend origin and keep the deterministic fallbacks enabled so a model outage cannot take the demo down.
+
 ---
 
 ## 8. Demo Video Script (must be under 2:00)
@@ -428,16 +452,16 @@ Official Rules §4.4 requires the demo video to be **less than two minutes**. Re
 | Time | On screen | Say |
 |------|-----------|-----|
 | **0:00–0:08** | Studio opens on Tele Cam | “This is AETHER PITCH: a live 3D football broadcast running on 100% synthetic 10 Hz telemetry.” |
-| **0:08–0:12** | Click **Run 80s Judge Autopilot** | “One click runs an 80-second guided tour of the whole stack.” |
-| **0:12–0:34** | Steps 1–2: CV viewport, control surface, lasers, Chaos Counter | “Every overlay comes from the five-stage pipeline: ingest, interpret, explain, render, personalize.” |
+| **0:08–0:12** | Click **Autopilot** | “One click runs an 80-second guided tour of the whole stack.” |
+| **0:12–0:34** | Step 1 opens the CV overlay; step 2 closes it for control surface, lasers, Chaos Counter | “Every overlay comes from the five-stage pipeline: ingest, interpret, explain, render, personalize.” |
 | **0:34–0:50** | Step 3: DVR freeze, drone orbit, spotlight, offside wall, ghost lane | “Freeze live play, scrub 15 seconds, and telestrate the full 22-player snapshot in 3D.” |
 | **0:50–1:04** | Step 4: broadcast alpha | “Alpha mode strips every opaque surface, leaving a transparent AR layer for any broadcast compositor.” |
 | **1:04–1:22** | Steps 5–6: Fan Tuner, Pass Quality, NLA lens, ES → HI → AR, recap then rubric | “The same moment becomes a different story per fan: persona, metric lock, club lens, and language.” |
 | **1:22–1:38** | Inspect milestones; click **Load Act** on Act 2; export teleprompter | “The milestone engine builds a three-act recap; Load Act restores the exact moment and draws actual versus ghost.” |
-| **1:38–1:50** | Click **Verify**; toggle the backend offline, then back | “A one-click five-stage audit, plus a 10 Hz edge engine that keeps the picture alive if the backend drops.” |
+| **1:38–1:50** | Open **Controls → Studio**; click **Verify**; toggle the backend offline, then back | “A one-click five-stage audit, plus a 10 Hz edge engine that keeps the picture alive if the backend drops.” |
 | **1:50–1:58** | Close on the live pitch | “AETHER PITCH — synthetic football, real mathematics, broadcast-grade 3D.” |
 
-**Fallback 20-second version:** open the studio → Run Autopilot → skip to the recap and press **Verify**.
+**Fallback 20-second version:** open the studio → Autopilot → skip to the recap and open **Controls → Studio → Verify**.
 
 ---
 
@@ -446,7 +470,7 @@ Official Rules §4.4 requires the demo video to be **less than two minutes**. Re
 | Criterion | Where to look | Proof |
 |-----------|---------------|-------|
 | **Real-time 3D / broadcast quality** | Full-bleed R3F stadium, 22 avatars, 60 FPS interpolation | Tele cam, drone orbit, player lock, GOAL slam |
-| **Azure AI integration** | Pipeline Inspector + `/api/health/pipeline-audit` | Stage A→E latency, `stage_modes`, Azure posture, raw payloads, deterministic fallbacks |
+| **Azure AI integration** | Pipeline Inspector + `/api/health/pipeline-audit` | Stage A→E latency, P95, gate economy, grounded agent trace, `stage_modes`, Azure posture, raw payloads, deterministic fallbacks |
 | **Football intelligence** | Tactical Pulse, xT grid, PDR, ghost pass, defensive lasers, pass accuracy/distance leaders | Stage B math appendix |
 | **Personalization** | Fan Tuner + TwinCast badges + localized speech | Persona, metric lock, club bias, ES/AR/HI |
 | **Storytelling** | Milestones + three-act recap + teleprompter | Sprint/pass/press records, `LOAD ACT` time travel |
@@ -494,7 +518,7 @@ Responsive screenshots (1366×768, 1920×1080):
 
 ---
 
-## 11. Repository Map (v5 additions in bold)
+## 11. Repository Map (v6 additions included)
 
 ```text
 backend/
@@ -502,6 +526,7 @@ backend/
   stage_b_math_engine.py           # chaos / PDR / xT / ghost / gate
   stage_c_foundry_agents.py        # Azure AI Foundry + recap_storyboard
   stage_d_e_personalizer.py        # overlays + personalization + i18n
+  agent_trace.py                   # grounded 4-node handoff + numeric cross-check
   main.py                          # WS hub, recap archive, v5 REST
   test_pipeline.py
 
@@ -514,7 +539,7 @@ frontend/src/
     MatchRecapStudioModal.tsx      # 3-act recap + time travel + export
     JudgeAutopilotTour.tsx         # 80 s / 6-step rubric tour
     TwinCastHUD.tsx                # metric-lock + club-lens badges
-    PipelineInspector.tsx          # live/edge status pill
+    PipelineInspector.tsx          # 4-node trace DAG + gate + grounding
     VisionAutoEventerHUD.tsx       # external expanded override
     three/
       SpatialControlSurface3D.tsx  # 21×14 control surface + pass network
@@ -561,4 +586,4 @@ frontend/src/
 
 ---
 
-**AETHER PITCH v5.0** · Synthetic football. Real mathematics. Broadcast-grade 3D. Built for the championship finale.
+**AETHER PITCH v6.1** · Synthetic football. Real mathematics. Broadcast-grade 3D. Built for the championship finale.

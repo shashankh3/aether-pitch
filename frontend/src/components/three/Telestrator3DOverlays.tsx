@@ -255,6 +255,8 @@ function CompactnessPolygon() {
 function GhostReplayBall() {
   const mesh = useRef<THREE.Mesh>(null);
   const light = useRef<THREE.PointLight>(null);
+  const ringA = useRef<THREE.Mesh>(null);
+  const ringB = useRef<THREE.Mesh>(null);
   const trail = useMemo(() => {
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(24 * 3), 3));
@@ -272,7 +274,13 @@ function GhostReplayBall() {
     const ghost = telemetry.ghost;
     const b = telemetry.ball;
     const fresh = ghost && performance.now() - ghost.at < 8000;
-    if (!fresh) { m.visible = false; trail.visible = false; return; }
+    if (!fresh) {
+      m.visible = false;
+      trail.visible = false;
+      if (ringA.current) ringA.current.visible = false;
+      if (ringB.current) ringB.current.visible = false;
+      return;
+    }
     const start = new THREE.Vector3((b.pass_start?.[0] ?? b.x) - 52.5, 0.2, (b.pass_start?.[1] ?? b.y) - 34);
     const end = new THREE.Vector3(ghost!.x - 52.5, 0.2, ghost!.y - 34);
     const mid = start.clone().add(end).multiplyScalar(0.5).setY(1.4);
@@ -282,6 +290,19 @@ function GhostReplayBall() {
     m.visible = true;
     m.position.copy(p);
     if (light.current) light.current.position.copy(p);
+    const pulse = 0.5 + 0.5 * Math.sin(state.clock.elapsedTime * 4.2);
+    if (ringA.current) {
+      ringA.current.visible = true;
+      ringA.current.position.set(end.x, 0.06, end.z);
+      ringA.current.scale.setScalar(0.82 + pulse * 0.28);
+      (ringA.current.material as THREE.MeshBasicMaterial).opacity = 0.45 + pulse * 0.35;
+    }
+    if (ringB.current) {
+      ringB.current.visible = true;
+      ringB.current.position.set(end.x, 0.05, end.z);
+      ringB.current.scale.setScalar(1.2 + pulse * 0.55);
+      (ringB.current.material as THREE.MeshBasicMaterial).opacity = 0.28 * (1 - pulse);
+    }
     const attr = trail.geometry.getAttribute("position") as THREE.BufferAttribute;
     for (let i = 0; i < 24; i++) {
       const pt = curve.getPoint(clamp01(u - i * 0.012));
@@ -297,6 +318,14 @@ function GhostReplayBall() {
         <meshStandardMaterial color={0x00f0ff} emissive={0x00f0ff} emissiveIntensity={2.2} transparent opacity={0.85} toneMapped={false} />
       </mesh>
       <pointLight ref={light} color={0x00f0ff} intensity={4} distance={9} decay={2} />
+      <mesh ref={ringA} rotation={[-Math.PI / 2, 0, 0]} visible={false}>
+        <ringGeometry args={[1.0, 1.28, 56]} />
+        <meshBasicMaterial color={0x00f0ff} transparent opacity={0.7} side={THREE.DoubleSide} toneMapped={false} />
+      </mesh>
+      <mesh ref={ringB} rotation={[-Math.PI / 2, 0, 0]} visible={false}>
+        <ringGeometry args={[1.28, 1.36, 56]} />
+        <meshBasicMaterial color={0x00f0ff} transparent opacity={0.25} side={THREE.DoubleSide} toneMapped={false} />
+      </mesh>
       <primitive object={trail} />
     </group>
   );

@@ -28,6 +28,7 @@ from typing import Any, Dict, List, Optional, Set
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
+from agent_trace import build_agent_trace, gate_snapshot, p95, verify_grounding
 from config import settings
 from stage_a_synthetic_engine import PitchForgeEngine
 from stage_b_math_engine import TacticalMathEngine
@@ -84,7 +85,8 @@ class Hub:
 hub = Hub()
 last_state: dict = {}
 last_metrics: dict = {}
-last_ghost: Optional[tuple] = None    # (expire_t_match, [gx, gy], delta_xt)
+last_ghost: Optional[tuple] = None    # expire, target xy, ghost ΔxT, actual ΔxT, target id, completion %, net gain
+latest_ghost_counterfactual: Optional[dict] = None
 insights: deque = deque(maxlen=40)
 top_inflections: List[dict] = []
 recap_archive: deque = deque(maxlen=80)
@@ -99,14 +101,30 @@ pipeline: Dict[str, Any] = {
     "stages": {k: {"latency_ms": 0.0} for k in "abcde"},
     "payloads": {k: "" for k in "abcde"},
     "updated_at": None,
+    "agent_trace": None,
+    "gate": gate_snapshot({}),
+    "latency_p95": {k: 0.0 for k in "abcde"},
 }
 insight_counter = 0
 last_insight_real_ts = 0.0
 last_insight_priority = 0.0
+latest_agent_trace: Optional[dict] = None
+gate_stats = {
+    "ticks": 0,
+    "events_considered": 0,
+    "events_gated": 0,
+    "insights": 0,
+    "azure_insights": 0,
+    "fallback_insights": 0,
+    "grounding_pass": 0,
+}
+latency_samples = {k: deque(maxlen=300) for k in "abcde"}
 
 
 def _stamp_pipeline(stage: str, latency_ms: float, payload: Any) -> None:
     pipeline["stages"][stage]["latency_ms"] = round(latency_ms, 2)
+    latency_samples[stage].append(float(latency_ms))
+    pipeline["latency_p95"][stage] = p95(latency_samples[stage])
     try:
         pipeline["payloads"][stage] = json.dumps(payload, default=str)[:900]
     except Exception:
@@ -151,8 +169,10 @@ def _fallback_pass(state: dict) -> dict:
     end_p = next((p for p in attack if p.get("id") != start_p.get("id")), attack[0])
     start = {"x": round(start_p.get("x", 52.5), 2), "y": round(start_p.get("y", 34.0), 2)}
     end = {"x": round(end_p.get("x", 78.0), 2), "y": round(end_p.get("y", 34.0), 2)}
+    actual_delta = math.delta_xt(team, (start["x"], start["y"]), (end["x"], end["y"]))
     ghost = math.ghost_pass(
-        state, team, start_p.get("id"), (start["x"], start["y"])) or {}
+        state, team, start_p.get("id"), (start["x"], start["y"]),
+        actual_delta_xt=actual_delta) or {}
     gx = ghost.get("x", min(100.0, end["x"] + 6.0))
     gy = ghost.get("y", 48.0 if end["y"] < 34.0 else 20.0)
     return {
@@ -160,6 +180,11 @@ def _fallback_pass(state: dict) -> dict:
         "ghost": {
             "start": start, "end": {"x": round(gx, 2), "y": round(gy, 2)},
             "delta_xt": float(ghost.get("delta_xt") or 0.214),
+            "actual_delta_xt": round(float(actual_delta), 3),
+            "ghost_delta_xt": float(ghost.get("ghost_delta_xt") or ghost.get("delta_xt") or 0.214),
+            "net_xt_gain": float(ghost.get("net_xt_gain") or 0.0),
+            "completion_probability": float(ghost.get("completion_probability") or 0.0),
+            "receiver_target_xy": ghost.get("receiver_target_xy") or {"x": round(gx, 2), "y": round(gy, 2)},
             "target_id": ghost.get("target_id"),
             "openness_m": float(ghost.get("openness_m") or 12.0),
         },
@@ -208,15 +233,29 @@ async def build_match_recap() -> dict:
             "end": {"x": float(ev_end[0]), "y": float(ev_end[1])} if ev_end else pair["actual"]["end"],
         }
         ghost_ev = used_ev.get("ghost_pass") or pair["ghost"]
+        team = used_ev.get("team") or state.get("possession") or "NLA"
+        actual_delta = math.delta_xt(
+            team,
+            (actual["start"]["x"], actual["start"]["y"]),
+            (actual["end"]["x"], actual["end"]["y"]),
+        )
+        ghost_delta = float(ghost_ev.get("delta_xt") or pair["ghost"]["delta_xt"])
         ghost = {
             "start": actual["start"],
             "end": {"x": float(ghost_ev.get("x", pair["ghost"]["end"]["x"])),
                     "y": float(ghost_ev.get("y", pair["ghost"]["end"]["y"]))},
-            "delta_xt": float(ghost_ev.get("delta_xt") or pair["ghost"]["delta_xt"]),
+            "delta_xt": ghost_delta,
+            "actual_delta_xt": round(float(ghost_ev.get("actual_delta_xt", actual_delta)), 3),
+            "ghost_delta_xt": float(ghost_ev.get("ghost_delta_xt") or ghost_delta),
+            "net_xt_gain": float(ghost_ev.get("net_xt_gain") or (ghost_delta - actual_delta)),
+            "completion_probability": float(ghost_ev.get("completion_probability") or 0.0),
+            "receiver_target_xy": ghost_ev.get("receiver_target_xy") or {
+                "x": float(ghost_ev.get("x", pair["ghost"]["end"]["x"])),
+                "y": float(ghost_ev.get("y", pair["ghost"]["end"]["y"])),
+            },
             "target_id": ghost_ev.get("target_id") or pair["ghost"].get("target_id"),
             "openness_m": float(ghost_ev.get("openness_m") or pair["ghost"].get("openness_m", 0.0)),
         }
-        team = used_ev.get("team") or state.get("possession") or "NLA"
         carrier = state.get("carrier")
         pressers = [pid for pid in (used_ev.get("players") or []) if pid]
         primary_id = used_ev.get("player_id") or (pressers[0] if pressers else carrier)
@@ -288,7 +327,7 @@ async def build_match_recap() -> dict:
 
 async def make_insight(ev: dict, metrics: dict, state: dict) -> None:
     """Stage (c) -> (d) -> (e) for one gated event, then broadcast the packet."""
-    global insight_counter, last_insight_real_ts, last_ghost
+    global insight_counter, last_insight_real_ts, last_ghost, latest_agent_trace
     ctx = {
         "event": ev,
         "metrics": metrics,
@@ -301,6 +340,24 @@ async def make_insight(ev: dict, metrics: dict, state: dict) -> None:
         "personalization": active_personalization,
     }
     stage_c = await foundry.explain(ctx)
+    guardrail = None
+    if stage_c.get("mode") == "azure":
+        check = verify_grounding(stage_c, ev, metrics, state)
+        if check["status"] == "review":
+            guardrail = {
+                "triggered": True,
+                "action": "replaced_with_deterministic_fallback",
+                "unmatched_numbers": check["unmatched_numbers"],
+                "attempted_mode": "azure",
+            }
+            stage_c = {
+                **foundry._fallback_explain(ctx),
+                "mode": "fallback",
+                "degraded": True,
+                "model": "grounding-guard-v1",
+                "agent_timings": stage_c.get("agent_timings", {}),
+                "latency_ms": stage_c.get("latency_ms", 0.0),
+            }
     packet = await personalizer.build_async(
         stage_c, ev, metrics, state["score"], active_personalization, state)
     insight_counter += 1
@@ -312,8 +369,6 @@ async def make_insight(ev: dict, metrics: dict, state: dict) -> None:
         "archetype": stage_c.get("archetype", "rhythm_shift"),
         **packet,
     }
-    insights.append(data)
-    last_insight_real_ts = time.perf_counter()
     ghost = data["stage_d_broadcast_overlay"].get("draw_ghost_pass") and ev.get("ghost_pass")
     if ghost:
         last_ghost = (state["t_match"] + 4.0, [ghost["x"], ghost["y"]], ghost.get("delta_xt", 0.0))
@@ -325,6 +380,25 @@ async def make_insight(ev: dict, metrics: dict, state: dict) -> None:
     })
     _stamp_pipeline("d", personalizer.last_d_ms, data["stage_d_broadcast_overlay"])
     _stamp_pipeline("e", personalizer.last_e_ms, data["stage_e_personalization"])
+    trace = build_agent_trace(
+        ev, metrics, state, stage_c, data,
+        stage_b_ms=pipeline["stages"]["b"]["latency_ms"],
+        stage_d_ms=personalizer.last_d_ms,
+        stage_e_ms=personalizer.last_e_ms,
+        gate_stats=gate_stats,
+        guardrail=guardrail,
+    )
+    data["agent_trace"] = trace
+    latest_agent_trace = trace
+    gate_stats["insights"] += 1
+    if stage_c.get("mode") == "azure":
+        gate_stats["azure_insights"] += 1
+    else:
+        gate_stats["fallback_insights"] += 1
+    if trace["grounding"]["status"] != "review":
+        gate_stats["grounding_pass"] += 1
+    insights.append(data)
+    last_insight_real_ts = time.perf_counter()
     await hub.broadcast({"type": "insight", "data": data})
 
 
@@ -370,12 +444,14 @@ def _record_inflection(ev: dict) -> None:
 async def match_loop() -> None:
     """The heartbeat: 10Hz Stage (a) ticks; 2Hz metrics/pipeline packets."""
     global last_state, last_metrics, last_insight_real_ts, last_insight_priority, last_ghost
+    global latest_ghost_counterfactual
     next_real_metrics = time.perf_counter()
     math.scenario_active = None
     event_seq = 0
     insight_candidates: List[dict] = []
     while True:
         loop_t0 = time.perf_counter()
+        gate_stats["ticks"] += 1
 
         # ---- Stage (a): synthetic ingest --------------------------------
         t0 = time.perf_counter()
@@ -404,16 +480,45 @@ async def match_loop() -> None:
                     engine.set_badge([ev["player_id"]], "INCISIVE_PASS", 4.0)
                 ghost = ev.get("ghost_pass")
                 if ghost:
-                    last_ghost = (state["t_match"] + 4.0, [ghost["x"], ghost["y"]],
-                                  ghost.get("delta_xt", 0.0))
+                    ghost_delta = float(ghost.get("delta_xt") or 0.0)
+                    actual_delta = float(ev.get("delta_xt") or 0.0)
+                    last_ghost = (
+                        state["t_match"] + 4.0,
+                        [ghost["x"], ghost["y"]],
+                        ghost_delta,
+                        actual_delta,
+                        ghost.get("target_id"),
+                        float(ghost.get("completion_probability") or 0.0),
+                        float(ghost.get("net_xt_gain") or (ghost_delta - actual_delta)),
+                    )
+                    latest_ghost_counterfactual = {
+                        "clock": ev.get("clock"),
+                        "team": ev.get("team"),
+                        "player_id": ev.get("player_id"),
+                        "player_name": ev.get("player_name"),
+                        "target_id": ghost.get("target_id"),
+                        "actual_delta_xt": round(actual_delta, 3),
+                        "ghost_delta_xt": round(ghost_delta, 3),
+                        "net_xt_gain": round(ghost_delta - actual_delta, 3),
+                        "completion_probability": ghost.get("completion_probability"),
+                        "receiver_target_xy": ghost.get("receiver_target_xy"),
+                    }
             elif ev.get("type") == "PRESSURE_TRAP" and ev.get("players"):
                 engine.set_badge(list(ev["players"])[:3], "INTERCEPT", 4.0)
         if last_ghost and state["t_match"] < last_ghost[0]:
             state["ball"]["ghost_end"] = last_ghost[1]
             state["ball"]["ghost_delta_xt"] = round(last_ghost[2], 3)
+            state["ball"]["ghost_actual_delta_xt"] = round(last_ghost[3], 3)
+            state["ball"]["ghost_target_id"] = last_ghost[4]
+            state["ball"]["ghost_completion_probability"] = last_ghost[5]
+            state["ball"]["ghost_net_xt_gain"] = round(last_ghost[6], 3)
         elif state.get("ball"):
             state["ball"]["ghost_end"] = None
             state["ball"]["ghost_delta_xt"] = None
+            state["ball"]["ghost_actual_delta_xt"] = None
+            state["ball"]["ghost_target_id"] = None
+            state["ball"]["ghost_completion_probability"] = None
+            state["ball"]["ghost_net_xt_gain"] = None
 
         new_milestones = engine.milestones.update(state, enriched, metrics)
         for ev in enriched:
@@ -432,6 +537,8 @@ async def match_loop() -> None:
         now_real = time.perf_counter()
         if now_real >= next_real_metrics:
             next_real_metrics = now_real + 0.5
+            pipeline["agent_trace"] = latest_agent_trace
+            pipeline["gate"] = gate_snapshot(gate_stats)
             await hub.broadcast({"type": "metrics", "data": metrics})
             await hub.broadcast({"type": "pipeline", "data": pipeline})
 
@@ -440,7 +547,9 @@ async def match_loop() -> None:
             await hub.broadcast({"type": "event", "data": ev})
             _record_inflection(ev)
             gate = ev.get("ai_gate", {})
+            gate_stats["events_considered"] += 1
             if gate.get("should_explain"):
+                gate_stats["events_gated"] += 1
                 insight_candidates.append({
                     "ev": ev, "metrics": metrics, "state": state,
                     "at": now_real, "priority": _insight_priority(ev),
@@ -505,8 +614,11 @@ def _spatial_context(team: Optional[str] = None) -> dict:
         "gap_center": gap_center,
         "gap_defender": gap_defender,
         "fastest_sprinter": dict(fastest) if fastest else {},
+        "xt_at_gap": round(math.xt_value(team, gap_center["x"], gap_center["y"]), 3),
         "ghost": ({"x": last_ghost[1][0], "y": last_ghost[1][1],
-                   "delta_xt": last_ghost[2], "target_id": None}
+                   "delta_xt": last_ghost[2], "actual_delta_xt": last_ghost[3],
+                   "target_id": last_ghost[4], "completion_probability": last_ghost[5],
+                   "net_xt_gain": last_ghost[6]}
                   if last_ghost and st.get("t_match", 0) < last_ghost[0] else None),
         "def_lines": last_metrics.get("def_lines", {}) if last_metrics else {},
         "ppda": last_metrics.get("ppda", {}) if last_metrics else {},
@@ -545,6 +657,55 @@ async def _studio_query_handler(body: dict) -> dict:
 async def studio_query(body: dict) -> dict:
     """Bi-directional 'Ask The 12th Man' agentic co-pilot."""
     return await _studio_query_handler(body)
+
+
+def _stage_b_summary(metrics: dict) -> dict:
+    rows: List[dict] = []
+    for entry in list(recap_archive):
+        ev = entry.get("ev") or {}
+        if ev.get("delta_xt") is None:
+            continue
+        ghost = ev.get("ghost_pass") or {}
+        rows.append({
+            "clock": ev.get("clock") or entry.get("clock") or "—",
+            "player": ev.get("player_name") or ev.get("player_id") or "—",
+            "team": ev.get("team"),
+            "type": ev.get("type"),
+            "delta_xt": round(float(ev.get("delta_xt") or 0.0), 3),
+            "pdr": ev.get("pdr"),
+            "ghost_delta_xt": ghost.get("delta_xt"),
+        })
+    rows.sort(key=lambda r: r["delta_xt"], reverse=True)
+    history = metrics.get("chaos_history") or []
+    peak_chaos = max(history) if history else metrics.get("chaos_index", 0.0)
+    ghost = latest_ghost_counterfactual
+    if not ghost:
+        for entry in reversed(list(recap_archive)):
+            ev = entry.get("ev") or {}
+            candidate = ev.get("ghost_pass") or {}
+            if not candidate:
+                continue
+            actual = float(ev.get("delta_xt") or 0.0)
+            ghost_delta = float(candidate.get("delta_xt") or 0.0)
+            ghost = {
+                "clock": ev.get("clock") or entry.get("clock") or "—",
+                "team": ev.get("team"),
+                "player_id": ev.get("player_id"),
+                "player_name": ev.get("player_name"),
+                "target_id": candidate.get("target_id"),
+                "actual_delta_xt": round(actual, 3),
+                "ghost_delta_xt": round(ghost_delta, 3),
+                "net_xt_gain": round(ghost_delta - actual, 3),
+                "completion_probability": candidate.get("completion_probability"),
+                "receiver_target_xy": candidate.get("receiver_target_xy"),
+            }
+            break
+    return {
+        "peak_chaos_index": round(float(peak_chaos or 0.0), 3),
+        "team_ppda": metrics.get("ppda") or {},
+        "top_delta_xt": rows[:3],
+        "ghost_counterfactual": ghost,
+    }
 
 
 @app.get("/api/health/pipeline-audit")
@@ -594,9 +755,37 @@ async def pipeline_audit() -> dict:
         t_e += personalizer.last_e_ms
         sample_event, sample_c, sample_packet = ev, stage_c, packet
 
+    trace_stage_c = {
+        **sample_c,
+        "latency_ms": round(t_c / reps, 2),
+        "mode": sample_c.get("mode", "fallback"),
+    }
+    sample_trace = build_agent_trace(
+        sample_event, mets, st, trace_stage_c, sample_packet,
+        stage_b_ms=t_b / reps,
+        stage_d_ms=t_d / reps,
+        stage_e_ms=t_e / reps,
+        gate_stats=gate_stats,
+    )
+    live_metrics = last_metrics or mets
+    live_state = last_state or st
+    metadata = live_state.get("match_metadata") or {}
+    match_summary = {
+        "home": metadata.get("home", "NLA"),
+        "away": metadata.get("away", "MCS"),
+        "competition": metadata.get("competition", "AETHER Synthetic League"),
+        "venue": metadata.get("venue", "AETHER 3D DIGITAL TWIN"),
+        "clock": live_state.get("clock"),
+        "score": live_state.get("score"),
+        "synthetic_provenance": bool(metadata.get("synthetic", True)),
+        "data_source": "Stage A deterministic 10Hz synthetic engine",
+        "provenance": "No real footage, third-party broadcast marks, or external video assets.",
+    }
     return {
         "status": "ok",
         "synthetic_data_compliance": True,
+        "match_summary": match_summary,
+        "stage_b_summary": _stage_b_summary(live_metrics),
         "audit": {
             "stage_a_ingest_ms": round(t_a / reps, 3),
             "stage_b_interpret_ms": round(t_b / reps, 3),
@@ -615,6 +804,15 @@ async def pipeline_audit() -> dict:
         "azure": foundry.status(),
         "live_pipeline": {
             k: v.get("latency_ms") for k, v in pipeline["stages"].items()
+        },
+        "latency_p95": {k: p95(v) for k, v in latency_samples.items()},
+        "agent_trace": sample_trace,
+        "gate_efficiency": gate_snapshot(gate_stats),
+        "handoff_counts": {
+            "insights": gate_stats["insights"],
+            "azure": gate_stats["azure_insights"],
+            "fallback": gate_stats["fallback_insights"],
+            "grounding_pass": gate_stats["grounding_pass"],
         },
         "samples": {
             "stage_a_tick": {"clock": st["clock"], "players": len(st["players"]),

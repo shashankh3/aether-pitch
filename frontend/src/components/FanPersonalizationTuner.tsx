@@ -1,7 +1,7 @@
 "use client";
-// AETHER PITCH v6.0 — Fan Personalization panel. Rendered inline as a
-// right-dock tab (previously a floating popover): persona mode, single-metric
-// focus, favorite club lens. The market-language selector lives in the TopBar.
+// AETHER PITCH v6.1 — Fan Personalization panel. Rendered in the Control
+// Center's Fan tab: persona mode, single-metric focus, favorite club lens.
+// The market-language selector sits directly above it in the same tab.
 
 import { Target, Users, Heart } from "lucide-react";
 import type {

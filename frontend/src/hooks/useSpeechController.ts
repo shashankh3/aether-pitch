@@ -59,7 +59,9 @@ function pickVoice(lang: LangCode): SpeechSynthesisVoice | null {
 }
 
 function speakInsight(text: string, lang: LangCode) {
-  if (state.isVoiceMuted || !text) return;
+  if (!text) return;
+  emit({ activeText: text.slice(0, 180), lang });
+  if (state.isVoiceMuted) return;
   if (typeof window === "undefined" || !window.speechSynthesis) return;
   try {
     const synth = window.speechSynthesis;
@@ -72,7 +74,7 @@ function speakInsight(text: string, lang: LangCode) {
     u.pitch = 1.02;
     u.onend = () => emit({ isSpeaking: false });
     u.onerror = () => emit({ isSpeaking: false });
-    emit({ isSpeaking: true, activeText: text.slice(0, 140), lang });
+    emit({ isSpeaking: true });
     synth.speak(u);
   } catch {
     emit({ isSpeaking: false });
@@ -100,7 +102,14 @@ function setAutoNarrationSuppressed(next: boolean) {
 function toggleMute() {
   const next = !state.isVoiceMuted;
   emit({ isVoiceMuted: next });
-  if (next) stopSpeaking();
+  if (next) {
+    try {
+      window.speechSynthesis?.cancel();
+    } catch {
+      /* noop */
+    }
+    emit({ isSpeaking: false });
+  }
 }
 
 export function useSpeechController() {

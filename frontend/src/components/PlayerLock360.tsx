@@ -131,7 +131,7 @@ export default function PlayerLock360({ tick, lockedId, onLock, events, lang, in
   };
 
   return (
-    <section className="pointer-events-auto w-[352px]">
+    <section className="pointer-events-auto w-full max-w-[352px]">
       {/* quick-roster strip */}
       <div className="clip-ea mb-1.5 flex flex-wrap gap-[3px] border border-white/10 bg-slate-950/80 p-1 backdrop-blur-xl">
         {roster.map((p) => (

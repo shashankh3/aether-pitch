@@ -1,10 +1,9 @@
 "use client";
-// AETHER PITCH v3.0 — TelestratorDVRBar
-// 15-second circular DVR time-machine + telestrator quick actions, embedded
-// in the unified bottom dock. The scrubber tick markers show exactly where
+// AETHER PITCH v6.1 — TelestratorDVRBar
+// 15-second circular DVR time-machine + telestrator quick actions, surfaced
+// from the bottom Replay button. The scrubber tick markers show exactly where
 // high-chaos spikes / 30+ km/h sprint bursts occurred on the timeline.
-// Tool labels are always visible; the row is also exported standalone for
-// the mobile panel sheet.
+// Tool labels stay visible and form a 2×2 grid on phones.
 
 import { Pause, Play, Focus, BrickWall, Hexagon, Ghost } from "lucide-react";
 import type { TelestratorState } from "@/lib/types";
@@ -90,6 +89,13 @@ export default function TelestratorDVRBar({
   const history = telemetry.history;
   const secondsAgo = Math.abs(Math.min(0, dvrOffsetTicks)) / 10;
   const snapshotClock = telemetry.snapshotAt(dvrOffsetTicks)?.clock ?? "--:--";
+  const ghost = telemetry.ghost;
+  const actualXt = ghost?.actual_delta_xt ?? null;
+  const ghostXt = ghost?.delta_xt ?? null;
+  const netXt = ghost?.net_xt_gain
+    ?? (actualXt != null && ghostXt != null ? ghostXt - actualXt : null);
+  const signed = (value: number | null, digits = 2) =>
+    value == null ? "—" : `${value >= 0 ? "+" : ""}${value.toFixed(digits)}`;
 
   // timeline markers: high-chaos spikes + sprint bursts recorded in the buffer
   const markers = history
@@ -146,8 +152,43 @@ export default function TelestratorDVRBar({
         </div>
       </div>
 
-      {/* telestrator quick actions — labels always visible */}
-      <div className="hidden gap-1.5 border-t border-white/10 pt-1 xl:flex">
+      {ghost && (
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 border border-gold/25 bg-gold/[0.06] px-2 py-1">
+          <span className="flex items-center gap-1 font-tech text-[9px] font-bold uppercase tracking-wider text-gold">
+            <Ghost size={11} /> Ghost pass
+          </span>
+          <span className="font-tech text-[9px] uppercase tracking-wider text-slate-400">
+            Actual <b className="text-slate-100">{signed(actualXt)} xT</b>
+          </span>
+          <span className="text-gold">→</span>
+          <span className="font-tech text-[9px] uppercase tracking-wider text-slate-400">
+            Ghost <b className="text-gold">{signed(ghostXt)} xT</b>
+          </span>
+          <span className="clip-skew bg-gold/15 px-1.5 py-0.5 font-tech text-[9px] font-bold text-gold">
+            NET {signed(netXt)} xT
+          </span>
+          {ghost.completion_probability != null && (
+            <span className="font-tech text-[9px] text-slate-400">
+              {ghost.completion_probability.toFixed(0)}% COMP
+            </span>
+          )}
+          <button
+            onClick={() => onToggleTelestrator("animateGhostReplay")}
+            className={cn(
+              "ml-auto clip-skew px-1.5 py-0.5 font-tech text-[9px] font-bold uppercase tracking-wider transition",
+              telestrator.animateGhostReplay
+                ? "bg-gold/25 text-gold"
+                : "bg-white/[0.06] text-slate-400 hover:text-gold",
+            )}
+            aria-pressed={telestrator.animateGhostReplay}
+          >
+            {telestrator.animateGhostReplay ? "Counterfactual ON" : "Play counterfactual"}
+          </button>
+        </div>
+      )}
+
+      {/* telestrator quick actions — visible in the Replay popover, 2×2 on phones */}
+      <div className="mt-1 grid grid-cols-2 gap-1.5 border-t border-white/10 pt-1.5 sm:flex">
         <TelestratorTools
           telestrator={telestrator}
           onToggleTelestrator={onToggleTelestrator}

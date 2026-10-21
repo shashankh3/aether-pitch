@@ -1,26 +1,21 @@
 "use client";
-// AETHER PITCH v6.0 — TopBar: brand + connection, the three broadcast mode
-// tabs (LIVE / ANALYSIS / STUDIO), the global market-language selector,
-// judge autopilot trigger, cinema / fullscreen / shortcuts controls.
-// On <xl it also carries the button that opens the mobile panel sheet.
+// AETHER PITCH v6.1 — calm top bar: brand, connection, autopilot, one
+// Controls button. Mode tabs and the full language switcher now live inside
+// the Control Center so the default broadcast view stays uncluttered.
 
-import { Clapperboard, Eye, EyeOff, HelpCircle, Maximize2, Minimize2, Play, PanelRightOpen, Radio, Square, Trophy } from "lucide-react";
+import {
+  Eye, EyeOff, Languages, Maximize2, Minimize2, Play, Radio, SlidersHorizontal,
+  Square, Trophy, Volume2, VolumeX,
+} from "lucide-react";
 import type { LangCode } from "@/lib/types";
 import { LANG_LABELS } from "@/lib/types";
 import { AUTOPILOT_TOTAL_SECONDS } from "@/components/JudgeAutopilotTour";
-import { useHud, type HudMode } from "@/lib/hudContext";
+import { useHud } from "@/lib/hudContext";
 import { cn } from "@/lib/utils";
-
-const MODES: { id: HudMode; label: string; title: string }[] = [
-  { id: "live", label: "Live", title: "Clean broadcast view (L)" },
-  { id: "analysis", label: "Analysis", title: "CV auto-eventing + tactical tooling (A)" },
-  { id: "studio", label: "Studio", title: "Alpha compositing, JSON, verify, recap (S)" },
-];
 
 interface Props {
   connected: boolean;
   lang: LangCode;
-  onLang: (l: LangCode) => void;
   alphaMode: boolean;
   cinemaMode: boolean;
   onToggleCinema: () => void;
@@ -30,81 +25,78 @@ interface Props {
   autopilotElapsed: number;
   autopilotStep: number;
   onToggleAutopilot: () => void;
+  isSpeaking: boolean;
+  isVoiceMuted: boolean;
+  onToggleMute: () => void;
 }
 
 export default function TopBar({
-  connected, lang, onLang, alphaMode, cinemaMode, onToggleCinema,
+  connected, lang, alphaMode, cinemaMode, onToggleCinema,
   isFullscreen, onToggleFullscreen, autopilotActive, autopilotElapsed, autopilotStep, onToggleAutopilot,
+  isSpeaking, isVoiceMuted, onToggleMute,
 }: Props) {
-  const { hudMode, setHudMode, setShortcutsOpen, mobileSheetOpen, setMobileSheetOpen } = useHud();
+  const { controlCenterOpen, openControlCenter } = useHud();
 
   return (
-    <header className="clip-ea panel-lux pointer-events-auto flex h-[46px] items-center gap-2 px-2.5">
+    <header className="clip-ea panel-lux pointer-events-auto flex h-[52px] items-center gap-2 px-3">
       {/* brand + connection */}
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex min-w-0 items-center gap-2.5">
         <div
           className="clip-skew flex h-8 w-8 items-center justify-center bg-gradient-to-br from-violetdeep via-[#6d1250] to-crimson"
           style={{ boxShadow: "0 0 16px rgba(255,30,86,0.35)" }}
         >
           <Radio size={16} className="text-white" />
         </div>
-        <div className="leading-none">
-          <div className="font-display text-[16px] font-bold uppercase tracking-[0.1em] text-white">
+        <div className="min-w-0 leading-none">
+          <div className="truncate font-display text-[16px] font-bold uppercase tracking-[0.1em] text-white">
             AETHER<span className="text-tactical">PITCH</span>
           </div>
-          <div className="mt-0.5 hidden items-center gap-1.5 sm:flex">
+          <div className="mt-1 hidden items-center gap-1.5 sm:flex">
             <span className={cn("h-1.5 w-1.5 rounded-full", connected ? "bg-crimson animate-breathe" : "bg-slate-600")} />
             <span className="font-tech text-[8.5px] font-semibold uppercase tracking-[0.3em] text-slate-400">
-              3D Broadcast · 10 Hz
+              Live 3D Broadcast · 10 Hz
             </span>
           </div>
         </div>
       </div>
 
-      {/* broadcast mode tabs */}
-      <nav
-        aria-label="Broadcast mode"
-        className="mx-auto flex items-center gap-0.5 border border-white/10 bg-black/30 p-0.5"
-      >
-        {MODES.map((m) => (
-          <button
-            key={m.id}
-            onClick={() => setHudMode(m.id)}
-            aria-pressed={hudMode === m.id}
-            data-mode={m.id}
-            className="hud-tab clip-skew"
-            title={m.title}
-          >
-            {m.label}
-          </button>
-        ))}
-      </nav>
-
-      {/* global market language — one switcher drives TwinCast, co-pilot,
-          recap and the Stage-E personalization POST */}
-      <div className="hidden shrink-0 items-center gap-0.5 border border-white/10 bg-black/30 p-0.5 md:flex" role="group" aria-label="Market language">
-        {(["en", "es", "ar", "hi"] as LangCode[]).map((l) => (
-          <button
-            key={l}
-            onClick={() => onLang(l)}
-            aria-pressed={lang === l}
-            className={cn(
-              "px-1.5 py-0.5 font-tech text-[10px] font-bold uppercase tracking-wider transition",
-              lang === l ? "bg-pitch/20 text-pitch" : "text-slate-500 hover:text-slate-300",
-            )}
-            title={`Commentary language: ${LANG_LABELS[l]}`}
-          >
-            {LANG_LABELS[l]}
-          </button>
-        ))}
-      </div>
-
       {/* right control cluster */}
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="ml-auto flex shrink-0 items-center gap-1">
+        <button
+          onClick={onToggleMute}
+          aria-pressed={isVoiceMuted}
+          className={cn(
+            "clip-skew flex h-8 items-center gap-1 border px-2 transition",
+            isVoiceMuted
+              ? "border-crimson/30 bg-crimson/10 text-crimson"
+              : isSpeaking
+                ? "border-pitch/40 bg-pitch/10 text-pitch"
+                : "border-white/10 bg-slate-950/75 text-slate-400 hover:border-tactical/40 hover:text-white",
+          )}
+          title={isVoiceMuted ? "Unmute AI broadcast voice" : "Mute AI broadcast voice"}
+        >
+          {isVoiceMuted ? <VolumeX size={13} /> : <Volume2 size={13} />}
+          {isSpeaking && !isVoiceMuted && (
+            <span className="h-1.5 w-1.5 animate-breathe rounded-full bg-pitch" />
+          )}
+          <span className="sr-only">{isVoiceMuted ? "Unmute AI voice" : "Mute AI voice"}</span>
+        </button>
+
+        <button
+          onClick={() => openControlCenter("fan")}
+          className="clip-skew hidden h-8 items-center gap-1.5 border border-white/10 bg-slate-950/75 px-2 font-tech text-[10px] font-bold uppercase tracking-wider text-slate-400 transition hover:border-tactical/40 hover:text-white md:flex"
+          title={`Commentary language: ${LANG_LABELS[lang]} — open Fan controls`}
+          aria-label={`Commentary language ${LANG_LABELS[lang]} — open Fan controls`}
+        >
+          <Languages size={12} className="text-tactical" />
+          {LANG_LABELS[lang]}
+        </button>
+
         <button
           onClick={onToggleAutopilot}
+          aria-pressed={autopilotActive}
           className={cn(
-            "clip-skew flex items-center gap-1.5 border px-2 py-1 font-tech text-[10px] font-bold uppercase tracking-wider transition",
+            "clip-skew flex h-8 items-center gap-1.5 border px-2 font-tech text-[10px] font-bold uppercase tracking-wider transition",
             autopilotActive
               ? "border-crimson/60 bg-crimson/15 text-crimson"
               : "animate-breathe border-gold/60 bg-gold/15 text-gold hover:bg-gold/25",
@@ -117,14 +109,34 @@ export default function TopBar({
               ? `Autopilot ${Math.max(1, autopilotStep + 1)}/6 · ${Math.ceil(AUTOPILOT_TOTAL_SECONDS - autopilotElapsed)}s`
               : `${AUTOPILOT_TOTAL_SECONDS}s Autopilot`}
           </span>
+          <span className="sr-only lg:hidden">
+            {autopilotActive ? "Stop autopilot" : "Start autopilot"}
+          </span>
           <Trophy size={12} className="hidden lg:inline" />
+        </button>
+
+        <button
+          onClick={() => openControlCenter()}
+          aria-expanded={controlCenterOpen}
+          aria-controls="control-center"
+          aria-label="Open controls"
+          className={cn(
+            "clip-skew flex h-8 items-center gap-1.5 border px-2 font-tech text-[10px] font-bold uppercase tracking-wider transition",
+            controlCenterOpen
+              ? "border-tactical/50 bg-tactical/15 text-tactical"
+              : "border-white/10 bg-slate-950/75 text-slate-300 hover:border-tactical/40 hover:text-white",
+          )}
+          title="Open all controls: cameras, stats, AI voices, fan, co-pilot, data"
+        >
+          <SlidersHorizontal size={13} />
+          <span className="hidden md:inline">Controls</span>
         </button>
 
         <button
           onClick={onToggleCinema}
           disabled={alphaMode}
           aria-pressed={cinemaMode}
-          className="clip-skew border border-white/10 bg-slate-950/75 p-1.5 text-slate-400 hover:border-tactical/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+          className="clip-skew flex h-8 items-center border border-white/10 bg-slate-950/75 px-2 text-slate-400 hover:border-tactical/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
           title="Clean broadcast feed (H)"
           aria-label="Enter clean broadcast feed"
         >
@@ -132,34 +144,11 @@ export default function TopBar({
         </button>
         <button
           onClick={onToggleFullscreen}
-          className="clip-skew border border-white/10 bg-slate-950/75 p-1.5 text-slate-400 hover:border-tactical/40 hover:text-white"
+          className="clip-skew flex h-8 items-center border border-white/10 bg-slate-950/75 px-2 text-slate-400 hover:border-tactical/40 hover:text-white"
           title={isFullscreen ? "Exit fullscreen (F)" : "Enter fullscreen (F)"}
           aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
         >
           {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
-        </button>
-        <button
-          onClick={() => setShortcutsOpen(true)}
-          className="clip-skew border border-white/10 bg-slate-950/75 p-1.5 text-slate-400 hover:border-tactical/40 hover:text-white"
-          title="Keyboard shortcuts (?)"
-          aria-label="Keyboard shortcuts"
-        >
-          <HelpCircle size={13} />
-        </button>
-        {/* mobile panel sheet trigger */}
-        <button
-          onClick={() => setMobileSheetOpen((o) => !o)}
-          aria-expanded={mobileSheetOpen}
-          className={cn(
-            "clip-skew border p-1.5 xl:hidden",
-            mobileSheetOpen
-              ? "border-tactical/50 bg-tactical/15 text-tactical"
-              : "border-white/10 bg-slate-950/75 text-slate-400 hover:text-white",
-          )}
-          title="Panels: cameras, AI voices, co-pilot, fan tuner, radar, CV…"
-          aria-label="Open panels sheet"
-        >
-          {mobileSheetOpen ? <Clapperboard size={13} /> : <PanelRightOpen size={13} />}
         </button>
       </div>
     </header>

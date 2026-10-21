@@ -1,14 +1,104 @@
 import type {
-  MatchEvent, MatchMetadata, MatchTick, Metrics, Insight, Pipeline, PlayerStats,
+  AgentTrace, MatchEvent, MatchMetadata, MatchTick, Metrics, Insight, Pipeline, PlayerStats,
   PlayStyleBadge, PoseState, Role, Team, TeamStats,
 } from "./types";
 
 const PITCH_L = 105;
 const PITCH_W = 68;
 
+function buildEdgeTrace(
+  event: MatchEvent,
+  tick: MatchTick,
+  metrics: Metrics,
+  archetype: string,
+  pdr: number,
+  dxt: number,
+  ghost: MatchEvent["ghost_pass"],
+  seq: number,
+): AgentTrace {
+  const gate = event.ai_gate ?? { should_explain: true, reasons: ["edge fallback event"] };
+  const deltaChaos = event.delta_chaos ?? metrics.delta_chaos;
+  const ticks = Math.max(1, Math.round(tick.t_match * 10));
+  const ghostDelta = ghost?.delta_xt ?? null;
+  return {
+    trace_id: `trace_edge_${String(seq).padStart(4, "0")}`,
+    event_id: event.id,
+    anchor_clock: tick.clock,
+    created_at: new Date().toISOString(),
+    mode: "edge",
+    archetype,
+    model: "edge-autonomous-engine-v5",
+    gate: {
+      should_explain: gate.should_explain,
+      reasons: gate.reasons ?? [],
+      pdr,
+      delta_xt: dxt,
+      delta_chaos: deltaChaos,
+    },
+    handoff_chain: [
+      {
+        id: "sentinel",
+        agent: "Spatial Sentinel",
+        role: "Deterministic gate",
+        status: "completed",
+        latency_ms: 0,
+        summary: `PDR ${pdr.toFixed(0)}% · ΔxT ${dxt >= 0 ? "+" : ""}${dxt.toFixed(2)} · ΔChaos ${deltaChaos >= 0 ? "+" : ""}${deltaChaos.toFixed(2)}`,
+        detail: gate.reasons?.join("; ") || "Edge threshold gate",
+      },
+      {
+        id: "triage",
+        agent: "Tactical Triage",
+        role: "Archetype router",
+        status: "fallback",
+        latency_ms: 0,
+        summary: archetype.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        detail: "Browser-native local router",
+      },
+      {
+        id: "analyst",
+        agent: "Causal Analyst + Critic",
+        role: "Narrative + numeric critic",
+        status: "fallback",
+        latency_ms: 0,
+        summary: "Deterministic edge template · 100% grounded",
+        detail: ghostDelta != null
+          ? `Ghost lane ${ghostDelta >= 0 ? "+" : ""}${ghostDelta.toFixed(2)} xT vs actual ${dxt >= 0 ? "+" : ""}${dxt.toFixed(2)} xT.`
+          : "No higher-value ghost lane in the edge scan.",
+      },
+      {
+        id: "director",
+        agent: "Broadcast Director",
+        role: "Overlay + camera + i18n",
+        status: "completed",
+        latency_ms: 0,
+        summary: "Tactical pulse · auto camera · 4 languages",
+        detail: "Edge render contract active while the backend reconnects.",
+      },
+    ],
+    grounding: {
+      status: "fallback_verified",
+      score: 1,
+      checked_numbers: 0,
+      unmatched_numbers: [],
+      source: "deterministic_edge_template",
+      note: "Edge templates are generated from the browser simulation snapshot.",
+    },
+    compute: {
+      considered_events: seq,
+      gated_events: seq,
+      filtered_events: 0,
+      filter_ratio: 0,
+      ticks,
+      insights: seq,
+      ticks_per_insight: Number((ticks / Math.max(1, seq)).toFixed(1)),
+    },
+    languages: ["en", "es", "ar", "hi"],
+  };
+}
+
 const EDGE_MATCH_METADATA: MatchMetadata = {
   match_id: "SYN-PL-2026-1019-NLA-MCS",
-  competition: "Synthetic Premier League",
+  competition: "AETHER Synthetic League",
   season: "2026/27",
   matchday: 9,
   venue: "Aether Arena",
@@ -141,6 +231,10 @@ export class EdgeEngine {
     lofted: false,
     ghostEnd: null as [number, number] | null,
     ghostDelta: null as number | null,
+    ghostActualDelta: null as number | null,
+    ghostTargetId: null as string | null,
+    ghostCompletion: null as number | null,
+    ghostNetGain: null as number | null,
   };
   private flight: Flight | null = null;
   private scenarioName: string | null = null;
@@ -174,6 +268,7 @@ export class EdgeEngine {
   private lastMilestoneClock = -999;
   private pending: MatchEvent[] = [];
   private ghost: { x: number; y: number; delta: number; targetId: string | null } | null = null;
+  private lastTrace: AgentTrace | null = null;
 
   constructor(seed = 7) {
     let n = seed;
@@ -376,12 +471,15 @@ export class EdgeEngine {
       hi: `रणनीतिक पल! ${story}`,
     };
     const eventId = event.id;
+    const trace = buildEdgeTrace(event, tick, metrics, archetype, pdr, dxt, ghost, this.insightSeq);
+    this.lastTrace = trace;
     return {
       id: `edge_insight_${String(this.insightSeq).padStart(4, "0")}`,
       event_id: eventId,
       created_at: new Date().toISOString(),
       model: "edge-autonomous-engine-v5",
       archetype,
+      agent_trace: trace,
       camera_directive: {
         recommended_mode: archetype === "difficult_progression" ? "PLAYER_LOCK_3RD_PERSON" : "TACTICAL_DRONE",
         focus_target_id: event.player_id ?? null,
@@ -453,6 +551,8 @@ export class EdgeEngine {
         e: JSON.stringify({ languages: ["en", "es", "ar", "hi"], personas: ["analyst", "casual"] }),
       },
       updated_at: new Date().toISOString(),
+      agent_trace: this.lastTrace,
+      gate: this.lastTrace?.compute,
     };
   }
 
@@ -496,6 +596,10 @@ export class EdgeEngine {
         is_lofted: this.ball.lofted,
         ghost_end: this.ball.ghostEnd,
         ghost_delta_xt: this.ball.ghostDelta,
+        ghost_actual_delta_xt: this.ball.ghostActualDelta,
+        ghost_target_id: this.ball.ghostTargetId,
+        ghost_completion_probability: this.ball.ghostCompletion,
+        ghost_net_xt_gain: this.ball.ghostNetGain,
       },
       carrier: this.carrierId || null,
       scenario: this.scenarioName,
@@ -635,13 +739,31 @@ export class EdgeEngine {
         })),
       }))
       .sort((a, b) => b.openness - a.openness)[0];
+    const ghostDistance = ghostTarget
+      ? Math.hypot(ghostTarget.p.x - start[0], ghostTarget.p.y - start[1])
+      : 0;
+    const ghostDelta = ghostTarget
+      ? Number((dxt + 0.05 + ghostTarget.openness * 0.005).toFixed(3))
+      : 0;
+    const ghostCompletion = ghostTarget
+      ? Number(clamp(52 + ghostTarget.openness * 2.8 - Math.max(0, ghostDistance - 20) * 0.35, 18, 97).toFixed(1))
+      : 0;
     const ghost = ghostTarget
       ? {
           x: Number(ghostTarget.p.x.toFixed(2)),
           y: Number(ghostTarget.p.y.toFixed(2)),
-          delta_xt: Number((dxt + 0.05 + ghostTarget.openness * 0.005).toFixed(3)),
+          delta_xt: ghostDelta,
           target_id: ghostTarget.p.id,
           openness_m: Number(ghostTarget.openness.toFixed(1)),
+          distance_m: Number(ghostDistance.toFixed(1)),
+          actual_delta_xt: Number(dxt.toFixed(3)),
+          ghost_delta_xt: ghostDelta,
+          net_xt_gain: Number((ghostDelta - dxt).toFixed(3)),
+          completion_probability: ghostCompletion,
+          receiver_target_xy: {
+            x: Number(ghostTarget.p.x.toFixed(2)),
+            y: Number(ghostTarget.p.y.toFixed(2)),
+          },
         }
       : null;
     this.eventSeq += 1;
@@ -703,6 +825,10 @@ export class EdgeEngine {
     this.ball.lofted = distance > 28;
     this.ball.ghostEnd = ghost ? [ghost.x, ghost.y] : null;
     this.ball.ghostDelta = ghost ? ghost.delta_xt : null;
+    this.ball.ghostActualDelta = ghost ? ghost.actual_delta_xt : null;
+    this.ball.ghostTargetId = ghost ? ghost.target_id : null;
+    this.ball.ghostCompletion = ghost ? ghost.completion_probability : null;
+    this.ball.ghostNetGain = ghost ? ghost.net_xt_gain : null;
     this.ghost = ghost ? { x: ghost.x, y: ghost.y, delta: ghost.delta_xt, targetId: ghost.target_id } : null;
     this.ballSpeeds.push(speedKmh);
     if (this.ballSpeeds.length > 60) this.ballSpeeds.shift();

@@ -112,7 +112,8 @@ class TacticalMathEngine:
 
     # ----------------------------------------------------------- ghost pass
     def ghost_pass(self, state: dict, team: str, carrier_id: Optional[str],
-                   start: Tuple[float, float]) -> Optional[dict]:
+                   start: Tuple[float, float],
+                   actual_delta_xt: Optional[float] = None) -> Optional[dict]:
         """Scan all 10 teammates: score by openness + ΔxT; return optimal alternative."""
         opponents = [p for p in state["players"] if p["team"] != team]
         teammates = [p for p in state["players"]
@@ -128,8 +129,23 @@ class TacticalMathEngine:
             score = dxt * 3.0 + openness * 0.06
             if best is None or score > best["score"]:
                 best = {"score": score, "x": round(end[0], 2), "y": round(end[1], 2),
+                        "distance_m": round(d, 1),
                         "delta_xt": round(dxt, 3), "target_id": tm["id"],
                         "openness_m": round(openness, 1)}
+        if best is None:
+            return None
+        ghost_delta = round(float(best["delta_xt"]), 3)
+        actual = round(float(actual_delta_xt), 3) if actual_delta_xt is not None else None
+        completion = round(max(18.0, min(97.0,
+            52.0 + float(best["openness_m"]) * 2.8
+            - max(0.0, float(best["distance_m"]) - 20.0) * 0.35)), 1)
+        best.update({
+            "actual_delta_xt": actual,
+            "ghost_delta_xt": ghost_delta,
+            "net_xt_gain": round(ghost_delta - actual, 3) if actual is not None else None,
+            "completion_probability": completion,
+            "receiver_target_xy": {"x": best["x"], "y": best["y"]},
+        })
         return best
 
     @staticmethod
@@ -414,7 +430,8 @@ class TacticalMathEngine:
             start, end = tuple(ev.get("start", (0, 0))), tuple(ev.get("end", (0, 0)))
             dxt = self.delta_xt(ev["team"], start, end)
             ev["delta_xt"] = round(dxt, 3)
-            ev["ghost_pass"] = self.ghost_pass(state, ev["team"], ev.get("player_id"), start)
+            ev["ghost_pass"] = self.ghost_pass(
+                state, ev["team"], ev.get("player_id"), start, actual_delta_xt=dxt)
         elif ev.get("type") == "SHOT":
             d = ev.get("distance_m", 0.0)
             v = ev.get("ball_speed_kmh", 0.0)

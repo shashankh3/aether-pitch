@@ -1,10 +1,10 @@
 "use client";
-// AETHER PITCH v6.0 — broadcast monitor shell.
-// Full-bleed 3D WebGL stadium + a three-mode HUD (LIVE / ANALYSIS / STUDIO):
-//   TopBar      — brand, mode tabs, language, autopilot, cinema/fullscreen/help
-//   LeftRail    — scorebug + mode-gated CV auto-eventer / production panel
-//   RightDock   — camera director, tabbed AI Voices / 12th Man / Fan, radar
-//   BottomDock  — player chip, DVR + telestrator, God-Mode deck, pipeline
+// AETHER PITCH v6.1 — fan-first broadcast monitor shell.
+// Full-bleed 3D WebGL stadium with a calm default surface:
+//   TopBar      — brand, voice mute, autopilot, Controls, cinema/fullscreen
+//   LeftRail    — scorebug + one route into match stats
+//   BottomDock  — five buttons: Players / Replay / Moments / Stats / Controls
+//   RightDock   — every optional tool in one closed-by-default Control Center
 // This file is the orchestrator: all data wiring, handlers and transient
 // broadcast graphics (lower-third, GOAL slam, autopilot banner, modals).
 
@@ -14,8 +14,8 @@ import TacticalPulseBar from "@/components/TacticalPulseBar";
 import BroadcastAlphaModal, { SMPTEChip } from "@/components/BroadcastAlphaModal";
 import RubricVerifierModal from "@/components/RubricVerifierModal";
 import MatchRecapStudioModal from "@/components/MatchRecapStudioModal";
+import LiveCaptionStrip from "@/components/LiveCaptionStrip";
 import JudgeAutopilotTour, { AUTOPILOT_STEPS, AUTOPILOT_TOTAL_SECONDS } from "@/components/JudgeAutopilotTour";
-import PipelineRibbon from "@/components/PipelineRibbon";
 import TopBar from "@/components/hud/TopBar";
 import LeftRail from "@/components/hud/LeftRail";
 import RightDock from "@/components/hud/RightDock";
@@ -29,7 +29,7 @@ import { API_BASE } from "@/lib/api";
 import type {
   CameraDirective, CameraMode, HighlightZone, Insight, LangCode, MatchRecapStoryboard,
   MetricFocus, PersonaMode, PersonaModeV5, PersonalizationState, RecapAct, RecapPassArc,
-  StudioQueryResponse, TelestratorState,
+  StudioQueryResponse, StudioSuggestedAction, TelestratorState,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +42,15 @@ const SCENARIO_KEYS: Record<string, string> = {
 
 const CAMERA_OVERRIDE_MS = 6500;
 const AUTOPILOT_TOTAL_MS = AUTOPILOT_TOTAL_SECONDS * 1000;
+
+const CAMERA_NOTICE_LABELS: Record<string, string> = {
+  TELE_BROADCAST: "TELE CAM",
+  PLAYER_LOCK_3RD_PERSON: "PLAYER LOCK",
+  TACTICAL_DRONE_ORBIT: "DRONE ORBIT",
+  TACTICAL_DRONE: "TACTICAL DRONE",
+  AUTO_DIRECTOR: "AUTO-DIRECTOR",
+  ACTION_ZOOM: "ACTION ZOOM",
+};
 
 const PERSONA_MAP: Record<PersonaModeV5, PersonaMode> = {
   ANALYST_HUD: "analyst",
@@ -80,7 +89,9 @@ function StudioOrchestrator() {
     recap: studioRecap, clearRecap,
   } = studio;
 
-  const { hudMode, setHudMode, setPlayerPanelOpen, setPipelinePanelOpen, setShortcutsOpen } = useHud();
+  const {
+    setHudMode, setControlCenterOpen, setDockTool, openControlCenter, setShortcutsOpen,
+  } = useHud();
 
   const [lockedId, setLockedId] = useState<string | null>(null);
   const [camMode, setCamMode] = useState<CameraMode>("TELE_BROADCAST");
@@ -100,6 +111,9 @@ function StudioOrchestrator() {
   const [goalBanner, setGoalBanner] = useState<GoalBanner | null>(null);
   const [override, setOverride] = useState<{ directive: CameraDirective; at: number } | null>(null);
   const overrideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [cameraNotice, setCameraNotice] = useState<{ label: string; ai: boolean; at: number } | null>(null);
+  const cameraNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cameraNoticeSeen = useRef(false);
 
   // ---- v3.0 DVR + telestrator ----
   const [isDvrPaused, setDvrPaused] = useState(false);
@@ -143,14 +157,31 @@ function StudioOrchestrator() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("overlay") === "alpha") setAlphaMode(true);
     const mode = params.get("mode");
-    if (mode === "analysis" || mode === "studio") setHudMode(mode);
-  }, [setHudMode]);
+    if (mode === "analysis" || mode === "studio") {
+      setHudMode(mode);
+      openControlCenter(mode === "analysis" ? "stats" : "prod");
+    }
+  }, [setHudMode, openControlCenter]);
 
   useEffect(() => {
     const sync = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", sync);
     return () => document.removeEventListener("fullscreenchange", sync);
   }, []);
+
+  // Clean feed means clean: no drawer, no dock popovers.
+  useEffect(() => {
+    if (!cinemaMode) return;
+    setControlCenterOpen(false);
+    setDockTool(null);
+  }, [cinemaMode, setControlCenterOpen, setDockTool]);
+
+  // Alpha output is also a clean surface; clear transient tooling.
+  useEffect(() => {
+    if (!alphaMode) return;
+    setControlCenterOpen(false);
+    setDockTool(null);
+  }, [alphaMode, setControlCenterOpen, setDockTool]);
 
   const toggleFullscreen = useCallback(() => {
     if (typeof document === "undefined") return;
@@ -190,6 +221,24 @@ function StudioOrchestrator() {
     if (overrideTimer.current) clearTimeout(overrideTimer.current);
     overrideTimer.current = setTimeout(() => setOverride(null), CAMERA_OVERRIDE_MS);
   }, [latest?.id]);
+
+  useEffect(() => {
+    const mode = override?.directive.recommended_mode ?? camMode;
+    if (!cameraNoticeSeen.current) {
+      cameraNoticeSeen.current = true;
+      return;
+    }
+    setCameraNotice({
+      label: CAMERA_NOTICE_LABELS[mode] ?? mode.replace(/_/g, " "),
+      ai: !!override,
+      at: performance.now(),
+    });
+    if (cameraNoticeTimer.current) clearTimeout(cameraNoticeTimer.current);
+    cameraNoticeTimer.current = setTimeout(() => setCameraNotice(null), 2600);
+    return () => {
+      if (cameraNoticeTimer.current) clearTimeout(cameraNoticeTimer.current);
+    };
+  }, [camMode, override]);
 
   // two-phase scenario UX: phase 2 resolves when a *new* AI insight lands
   useEffect(() => {
@@ -253,9 +302,9 @@ function StudioOrchestrator() {
         setCinemaMode(false);
         return;
       }
-      if (key === "l") { setHudMode("live"); return; }
-      if (key === "a") { setHudMode("analysis"); return; }
-      if (key === "s") { setHudMode("studio"); return; }
+      if (key === "l") { setCinemaMode(false); openControlCenter("cams"); return; }
+      if (key === "a") { setCinemaMode(false); openControlCenter("stats"); return; }
+      if (key === "s") { setCinemaMode(false); openControlCenter("prod"); return; }
       if (e.key === "?") {
         e.preventDefault();
         setShortcutsOpen((o) => !o);
@@ -266,7 +315,7 @@ function StudioOrchestrator() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [alphaMode, cinemaMode, inject, busy, toggleFullscreen, setHudMode, setShortcutsOpen]);
+  }, [alphaMode, cinemaMode, inject, busy, toggleFullscreen, openControlCenter, setShortcutsOpen]);
 
   // ---- pill targets: locked / carrier / receiver / spotlighted / sprinters ----
   const keySig = tick
@@ -331,9 +380,10 @@ function StudioOrchestrator() {
 
   // market language — one switcher drives TwinCast, co-pilot, recap and Stage-E
   const handleLang = useCallback((next: LangCode) => {
+    stopSpeaking();
     setLang(next);
     setPersonalization((p) => ({ ...p, market_language: next }));
-  }, []);
+  }, [stopSpeaking]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -488,13 +538,39 @@ function StudioOrchestrator() {
     [lockedId]
   );
 
-  // mode-gated popover hints: ANALYSIS opens the player hologram when a player
-  // is locked, STUDIO opens the pipeline payloads
-  useEffect(() => {
-    if (hudMode === "analysis" && lockedId) setPlayerPanelOpen(true);
-    if (hudMode === "studio") setPipelinePanelOpen(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hudMode]);
+  const handleStudioAction = useCallback((action: StudioSuggestedAction) => {
+    switch (action.type) {
+      case "SHOW_GHOST_PASS":
+        setTelestrator((t) => ({
+          ...t,
+          animateGhostReplay: action.payload?.enabled ?? true,
+        }));
+        break;
+      case "LOCK_PLAYER":
+        handleLock(action.payload?.player_id ?? null);
+        break;
+      case "GENERATE_RECAP":
+        setShowRecap(true);
+        break;
+      case "FOCUS_GAP":
+      default: {
+        const zone = action.payload?.zone;
+        setOverride({
+          directive: {
+            recommended_mode: action.payload?.camera_mode ?? "TACTICAL_DRONE",
+            focus_target_id: lockedId,
+            cinematic_slow_mo: false,
+            ar_highlight_zone: zone
+              ? `SEAM ${zone.x.toFixed(0)} · ${zone.y.toFixed(0)}`
+              : "FOCUS_GAP",
+          },
+          at: performance.now(),
+        });
+        if (overrideTimer.current) clearTimeout(overrideTimer.current);
+        overrideTimer.current = setTimeout(() => setOverride(null), CAMERA_OVERRIDE_MS);
+      }
+    }
+  }, [handleLock, lockedId]);
 
   const handleAutopilotStop = useCallback((keepRubric = false, keepVoiceSuppressed = false) => {
     tourFxTimers.current.forEach((t) => clearTimeout(t));
@@ -514,9 +590,11 @@ function StudioOrchestrator() {
     telemetry.telestratorSpotlightIds = [];
     if (tickRef.current) telemetry.applyTick(tickRef.current, false);
     pickCamera("TELE_BROADCAST");
+    setControlCenterOpen(false);
+    setDockTool(null);
     setHudMode(keepRubric ? "studio" : "live");
     if (!keepVoiceSuppressed) setAutoNarrationSuppressed(false);
-  }, [pickCamera, tickRef, setHudMode, setAutoNarrationSuppressed]);
+  }, [pickCamera, tickRef, setHudMode, setControlCenterOpen, setDockTool, setAutoNarrationSuppressed]);
 
   const stopAutopilot = useCallback(() => {
     if (autopilotTicker.current) {
@@ -547,23 +625,29 @@ function StudioOrchestrator() {
 
   const handleAutopilotStep = useCallback(
     (index: number) => {
+      stopSpeaking();
       setAutopilotStep(index);
       const snap = tickRef.current;
       switch (index) {
         case 0:
           setHudMode("analysis");
           setCvExpanded(true);
+          setControlCenterOpen(false);
           pickCamera("TELE_BROADCAST");
           break;
         case 1:
           setHudMode("live");
           setCvExpanded(false);
+          setControlCenterOpen(false);
+          setDockTool(null);
           setToggles((t) => ({ ...t, pitchControl: true, passingNetwork: true, lasers: true, ghost: true }));
           void inject("chaos_counter");
           break;
         case 2: {
           setHudMode("analysis");
           setCvExpanded(false);
+          setControlCenterOpen(false);
+          setDockTool("replay");
           setDvrPaused(true);
           setPausedClock(null);
           telemetry.playbackPaused = true;
@@ -614,6 +698,8 @@ function StudioOrchestrator() {
         }
         case 3:
           setHudMode("studio");
+          setDockTool(null);
+          setControlCenterOpen(false);
           setDvrPaused(false);
           setPausedClock(null);
           telemetry.playbackPaused = false;
@@ -628,6 +714,8 @@ function StudioOrchestrator() {
         case 4: {
           setHudMode("live");
           setAlphaMode(false);
+          setControlCenterOpen(false);
+          setDockTool("player");
           pickCamera("PLAYER_LOCK_3RD_PERSON");
           const star = snap?.players.find((p) => p.team === snap.possession && p.role === "FWD")?.id
             ?? snap?.carrier
@@ -656,6 +744,8 @@ function StudioOrchestrator() {
         }
         case 5:
           setHudMode("studio");
+          setDockTool(null);
+          setControlCenterOpen(false);
           setShowRubric(false);
           setShowRecap(true);
           // Recap first, then the rubric proof. Never stack them: the recap
@@ -671,6 +761,7 @@ function StudioOrchestrator() {
     },
     [
       applyPreferences, dvrOffsetTicks, inject, personalization, pickCamera, tickRef, setHudMode,
+      openControlCenter, setControlCenterOpen, setDockTool, stopSpeaking,
     ]
   );
 
@@ -752,7 +843,8 @@ function StudioOrchestrator() {
       )}
 
       {/* ------------------------------------------------------------------ */}
-      {/* HUD shell: TopBar / [left rail · centre stage · right dock] / dock  */}
+      {/* HUD shell: TopBar / scorebug / tactical pulse / five-button dock    */}
+      {/* The optional Control Center renders outside this clean-feed wrapper. */}
       {/* ------------------------------------------------------------------ */}
       <div
         aria-hidden={cinemaMode || undefined}
@@ -762,17 +854,12 @@ function StudioOrchestrator() {
           cinemaMode ? "cinema-hide" : "cinema-show"
         )}
       >
-        <div className={cn(
-          "grid h-full w-full grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto] gap-2 overflow-y-auto p-2 scroll-slim lg:gap-3 lg:p-3 xl:grid-cols-[352px_minmax(0,1fr)_368px] xl:overflow-hidden",
-          alphaMode && "hidden",
-        )}>
-
-          {/* ---------- TopBar (all breakpoints) ---------- */}
-          <div className="flex flex-col gap-1 xl:col-span-3 xl:row-start-1">
+        <div className={cn("absolute inset-0", alphaMode && "hidden")}>
+          {/* ---------- calm top bar ---------- */}
+          <div className="pointer-events-auto absolute inset-x-2 top-2 z-20 lg:inset-x-3 lg:top-3">
             <TopBar
               connected={connected}
               lang={lang}
-              onLang={handleLang}
               alphaMode={alphaMode}
               cinemaMode={cinemaMode}
               onToggleCinema={() => setCinemaMode((v) => !v)}
@@ -782,153 +869,145 @@ function StudioOrchestrator() {
               autopilotElapsed={autopilotElapsed}
               autopilotStep={autopilotStep}
               onToggleAutopilot={toggleAutopilot}
+              isSpeaking={isSpeaking}
+              isVoiceMuted={isVoiceMuted}
+              onToggleMute={toggleMute}
             />
-            {!alphaMode && (
-              <PipelineRibbon pipeline={pipeline} connected={connected} status={status} />
+          </div>
+
+          {/* ---------- scorebug + one route into stats ---------- */}
+          <div className="pointer-events-auto absolute left-2 top-[62px] z-20 lg:left-3 lg:top-[71px]">
+            <LeftRail tick={tick} metrics={metrics} />
+          </div>
+
+          {/* ---------- tactical pulse (desktop breathing room only) ---------- */}
+          <div className="pointer-events-none absolute inset-x-4 top-[62px] z-10 hidden justify-center lg:flex lg:top-[71px]">
+            <TacticalPulseBar metrics={metrics} compact />
+          </div>
+
+          {/* ---------- live scenario / reasoning status ---------- */}
+          <div className="pointer-events-none absolute right-2 top-[62px] z-20 hidden max-w-[calc(100vw-350px)] flex-col items-end gap-1.5 md:flex md:right-3 lg:top-[71px]">
+            {tick?.scenario && (
+              <div
+                className="clip-skew flex max-w-full items-center gap-2 px-3 py-1"
+                style={{ background: "rgba(255,194,77,0.14)", border: "1px solid rgba(255,194,77,0.5)" }}
+              >
+                <span className="h-2 w-2 shrink-0 animate-breathe rounded-full bg-gold" />
+                <span className="truncate font-display text-[13px] font-bold uppercase tracking-[0.25em] text-gold">
+                  God Mode · {tick.scenario.replace(/_/g, " ")}
+                  {tick.scenario_left != null ? ` · ${Math.ceil(tick.scenario_left)}s` : ""}
+                </span>
+              </div>
+            )}
+            {phase2Pending && (
+              <div
+                className="clip-skew flex max-w-full items-center gap-2 border border-tactical/40 bg-slate-950/85 px-3 py-1 backdrop-blur-xl"
+                style={{ animation: "flicker-in 0.5s ease-out both" }}
+              >
+                <span className="h-2 w-2 shrink-0 animate-breathe rounded-full bg-tactical" />
+                <span
+                  className="truncate bg-gradient-to-r from-tactical via-white to-tactical bg-[length:200%_100%] bg-clip-text font-tech text-[11px] font-bold uppercase tracking-[0.14em] text-transparent"
+                  style={{ animation: "bar-shimmer 1.4s linear infinite" }}
+                >
+                  Azure AI Foundry Models reasoning over 60s spatial buffer...
+                </span>
+              </div>
+            )}
+            {cameraNotice && !alphaMode && (
+              <div
+                className="clip-skew flex max-w-full items-center gap-2 border border-white/15 bg-slate-950/85 px-2.5 py-1 backdrop-blur-xl"
+                style={{ animation: "flicker-in 0.35s ease-out both" }}
+                role="status"
+                aria-live="polite"
+              >
+                <span className={cn(
+                  "h-1.5 w-1.5 shrink-0 rounded-full",
+                  cameraNotice.ai ? "bg-gold" : "bg-tactical",
+                )} />
+                <span className="font-tech text-[8px] font-bold uppercase tracking-[0.2em] text-slate-500">
+                  {cameraNotice.ai ? "AI DIRECTOR" : "CAMERA"}
+                </span>
+                <span className="truncate font-display text-[10px] font-bold uppercase tracking-[0.14em] text-white">
+                  {cameraNotice.label}
+                </span>
+              </div>
             )}
           </div>
 
-          {/* ---------- middle band: left rail + centre stage (grid items on xl) ---------- */}
-          <div className="flex min-h-0 flex-col gap-2 overflow-y-auto scroll-slim xl:contents xl:overflow-visible">
-            <div className="pointer-events-auto xl:col-start-1 xl:row-start-2">
-              <LeftRail
+          {/* ---------- five-button fan dock ---------- */}
+          <div className="pointer-events-none absolute inset-x-2 bottom-2 z-20 flex justify-center lg:bottom-3">
+            <div className="pointer-events-auto w-full max-w-[700px]">
+              <BottomDock
                 tick={tick}
-                metrics={metrics}
+                busy={busy}
+                inject={inject}
+                isDvrPaused={isDvrPaused}
+                dvrOffsetTicks={dvrOffsetTicks}
+                pausedClock={pausedClock}
+                togglePause={togglePause}
+                scrub={scrub}
+                telestrator={telestrator}
+                toggleTelestrator={toggleTelestrator}
+                autoSpotlight={autoSpotlight}
+                lockedId={lockedId}
+                onLock={handleLock}
                 events={events}
-                cvExpanded={cvExpanded}
-                alphaMode={alphaMode}
-                alphaBackdrop={alphaBackdrop}
-                onToggleAlpha={toggleAlpha}
-                onToggleBackdrop={() => setAlphaBackdrop((b) => (b === "checker" ? "green" : "checker"))}
-                onShowAlphaModal={() => setShowAlphaModal(true)}
-                onShowRubric={() => setShowRubric(true)}
-                onShowRecap={() => setShowRecap(true)}
+                lang={lang}
+                insightLine={latest?.stage_e_personalization.player_lock_insight ?? null}
+                lowerThird={lowerThird}
               />
             </div>
-
-            <div className="pointer-events-auto flex flex-col items-center gap-2 xl:col-start-2 xl:row-start-2">
-              <TacticalPulseBar metrics={metrics} compact={hudMode === "studio"} />
-              <div className="flex max-w-full flex-wrap items-center justify-center gap-2">
-                {isSpeaking && !isVoiceMuted && (
-                  <button
-                    onClick={toggleMute}
-                    className="clip-skew flex items-center gap-2 border border-pitch/50 bg-slate-950/85 px-2.5 py-1 backdrop-blur-xl"
-                    title="AI Broadcast Voice Live — click to mute"
-                  >
-                    <span className="flex items-end gap-[2px]">
-                      {[0, 1, 2, 3, 4].map((i) => (
-                        <span
-                          key={i}
-                          className="w-[3px] bg-pitch"
-                          style={{
-                            height: `${5 + ((i * 7) % 12)}px`,
-                            animation: `breathe ${0.5 + i * 0.13}s ease-in-out infinite`,
-                          }}
-                        />
-                      ))}
-                    </span>
-                    <span className="font-tech text-[10.5px] font-bold uppercase tracking-wider text-pitch">
-                      AI BROADCAST VOICE LIVE [{lang.toUpperCase()}] • CLICK TO MUTE
-                    </span>
-                  </button>
-                )}
-                <SMPTEChip visible={alphaMode} />
-              </div>
-              {tick?.scenario && (
-                <div
-                  className="clip-skew flex items-center gap-2 px-3 py-1"
-                  style={{ background: "rgba(255,194,77,0.14)", border: "1px solid rgba(255,194,77,0.5)" }}
-                >
-                  <span className="h-2 w-2 animate-breathe rounded-full bg-gold" />
-                  <span className="font-display text-[13px] font-bold uppercase tracking-[0.25em] text-gold">
-                    God Mode · {tick.scenario.replace(/_/g, " ")}
-                    {tick.scenario_left != null ? ` · ${Math.ceil(tick.scenario_left)}s` : ""}
-                  </span>
-                </div>
-              )}
-              {phase2Pending && (
-                <div
-                  className="clip-skew flex items-center gap-2 border border-tactical/40 bg-slate-950/85 px-3 py-1 backdrop-blur-xl"
-                  style={{ animation: "flicker-in 0.5s ease-out both" }}
-                >
-                  <span className="h-2 w-2 animate-breathe rounded-full bg-tactical" />
-                  <span className="bg-gradient-to-r from-tactical via-white to-tactical bg-[length:200%_100%] bg-clip-text font-tech text-[11px] font-bold uppercase tracking-[0.14em] text-transparent"
-                    style={{ animation: "bar-shimmer 1.4s linear infinite" }}>
-                    🧠 Azure AI Foundry Models Reasoning over 60s Spatial Buffer...
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ---------- right dock (tabbed rail / mobile sheet) ---------- */}
-          <RightDock
-            camMode={camMode}
-            pickCamera={pickCamera}
-            toggles={toggles}
-            toggleKey={toggleKey}
-            aiDirected={!!override}
-            insights={insights}
-            persona={persona}
-            onPersona={handlePersona}
-            lang={lang}
-            metrics={metrics}
-            tick={tick}
-            latestEvent={events[0] ?? null}
-            metricFocus={personalization.metric_focus}
-            clubBias={personalization.favorite_club_bias}
-            latest={latest}
-            studioRecap={studioRecap}
-            onCloseRecap={studio.clearRecap}
-            lockedId={lockedId}
-            onStudioDirective={handleStudioDirective}
-            personalization={personalization}
-            applyPreferences={applyPreferences}
-            telestrator={telestrator}
-            onLock={handleLock}
-            events={events}
-            cvExpanded={cvExpanded}
-            toggleTelestrator={toggleTelestrator}
-            autoSpotlight={autoSpotlight}
-            alphaMode={alphaMode}
-            alphaBackdrop={alphaBackdrop}
-            onToggleAlpha={toggleAlpha}
-            onToggleBackdrop={() => setAlphaBackdrop((b) => (b === "checker" ? "green" : "checker"))}
-            onShowAlphaModal={() => setShowAlphaModal(true)}
-            onShowRubric={() => setShowRubric(true)}
-            onShowRecap={() => setShowRecap(true)}
-          />
-
-          {/* ---------- unified bottom dock ---------- */}
-          <div className="xl:col-span-3 xl:row-start-3">
-            <BottomDock
-              tick={tick}
-              busy={busy}
-              inject={inject}
-              isDvrPaused={isDvrPaused}
-              dvrOffsetTicks={dvrOffsetTicks}
-              pausedClock={pausedClock}
-              togglePause={togglePause}
-              scrub={scrub}
-              telestrator={telestrator}
-              toggleTelestrator={toggleTelestrator}
-              autoSpotlight={autoSpotlight}
-              lockedId={lockedId}
-              onLock={handleLock}
-              events={events}
-              lang={lang}
-              insightLine={latest?.stage_e_personalization.player_lock_insight ?? null}
-              pipeline={pipeline}
-              connected={connected}
-              status={status}
-              lowerThird={lowerThird}
-            />
           </div>
         </div>
 
         {/* autopilot step banner (hidden with the HUD in cinema mode) */}
         <JudgeAutopilotTour active={autopilotActive && !alphaMode} currentStep={autopilotStep} elapsed={autopilotElapsed} />
       </div>
+
+      {/* ---------- optional Control Center (closed by default) ---------- */}
+      {!cinemaMode && (
+        <RightDock
+          camMode={camMode}
+          pickCamera={pickCamera}
+          toggles={toggles}
+          toggleKey={toggleKey}
+          aiDirected={!!override}
+          insights={insights}
+          persona={persona}
+          onPersona={handlePersona}
+          lang={lang}
+          onLang={handleLang}
+          metrics={metrics}
+          tick={tick}
+          latestEvent={events[0] ?? null}
+          metricFocus={personalization.metric_focus}
+          clubBias={personalization.favorite_club_bias}
+          latest={latest}
+          studioRecap={studioRecap}
+          onCloseRecap={studio.clearRecap}
+          lockedId={lockedId}
+          onStudioDirective={handleStudioDirective}
+          onStudioAction={handleStudioAction}
+          personalization={personalization}
+          applyPreferences={applyPreferences}
+          telestrator={telestrator}
+          onLock={handleLock}
+          events={events}
+          cvExpanded={cvExpanded}
+          toggleTelestrator={toggleTelestrator}
+          autoSpotlight={autoSpotlight}
+          alphaMode={alphaMode}
+          alphaBackdrop={alphaBackdrop}
+          onToggleAlpha={toggleAlpha}
+          onToggleBackdrop={() => setAlphaBackdrop((b) => (b === "checker" ? "green" : "checker"))}
+          onShowAlphaModal={() => setShowAlphaModal(true)}
+          onShowRubric={() => setShowRubric(true)}
+          onShowRecap={() => setShowRecap(true)}
+          pipeline={pipeline}
+          connected={connected}
+          status={status}
+        />
+      )}
 
       {alphaMode && (
         <div className="pointer-events-none fixed inset-0 z-30">
@@ -989,13 +1068,13 @@ function StudioOrchestrator() {
       )}
 
       {/* ---------- GOAL slam ---------- */}
-      {goalBanner && (
+      {goalBanner && !alphaMode && (
         <div
           key={goalBanner.id}
           role="status"
           aria-live="assertive"
           aria-atomic="true"
-          className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center overflow-hidden"
+          className="pointer-events-none fixed inset-0 z-[45] flex items-center justify-center overflow-hidden"
         >
           <div className="absolute inset-0 overflow-hidden" aria-hidden>
             {Array.from({ length: 36 }).map((_, i) => (
@@ -1053,6 +1132,8 @@ function StudioOrchestrator() {
           </div>
         </div>
       )}
+
+      {!alphaMode && !cinemaMode && <LiveCaptionStrip />}
 
       {/* ---------- modals (outside the pointer-events-none HUD wrapper) ---------- */}
       <BroadcastAlphaModal open={showAlphaModal} onClose={() => setShowAlphaModal(false)} insight={latest} />

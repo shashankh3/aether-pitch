@@ -43,6 +43,10 @@ export interface GhostSample {
   x: number;
   y: number;
   delta_xt: number;
+  actual_delta_xt: number | null;
+  target_id: string | null;
+  completion_probability: number | null;
+  net_xt_gain: number | null;
   at: number;
 }
 
@@ -225,11 +229,21 @@ class TelemetryStore {
     bl.prevTickAt = bl.currTickAt;
     bl.currTickAt = now;
     if (b.ghost_end) {
+      const traceActual = this.insight?.agent_trace?.gate.delta_xt;
+      const actual = typeof b.ghost_actual_delta_xt === "number"
+        ? b.ghost_actual_delta_xt
+        : typeof traceActual === "number" ? traceActual : null;
       this.ghost = {
         x: b.ghost_end[0], y: b.ghost_end[1],
         delta_xt: b.ghost_delta_xt ?? 0.08,
+        actual_delta_xt: actual,
+        target_id: b.ghost_target_id ?? null,
+        completion_probability: b.ghost_completion_probability ?? null,
+        net_xt_gain: b.ghost_net_xt_gain ?? null,
         at: now,
       };
+    } else {
+      this.ghost = null;
     }
     this.match = {
       t_match: tick.t_match,

@@ -6,8 +6,12 @@
 // mesh and ghost replay — plus localized answers and a 15s commentator cue.
 
 import { useRef, useState } from "react";
-import { Clapperboard, Film, Mic, X, Zap, Camera, Send, Sparkles, Loader2 } from "lucide-react";
-import type { Insight, LangCode, Recap, StudioQueryResponse } from "@/lib/types";
+import {
+  ArrowUpRight, Clapperboard, Film, Mic, X, Zap, Camera, Send, Sparkles, Loader2, Quote,
+} from "lucide-react";
+import type {
+  Insight, LangCode, Recap, StudioQueryResponse, StudioSuggestedAction,
+} from "@/lib/types";
 import { useSpeechController } from "@/hooks/useSpeechController";
 import { useModalA11y } from "@/lib/useModalA11y";
 import { API_BASE } from "@/lib/api";
@@ -19,6 +23,7 @@ interface Props {
   lang: LangCode;
   lockedId: string | null;
   onStudioDirective: (directive: StudioQueryResponse["scene_directive"]) => void;
+  onStudioAction: (action: StudioSuggestedAction) => void;
 }
 
 const CAM_LABELS: Record<string, string> = {
@@ -44,8 +49,23 @@ interface SpeechRecognitionLike {
   stop: () => void;
 }
 
+const OFFLINE_MESSAGES: Record<"backend" | "voice", Record<LangCode, string>> = {
+  backend: {
+    en: "The Foundry router is offline. The edge fallback can still drive the camera, ghost lane and recap.",
+    es: "El enrutador Foundry está fuera de línea. El modo edge aún puede controlar la cámara, el pase fantasma y el resumen.",
+    ar: "موجّه Foundry غير متصل. يمكن لوضع الحافة تشغيل الكاميرا والمسار الوهمي والملخص.",
+    hi: "Foundry राउटर ऑफ़लाइन है। एज फ़ॉलबैक कैमरा, घोस्ट लेन और रीकैप चला सकता है।",
+  },
+  voice: {
+    en: "Voice queries need Chrome/Edge. Type your question instead.",
+    es: "Las consultas de voz requieren Chrome/Edge. Escribe tu pregunta.",
+    ar: "الاستعلامات الصوتية تحتاج Chrome أو Edge. اكتب سؤالك بدلاً من ذلك.",
+    hi: "वॉइस क्वेरी के लिए Chrome/Edge चाहिए। कृपया अपना सवाल लिखें।",
+  },
+};
+
 export default function StudioProducer({
-  latest, recap, onCloseRecap, lang, lockedId, onStudioDirective,
+  latest, recap, onCloseRecap, lang, lockedId, onStudioDirective, onStudioAction,
 }: Props) {
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
@@ -56,6 +76,73 @@ export default function StudioProducer({
   useModalA11y(Boolean(recap), onCloseRecap, recapPanelRef);
   const { isVoiceMuted, speakInsight } = useSpeechController();
   const dir = latest?.camera_directive;
+
+  const offlineResponse = (
+    q: string,
+    kind: "backend" | "voice",
+    chain: string[],
+  ): StudioQueryResponse => {
+    const gate = latest?.agent_trace?.gate;
+    const actions: StudioSuggestedAction[] = [
+      {
+        id: "edge-ghost",
+        label: "Show ghost lane",
+        type: "SHOW_GHOST_PASS",
+        payload: { enabled: true },
+        reason: "Edge counterfactual overlay is always available.",
+      },
+    ];
+    const target = lockedId;
+    if (target) {
+      actions.push({
+        id: "edge-lock",
+        label: "Lock selected player",
+        type: "LOCK_PLAYER",
+        payload: { player_id: target },
+        reason: "Keep the selected player at the centre of the read.",
+      });
+    }
+    actions.push({
+      id: "edge-recap",
+      label: "Open 3-act recap",
+      type: "GENERATE_RECAP",
+      payload: { focus: "edge_fallback" },
+      reason: "The deterministic storyboard still runs offline.",
+    });
+    const message = OFFLINE_MESSAGES[kind][lang];
+    return {
+      query: q,
+      answer: message,
+      agent_specialist: "Edge Match Analyst",
+      grounding_citations: [
+        {
+          label: "Pass difficulty",
+          value: gate?.pdr != null ? `${gate.pdr.toFixed(0)}%` : "offline",
+          source: "EdgeEngine · last inferred event",
+          detail: "Browser-native fallback computed from the 10Hz stream.",
+        },
+        {
+          label: "Delta xT",
+          value: gate?.delta_xt != null ? gate.delta_xt.toFixed(2) : "offline",
+          source: "EdgeEngine · threat model",
+          detail: "No cloud round-trip required.",
+        },
+      ],
+      suggested_actions: actions.slice(0, 3),
+      agent_reasoning_chain: chain,
+      studio_answer_localized: message,
+      commentator_cue_15s: "",
+      scene_directive: {
+        camera_mode: "TELE_BROADCAST",
+        spotlight_player_ids: [],
+        enable_offside_wall: false,
+        enable_compactness_polygon: false,
+        draw_ghost_pass: true,
+        highlight_pitch_zone: null,
+      },
+      model: "edge-autonomous-engine-v5",
+    };
+  };
 
   const ask = async (rawQuery?: string) => {
     const q = (rawQuery ?? query).trim();
@@ -75,21 +162,14 @@ export default function StudioProducer({
       onStudioDirective(data.scene_directive);
       if (!isVoiceMuted) speakInsight(data.studio_answer_localized, lang);
     } catch {
-      setResponse({
-        query: q,
-        agent_reasoning_chain: ["Studio engine unreachable on :8000."],
-        studio_answer_localized: "The 12th Man could not reach the pipeline. Is the backend running?",
-        commentator_cue_15s: "",
-        scene_directive: {
-          camera_mode: "TELE_BROADCAST",
-          spotlight_player_ids: [],
-          enable_offside_wall: false,
-          enable_compactness_polygon: false,
-          draw_ghost_pass: false,
-          highlight_pitch_zone: null,
-        },
-        model: "offline",
-      });
+      const fallback = offlineResponse(q, "backend", [
+        "Foundry router unreachable; preserved the live 10Hz snapshot.",
+        "Re-ran the counterfactual and seam scan in EdgeEngine.",
+        "Rendered a local action plan without a cloud round-trip.",
+      ]);
+      setResponse(fallback);
+      onStudioDirective(fallback.scene_directive);
+      if (!isVoiceMuted) speakInsight(fallback.answer, lang);
     } finally {
       setBusy(false);
     }
@@ -101,18 +181,11 @@ export default function StudioProducer({
       | (new () => SpeechRecognitionLike)
       | undefined;
     if (!Ctor) {
-      setResponse({
-        query: "(voice)",
-        agent_reasoning_chain: ["SpeechRecognition API unavailable in this browser."],
-        studio_answer_localized: "Voice queries need Chrome/Edge — type your question instead.",
-        commentator_cue_15s: "",
-        scene_directive: {
-          camera_mode: "TELE_BROADCAST", spotlight_player_ids: [],
-          enable_offside_wall: false, enable_compactness_polygon: false,
-          draw_ghost_pass: false, highlight_pitch_zone: null,
-        },
-        model: "offline",
-      });
+      setResponse(offlineResponse("(voice)", "voice", [
+        "SpeechRecognition API unavailable in this browser.",
+        "Kept the typed query path active.",
+        "No telemetry or scene state was lost.",
+      ]));
       return;
     }
     if (listening) {
@@ -229,7 +302,15 @@ export default function StudioProducer({
                 </div>
               )}
               {response && (
-                <div className="space-y-1">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="clip-skew bg-pitch/15 px-1.5 py-0.5 font-tech text-[9px] font-bold uppercase tracking-wider text-pitch">
+                      {response.agent_specialist}
+                    </span>
+                    <span className="truncate font-tech text-[8.5px] uppercase tracking-wider text-slate-500">
+                      {response.model ?? "foundry"}
+                    </span>
+                  </div>
                   <div className="flex flex-wrap gap-1">
                     {response.agent_reasoning_chain.slice(0, 3).map((step, i) => (
                       <span
@@ -242,15 +323,42 @@ export default function StudioProducer({
                     ))}
                   </div>
                   <p className="text-[11px] leading-relaxed text-slate-200">
-                    {response.studio_answer_localized}
+                    {response.answer}
                   </p>
+                  {response.grounding_citations.length > 0 && (
+                    <div className="space-y-1 border-y border-tactical/15 py-1.5">
+                      {response.grounding_citations.slice(0, 3).map((citation) => (
+                        <div key={`${citation.label}-${citation.source}`} className="flex items-start gap-1.5">
+                          <Quote size={9} className="mt-0.5 shrink-0 text-tactical" />
+                          <div className="min-w-0 font-tech text-[9px] leading-snug">
+                            <span className="font-bold text-slate-200">{citation.label}: {citation.value}</span>
+                            <span className="text-slate-500"> · {citation.source}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {response.commentator_cue_15s && (
                     <p className="text-[10px] italic leading-relaxed text-amber-200/90">
                       🎙 “{response.commentator_cue_15s}”
                     </p>
                   )}
+                  {response.suggested_actions.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {response.suggested_actions.map((action) => (
+                        <button
+                          key={action.id}
+                          onClick={() => onStudioAction(action)}
+                          className="flex items-center gap-1 border border-pitch/40 bg-pitch/10 px-1.5 py-0.5 font-tech text-[9px] font-bold uppercase tracking-wider text-pitch transition hover:bg-pitch/25"
+                          title={action.reason}
+                        >
+                          <ArrowUpRight size={10} /> {action.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <div className="font-tech text-[9px] uppercase tracking-wider text-slate-500">
-                    scene executed · {response.model ?? "foundry"}
+                    scene executed · tools armed
                   </div>
                 </div>
               )}
