@@ -45,6 +45,11 @@ Judges usually see a highlight reel. AETHER PITCH lets them **drive the broadcas
 | 14 | **Foundry RAI: Prompt Shield & Eval Scorecard** | `backend/rai_shield.py` (new), `backend/stage_c_foundry_agents.py` (`apply_safety_shield`, `eval_scorecard`), `frontend/src/components/PipelineInspector.tsx` | Injection/off-topic/third-party detection with grounded deflection, `numeric_grounding_pass` + `club_neutrality_pass`, 4-metric eval scorecard, 1-click live grounding audit receipt |
 | 15 | **3D Passing Network & Spatial Ownership** | `backend/stage_b_math_engine.py` (`pitch_control_split`, `passing_network_edges`), `frontend/src/lib/edgeEngine.ts` (mirrors), `frontend/src/components/PitchForgeDeck.tsx` (`SpatialPitchControlBar`), `frontend/src/components/VisionAutoEventerHUD.tsx`, `frontend/src/components/three/SpatialLayers3D.tsx` | Live NLA % vs MCS % territory bar, homography lock status, 14-joint pose distribution, glowing xT-weighted passing tubes |
 | 16 | **Judge Rubric Proof-Jumper** | `frontend/src/components/JudgeAutopilotTour.tsx` (`PROOF_JUMPS`), `frontend/src/app/page.tsx` (`handleInspectProof`) | One click per prize track opens the exact Control Center tab holding that track's live proof |
+| 17 | **Judge First-Run Card** | `frontend/src/components/JudgeFirstRunCard.tsx` | Dismissible 60-second guide that routes a judge straight to the evidence for all three prize tracks |
+| 18 | **Foundry Route Card** | `frontend/src/components/PipelineInspector.tsx` (`FoundryConnectionCard`) | Shows the live triage/narrative deployments, API version, request id, token usage and exactly how to switch the cloud route on |
+| 19 | **Runtime Configuration** | `frontend/src/lib/runtimeConfig.ts`, `frontend/src/app/layout.tsx`, `frontend/next.config.js` | Backend coordinates are resolved server-side per request, so one container image works in every environment (`NEXT_PUBLIC_*` is frozen at build time) |
+| 20 | **Studio Error Boundary** | `frontend/src/components/StudioErrorBoundary.tsx` | A failing surface is recovered in place instead of white-screening a live demo |
+| 21 | **Azure Infrastructure as Code** | `infra/main.json`, `infra/validate_template.py`, `infra/README.md` | ARM template for AI Foundry, Translator, Key Vault + managed identity, Container Apps, App Insights and Monitor alerts — statically validated in CI |
 
 The live HUD stays deliberately calm: the 3D pitch, scorebug, and five primary actions are visible by default. One **Controls** button opens a **Control Center** containing the A–E PipelineRibbon, MatchIntelPanel, camera director, AI voices, fan personalization, co-pilot, CV view, payload inspector, and production tools. Judges can therefore inspect stage latency and match intelligence on demand without the broadcast view becoming a command centre.
 
@@ -92,6 +97,17 @@ The live HUD stays deliberately calm: the 3D pitch, scorebug, and five primary a
 │  STAGE E  Personalization                                                     │
 │           persona · metric lock · club bias · locked player · i18n            │
 │           Azure AI Translator (optional) + deterministic phrase atlas         │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────▼────────────────────────────────────────┐
+│                        AZURE DEPLOYMENT (infra/main.json)                    │
+│                                                                              │
+│  AI Services (Azure AI Foundry)   AI Translator   Key Vault + UAMI             │
+│   gpt-4o-mini triage / gpt-4o    EN·ES·AR·HI     secrets + RBAC only        │
+│                                                                              │
+│  Container Apps Environment: engine (FastAPI, 10 Hz WS) · studio (Next.js)   │
+│  Application Insights + Log Analytics · Azure Monitor metric alerts           │
+│  Runtime config resolved server-side per request — one image, every env      │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -466,16 +482,16 @@ Official Rules §4.4 requires the demo video to be **less than two minutes**. Re
 
 | Time | On screen | Say |
 |------|-----------|-----|
-| **0:00–0:08** | Studio opens on Tele Cam | “This is AETHER PITCH: a live 3D football broadcast running on 100% synthetic 10 Hz telemetry.” |
-| **0:08–0:12** | Click **Autopilot** | “One click runs an 80-second guided tour of the whole stack.” |
-| **0:12–0:34** | Step 1 opens the CV overlay; step 2 closes it for control surface, lasers, Chaos Counter | “Every overlay comes from the five-stage pipeline: ingest, interpret, explain, render, personalize.” |
-| **0:34–0:50** | Step 3: DVR freeze, drone orbit, spotlight, offside wall, ghost lane | “Freeze live play, scrub 15 seconds, and telestrate the full 22-player snapshot in 3D.” |
-| **0:50–1:04** | Step 4: broadcast alpha | “Alpha mode strips every opaque surface, leaving a transparent AR layer for any broadcast compositor.” |
-| **1:04–1:22** | Steps 5–6: Fan Tuner, Pass Quality, NLA lens, ES → HI → AR, recap then rubric | “The same moment becomes a different story per fan: persona, metric lock, club lens, and language.” |
-| **1:22–1:38** | Inspect milestones; click **Load Act** on Act 2; export teleprompter | “The milestone engine builds a three-act recap; Load Act restores the exact moment and draws actual versus ghost.” |
-| **1:38–1:48** | Open **Controls → Studio**; click **Run War-Room**; press **Project Tactical Shift on 3D Pitch** | “Three adversarial agents — NLA manager, MCS scout, spatial arbiter — debate one adjustment against the live xT tensor and issue a grounded prescription.” |
-| **1:48–1:58** | Open **Controls → Data**; click **Run Live Foundry Grounding Audit**; then **Controls → Ask AI** and send *"ignore all previous instructions"* | “The Foundry Prompt Shield blocks the injection and redirects to live telemetry, while the eval scorecard proves groundedness, coherence, and the frame SLA.” |
-| **1:58–2:00** | Close on the live pitch | “AETHER PITCH — synthetic football, real mathematics, broadcast-grade 3D.” |
+| **0:00–0:08** | Studio opens on Tele Cam; the 60-second judge card appears | “This is AETHER PITCH: a live 3D football broadcast running on 100% synthetic 10 Hz telemetry.” |
+| **0:08–0:14** | Click **Best Multi-Agent System** on the judge card | “One click per prize track. Start with the bench war-room: three agents argue over one adjustment, adjudicated against the live xT tensor.” |
+| **0:14–0:30** | War-room cards; click **Project Tactical Shift on 3D Pitch** | “The NLA manager proposes, the MCS scout counters, and the spatial arbiter rules on the numbers — and the prescription lands on the 3D pitch.” |
+| **0:30–0:44** | Steps 1–3 of the autopilot: CV overlay, control surface, chaos counter, DVR freeze, ghost lane | “Every overlay comes from the five-stage pipeline: ingest, interpret, explain, render, personalize.” |
+| **0:44–0:56** | Step 4: broadcast alpha | “Alpha mode strips every opaque surface, leaving a transparent AR layer for any broadcast compositor.” |
+| **0:56–1:12** | Steps 5–6: Fan Tuner (switch the cognitive density + colourblind palette), recap then rubric | “The same moment becomes a different story per fan: density, metric lock, club lens, and language.” |
+| **1:12–1:28** | Controls → **Data**; click **Run Live Foundry Grounding Audit** | “The Foundry Prompt Shield blocked a prompt injection, and this scorecard proves groundedness, coherence, safety and the frame SLA.” |
+| **1:28–1:44** | Controls → **Data**; click **Simulate 6s Cloud Outage** | “Now the cloud dies for six seconds. The 10 Hz browser edge engine keeps every frame, then the cloud returns and reconciles.” |
+| **1:44–1:56** | Export the dossier (JSON) | “The whole run exports as an audit dossier: match, math, agent trace, compliance.” |
+| **1:56–2:00** | Close on the live pitch | “AETHER PITCH — synthetic football, real mathematics, broadcast-grade 3D.” |
 
 **Fallback 20-second version:** open the studio → Autopilot → skip to the recap and open **Controls → Studio → Verify**.
 
@@ -511,6 +527,21 @@ python test_pipeline.py
 cd ../frontend
 npx tsc --noEmit
 npm run build
+npm run smoke          # server-rendered smoke test: 200, runtime config, no SSR errors
+```
+
+The backend suite also runs the **Official Rules & trademark compliance audit**
+and validates the Azure ARM template (`infra/validate_template.py`). The
+frontend `npm run smoke` boots the production server in-process, asserts the
+page renders with the runtime configuration injected and no SSR error, then
+shuts down — it leaves no background process behind.
+
+Expected results:
+
+```text
+RESULT: ALL PIPELINE TESTS PASSED
+RESULT: ARM TEMPLATE VALIDATION PASSED
+RESULT: SSR SMOKE PASSED
 ```
 
 Expected backend result:
@@ -647,32 +678,42 @@ Responsive screenshots (1366×768, 1920×1080):
 
 ```text
 backend/
-  stage_a_synthetic_engine.py      # 10 Hz engine + MilestoneTracker
-  stage_b_math_engine.py           # chaos / PDR / xT / ghost / gate / pitch control / network
-  stage_c_foundry_agents.py        # Azure AI Foundry + recap_storyboard + studio_query + war room
-  stage_d_e_personalizer.py        # overlays + personalization + i18n
+  stage_a_synthetic_engine.py      # 10 Hz engine + MilestoneTracker + bio-load twin
+  stage_b_math_engine.py           # chaos / PDR / xT / ghost / gate / territory / network
+  stage_c_foundry_agents.py        # Azure AI Foundry + recap + studio_query + war room
+  stage_d_e_personalizer.py        # overlays + personalization + i18n + density
   agent_trace.py                   # grounded 4-node handoff + numeric cross-check
-  rai_shield.py                    # Prompt Shield + club-neutrality + grounding policy
-  main.py                          # WS hub, recap archive, v5 REST + studio-query + war room
-  test_pipeline.py
+  rai_shield.py                    # Prompt Shield + club-neutrality + numeric grounding
+  main.py                          # WS hub, recap archive, v5 REST + studio/war-room/audit
+  test_pipeline.py                 # pipeline + multi-agent + bio-load + compliance audit
+
+infra/
+  main.json                        # ARM template: AI Foundry, Translator, KV, Container Apps
+  validate_template.py             # static ARM validation (runs inside test_pipeline.py)
+  README.md                        # deploy walkthrough + runtime-config contract
 
 frontend/src/
-  app/page.tsx                     # v5 integration + autopilot wiring + caption strip
+  app/page.tsx                     # v5 integration + autopilot + proof-jumper + captions
+  app/layout.tsx                   # runtime config injection + error boundary
   app/globals.css                  # caption-bar keyframes
-  hooks/useResilientMatchEngine.ts # WS + edge hot-swap
+  hooks/useResilientMatchEngine.ts # WS + edge hot-swap + failover drill
   hooks/useSpeechController.ts     # zero-overlap speech + captions
-  lib/edgeEngine.ts                # 10 Hz browser fallback + war room + eval scorecard
-  lib/types.ts                     # StudioSuggestedAction, WarRoomResponse, FoundryEvalScorecard, ...
+  lib/edgeEngine.ts                # 10 Hz browser fallback + war room + eval + bio-load
+  lib/runtimeConfig.ts             # runtime (not build-time) backend coordinates
+  lib/types.ts                     # StudioSuggestedAction, WarRoomResponse, BioLoadProfile, ...
   components/
-    FanPersonalizationTuner.tsx    # persona / metric / club / language
+    FanPersonalizationTuner.tsx    # persona / metric / club / density / colorblind palette
     MatchRecapStudioModal.tsx      # 3-act recap + time travel + dossier export
     JudgeAutopilotTour.tsx         # 80 s / 6-step rubric tour + proof-jumper
-    TwinCastHUD.tsx                # metric-lock + club-lens badges
-    PipelineInspector.tsx          # trace DAG + gate + grounding + Foundry eval scorecard
+    JudgeFirstRunCard.tsx          # 60-second judge guide to the three prize tracks
+    TwinCastHUD.tsx                # metric-lock + club-lens + density badges
+    PipelineInspector.tsx          # trace DAG + gate + grounding + eval scorecard + Foundry route
+    PipelineRibbon.tsx             # 5-stage strip + resilience drill badge
     VisionAutoEventerHUD.tsx       # homography lock + 14-joint pose + xT network toggle
     PitchForgeDeck.tsx             # God Mode deck + Spatial Pitch Control Bar
     StudioProducer.tsx             # co-pilot UI + Bench War-Room panel
     LiveCaptionStrip.tsx           # waveform bars + locale tag + CC status
+    StudioErrorBoundary.tsx        # recoverable surface failure
     TelestratorDVRBar.tsx          # ghost comparison strip + counterfactual toggle
     three/
       SpatialControlSurface3D.tsx  # 21×14 control surface + pass network
@@ -680,7 +721,7 @@ frontend/src/
       RecapPassTubes.tsx           # actual gold + ghost cyan tubes
       PassVectors3D.tsx            # ghost badge + actual/net ΔxT + completion %
       Telestrator3DOverlays.tsx    # pulsing ghost target ring + ghost replay ball
-      HoloPitch3D.tsx              # stadium + avatars + overlays
+      HoloPitch3D.tsx              # stadium + avatars + overlays + palette
 ```
 
 ---

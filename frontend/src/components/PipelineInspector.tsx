@@ -7,7 +7,7 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
 import {
   Activity, AlertTriangle, ChevronRight, GitBranch, ShieldCheck, ShieldAlert,
-  FlaskConical, Loader2, BadgeCheck, Gauge, CloudOff, RadioTower, Zap,
+  FlaskConical, Loader2, BadgeCheck, Gauge, CloudOff, RadioTower, Zap, CloudCog,
 } from "lucide-react";
 import type {
   AgentTrace, AgentTraceSpan, EngineStatus, FoundryEvalScorecard, Pipeline, PipelineAudit,
@@ -250,6 +250,88 @@ interface ScorecardProps {
   auditing: boolean;
   receipt: { at: string; source: string } | null;
   onRunAudit: () => void;
+  azure?: PipelineAudit["azure"];
+}
+
+/* ------------------------------------------- v6.2 Foundry connection panel */
+
+function FoundryConnectionCard({ azure }: { azure?: PipelineAudit["azure"] }) {
+  if (!azure) return null;
+  const configured = !!azure.configured;
+  const attempted = !!azure.last_attempted;
+  const used = !!azure.last_used;
+  const usage = (azure.usage ?? {}) as Record<string, unknown>;
+  const tokens =
+    typeof usage.total_tokens === "number"
+      ? usage.total_tokens
+      : typeof usage.prompt_tokens === "number" && typeof usage.completion_tokens === "number"
+        ? (usage.prompt_tokens as number) + (usage.completion_tokens as number)
+        : null;
+
+  return (
+    <div className="mt-2 border border-tactical/25 bg-tactical/[0.04] p-2">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <span className="flex items-center gap-1.5 font-display text-[10px] font-bold uppercase tracking-[0.2em] text-tactical">
+          <CloudCog size={12} /> Microsoft Foundry Route
+        </span>
+        <span
+          className={cn(
+            "clip-skew px-1.5 py-0.5 font-tech text-[8px] font-bold uppercase tracking-wider",
+            used
+              ? "bg-pitch/20 text-pitch"
+              : configured
+                ? "bg-gold/20 text-gold"
+                : "bg-white/10 text-slate-400",
+          )}
+        >
+          {used ? "LIVE CLOUD" : configured ? "ARMED" : "DETERMINISTIC"}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-1.5">
+        {[
+          ["Triage agent", azure.triage_deployment],
+          ["Narrative agent", azure.narrative_deployment],
+          ["API version", azure.api_version],
+          ["Request ID", azure.request_id ?? "—"],
+        ].map(([label, value]) => (
+          <div key={label} className="border border-white/10 bg-slate-950/55 px-1.5 py-1">
+            <div className="font-tech text-[7.5px] font-bold uppercase tracking-[0.14em] text-slate-500">
+              {label}
+            </div>
+            <div className="truncate font-mono text-[9.5px] text-slate-200" title={String(value)}>
+              {String(value ?? "—")}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-tech text-[8px] uppercase tracking-wider text-slate-500">
+        <span>
+          Attempted <b className={attempted ? "text-gold" : "text-slate-400"}>{attempted ? "YES" : "NO"}</b>
+        </span>
+        <span>
+          Cloud used <b className={used ? "text-pitch" : "text-slate-400"}>{used ? "YES" : "NO"}</b>
+        </span>
+        {tokens != null && (
+          <span>
+            Tokens <b className="text-slate-200">{tokens}</b>
+          </span>
+        )}
+        {azure.last_error && (
+          <span className="text-crimson" title={azure.last_error}>
+            last error: {String(azure.last_error).slice(0, 48)}
+          </span>
+        )}
+      </div>
+
+      <p className="mt-1.5 border-t border-white/10 pt-1.5 font-tech text-[7.5px] leading-relaxed text-slate-500">
+        {configured
+          ? "Azure AI Foundry credentials detected: Stage C routes to the cloud, Stage E to Azure AI Translator, and every call is recorded in the handoff trace."
+          : "Deterministic fallback is running. Set AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY (and AZURE_TRANSLATOR_KEY) to route Stage C to Azure AI Foundry and Stage E to Azure AI Translator — the trace then records the real cloud route, request id and token usage."}
+      </p>
+    </div>
+  );
 }
 
 function ScoreMetric({
@@ -288,7 +370,7 @@ function ScoreMetric({
 }
 
 function FoundryEvalScorecardPanel({
-  scorecard, trace, auditing, receipt, onRunAudit,
+  scorecard, trace, auditing, receipt, onRunAudit, azure,
 }: ScorecardProps) {
   const groundingPct = scorecard?.mathematical_groundedness_pct
     ?? (trace ? Math.round(trace.grounding.score * 100) : 100);
@@ -363,6 +445,8 @@ function FoundryEvalScorecardPanel({
         Suite {scorecard?.eval_suite ?? "aether-foundry-eval-v1"} · evaluated{" "}
         {scorecard?.evaluated_at ?? "on demand"} · deterministic offline fallback
       </p>
+
+      <FoundryConnectionCard azure={azure} />
     </div>
   );
 }
@@ -514,6 +598,7 @@ export function PipelinePanel({
   const [evalCard, setEvalCard] = useState<FoundryEvalScorecard | null>(null);
   const [auditReceipt, setAuditReceipt] = useState<{ at: string; source: string } | null>(null);
   const [auditing, setAuditing] = useState(false);
+  const [azureBlock, setAzureBlock] = useState<PipelineAudit["azure"] | undefined>(undefined);
 
   const runGroundingAudit = useCallback(async () => {
     setAuditing(true);
@@ -522,6 +607,7 @@ export function PipelinePanel({
       if (!r.ok) throw new Error(`audit HTTP ${r.status}`);
       const data = (await r.json()) as PipelineAudit;
       if (data.foundry_eval) setEvalCard(data.foundry_eval);
+      if (data.azure) setAzureBlock(data.azure);
       setAuditReceipt({
         at: new Date().toISOString(),
         source: data.foundry_eval?.eval_suite ?? "aether-foundry-eval-v1",
@@ -538,6 +624,23 @@ export function PipelinePanel({
     const timer = setTimeout(() => setAuditReceipt(null), 6000);
     return () => clearTimeout(timer);
   }, [auditReceipt]);
+
+  // Populate the Foundry route + scorecard the first time the Data tab is
+  // opened, so a judge sees the real Azure configuration without clicking.
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${API_BASE}/api/health/pipeline-audit`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: PipelineAudit | null) => {
+        if (cancelled || !data) return;
+        if (data.foundry_eval) setEvalCard(data.foundry_eval);
+        if (data.azure) setAzureBlock(data.azure);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="clip-ea panel-lux p-2.5">
@@ -565,6 +668,7 @@ export function PipelinePanel({
         auditing={auditing}
         receipt={auditReceipt}
         onRunAudit={runGroundingAudit}
+        azure={azureBlock}
       />
 
       {onTriggerDrill && (

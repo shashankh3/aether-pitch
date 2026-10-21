@@ -32,8 +32,13 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_WS_URL=ws://localhost:8000/ws
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      # Runtime (not build-time) configuration. The server reads these per
+      # request and inlines them into the page, so the browser always finds
+      # the engine. Set AETHER_API_URL to the engine's public URL in a cloud
+      # deployment, or leave it empty to use the same-origin proxy.
+      AETHER_API_URL=${AETHER_API_URL:-http://localhost:8000}
+      AETHER_WS_URL=${AETHER_WS_URL:-ws://localhost:8000/ws}
+      BACKEND_ORIGIN=${BACKEND_ORIGIN:-http://backend:8000}
     depends_on:
       backend:
         condition: service_healthy

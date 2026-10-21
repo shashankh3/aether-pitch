@@ -7,8 +7,11 @@ import type {
 import { telemetry } from "@/lib/telemetry";
 import { EdgeEngine } from "@/lib/edgeEngine";
 import { API_BASE } from "@/lib/api";
+import { wsUrl } from "@/lib/runtimeConfig";
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws";
+// The WebSocket target is resolved at RUNTIME (see lib/runtimeConfig.ts) so
+// a deployed container connects to the right host, not a build-time default.
+const WS_URL = wsUrl();
 
 /* ------------------------------------------------------------------ */
 /* v6.2 — Cloud outage / zero-downtime edge failover drill             */

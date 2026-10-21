@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Rajdhani, Teko, Inter, JetBrains_Mono } from "next/font/google";
+import StudioErrorBoundary from "@/components/StudioErrorBoundary";
 import "./globals.css";
 
 const rajdhani = Rajdhani({
@@ -64,14 +65,44 @@ export const viewport: Viewport = {
   colorScheme: "dark",
 };
 
+// The studio is a live dashboard, never a static page. Rendering per request
+// lets the server read the runtime environment and inline the backend
+// coordinates into the HTML — `NEXT_PUBLIC_*` variables would be frozen at
+// build time and would point a deployed container at the wrong host.
+export const dynamic = "force-dynamic";
+
+function runtimeConfig(): { apiBase: string; wsUrl: string } {
+  const api = (process.env.AETHER_API_URL ?? "").replace(/\/+$/, "");
+  const ws = (process.env.AETHER_WS_URL ?? "").trim();
+  return {
+    // Unset in production means "same origin" (the Next.js server proxies
+    // /api and /ws to the engine). In dev the engine lives on :8000.
+    apiBase: api || (process.env.NODE_ENV === "production" ? "" : "http://localhost:8000"),
+    wsUrl: ws,
+  };
+}
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const config = runtimeConfig();
   return (
     <html lang="en" className={`dark ${rajdhani.variable} ${teko.variable} ${inter.variable} ${jetbrains.variable}`}>
-      <body className="bg-obsidian font-sans text-slate-200 antialiased">{children}</body>
+      <head>
+        <script
+          id="aether-runtime-config"
+          dangerouslySetInnerHTML={{
+            __html: `window.__AETHER_CONFIG__=${JSON.stringify(config)};`,
+          }}
+        />
+      </head>
+      <body className="bg-obsidian font-sans text-slate-200 antialiased">
+        <StudioErrorBoundary label="studio">
+          {children}
+        </StudioErrorBoundary>
+      </body>
     </html>
   );
 }

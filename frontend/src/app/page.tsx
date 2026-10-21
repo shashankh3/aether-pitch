@@ -15,6 +15,8 @@ import BroadcastAlphaModal, { SMPTEChip } from "@/components/BroadcastAlphaModal
 import RubricVerifierModal from "@/components/RubricVerifierModal";
 import MatchRecapStudioModal from "@/components/MatchRecapStudioModal";
 import LiveCaptionStrip from "@/components/LiveCaptionStrip";
+import StudioErrorBoundary from "@/components/StudioErrorBoundary";
+import JudgeFirstRunCard from "@/components/JudgeFirstRunCard";
 import JudgeAutopilotTour, {
   AUTOPILOT_STEPS, AUTOPILOT_TOTAL_SECONDS, type ProofJump,
 } from "@/components/JudgeAutopilotTour";
@@ -855,22 +857,25 @@ function StudioOrchestrator() {
       {/* chroma / checkerboard backdrop behind the transparent WebGL canvas */}
       {alphaMode && <div className="fixed inset-0 z-0" style={alphaBackdropStyle} />}
 
-      {/* full-bleed 3D WebGL stadium */}
-      <HoloPitch3D
-        camMode={camMode}
-        override={override}
-        toggles={toggles}
-        lockedId={lockedId}
-        keyIds={keyIds}
-        metrics={metrics}
-        telestrator={telestrator}
-        highlightZone={highlightZone}
-        alphaMode={alphaMode}
-        recapPass={recapPass}
-        warRoomShift={warRoomShift}
-        palette={palette}
-        onLock={handleLock}
-      />
+      {/* full-bleed 3D WebGL stadium — isolated so a WebGL failure cannot
+          take down the HUD, the Control Center or the live telemetry */}
+      <StudioErrorBoundary label="3D pitch">
+        <HoloPitch3D
+          camMode={camMode}
+          override={override}
+          toggles={toggles}
+          lockedId={lockedId}
+          keyIds={keyIds}
+          metrics={metrics}
+          telestrator={telestrator}
+          highlightZone={highlightZone}
+          alphaMode={alphaMode}
+          recapPass={recapPass}
+          warRoomShift={warRoomShift}
+          palette={palette}
+          onLock={handleLock}
+        />
+      </StudioErrorBoundary>
 
       {!alphaMode && (
         <>
@@ -1187,6 +1192,8 @@ function StudioOrchestrator() {
       )}
 
       {!alphaMode && !cinemaMode && <LiveCaptionStrip />}
+
+      <JudgeFirstRunCard onRunAutopilot={toggleAutopilot} />
 
       {/* ---------- modals (outside the pointer-events-none HUD wrapper) ---------- */}
       <BroadcastAlphaModal open={showAlphaModal} onClose={() => setShowAlphaModal(false)} insight={latest} />

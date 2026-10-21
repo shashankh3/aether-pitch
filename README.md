@@ -23,15 +23,31 @@ The project was built for the **Microsoft Premier League Hackathon ("Inside the 
 
 **The problem:** a live match produces thousands of events, but analysts, casual fans, and broadcasters each need a different explanation, in the language and context they care about, without waiting on a studio. **The solution:** AETHER PITCH ingests synthetic 10 Hz telemetry, interprets it with deterministic football math, explains key moments with Azure AI Foundry-hosted models, renders synchronized 3D/AR overlays, and personalizes the same moment by persona, metric, club, player, and language.
 
+## Judge Quick Start (60 seconds)
+
+Open the app and a dismissible card routes you straight to the evidence for each prize track — no hunting through menus.
+
+| Prize track | One click opens | What you see |
+|---|---|---|
+| **Best Use of Microsoft Foundry** | Control Center → **Data** | Foundry Eval & Responsible AI scorecard (groundedness, tactical coherence, Prompt Shield status, P95 frame SLA), the **Microsoft Foundry Route** card showing the real triage/narrative deployments, API version, request id and token usage, plus the 4-node grounded handoff DAG. |
+| **Best Multi-Agent System** | Control Center → **Studio** | The **Bench War-Room**: `NLATacticalManagerAgent` proposes, `MCSOppositionScoutAgent` counters, `SpatialArbiterAgent` arbitrates against the 16×12 xT tensor, and issues one tactical prescription you can project onto the 3D pitch. |
+| **Best Azure Cloud Native** | Control Center → **Ask AI** | The distributed pipeline trace and the **Cloud Resilience & Edge Failover Drill** — one click simulates a 6-second cloud outage and measures the hot-swap latency, 10 Hz continuity and state reconciliation. |
+
+Prefer to be driven? **Controls → Autopilot** runs the full 80-second guided tour with voiceover, ending on the recap and the rubric proof.
+
 ## Highlights
 
 - **Cinematic 3D broadcast** — a procedural night stadium, 22 articulated player rigs, four camera modes, choreographed camera intros, dynamic FOV, score-impact camera shake, volumetric overlays, and broadcast alpha output.
 - **Five-stage pipeline** — synthetic ingest, deterministic tactical math, asynchronous AI explanation, render packets, and personalization.
 - **Grounded agent handoff trace** — deterministic gate → triage → causal analyst/critic → broadcast director, with measured latency, gate economy, P95 audit metrics, and numeric cross-checks of Azure narrative claims.
-- **Explainable analytics** — Pass Difficulty Rating, Expected Threat, Ghost Pass, Chaos Index, pressing metrics, and defensive line analysis.
-- **Fan runtime** — persona modes, metric locking, club bias, locked players, and EN/ES/AR/HI commentary without restarting the stream.
-- **Studio-grade interactions** — focus-managed dialogs, Escape/outside-click dismissal, ARIA live regions, reduced-motion support, and a responsive Control Center bottom sheet.
-- **Resilient by design** — a 10 Hz browser edge engine takes over if the WebSocket or backend pipeline drops, then hot-swaps back when it returns.
+- **Adversarial multi-agent debate** — a 3-agent bench war-room adjudicated against a live Expected Threat tensor, with a projected 30-second ΔxT gain and win-probability swing.
+- **Enterprise Responsible AI** — a Foundry Prompt Shield that blocks prompt injection, off-topic and third-party queries before the model is called, a club-neutrality check, and a live eval scorecard with a one-click grounding audit.
+- **Predictive bio-load digital twin** — rolling metabolic load, a +10-minute stamina projection and a fatigue-adjusted PDR penalty for every player, with a tactical relief directive.
+- **Explainable analytics** — Pass Difficulty Rating, Expected Threat, Ghost Pass, Chaos Index, pressing metrics, live pitch-control territory splits and defensive line analysis.
+- **Fan runtime** — persona modes, cognitive telemetry density, metric locking, club bias, locked players, a colorblind-safe palette, and EN/ES/AR/HI commentary without restarting the stream.
+- **Studio-grade interactions** — focus-managed dialogs, Escape/outside-click dismissal, ARIA live regions, reduced-motion support, a recoverable error boundary, and a responsive Control Center bottom sheet.
+- **Resilient by design** — a 10 Hz browser edge engine takes over if the WebSocket or backend pipeline drops, then hot-swaps back when it returns — provable with a one-click failover drill.
+- **Infrastructure as code** — a declarative ARM template for Azure AI Foundry, Azure AI Translator, Key Vault + managed identity, Container Apps, Application Insights and Azure Monitor alerts.
 
 ## Contents
 
@@ -297,6 +313,19 @@ docker compose up --build
 
 The backend health check uses `GET /api/health`; the frontend waits for the backend to become healthy before starting.
 
+### Azure deployment
+
+The full stack is defined as declarative infrastructure in [`infra/main.json`](infra/main.json): Azure AI Foundry (AI Services) with a triage and a narrative model deployment, Azure AI Translator, Key Vault with a user-assigned managed identity, an Azure Container Apps environment running both services, Application Insights and Azure Monitor alerts.
+
+```bash
+az deployment group create \
+  --resource-group rg-aether-pitch \
+  --template-file infra/main.json \
+  --parameters prefix=aether openAiApiKey=<foundry-key> translatorKey=<translator-key>
+```
+
+See [`infra/README.md`](infra/README.md) for the full deploy walkthrough, the runtime-configuration contract, and the offline validator (`python infra/validate_template.py`).
+
 ## Configuration
 
 Copy the example environment file before adding Azure credentials:
@@ -334,8 +363,11 @@ Frontend environment variables (set in `frontend/.env.local` or the container en
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | REST base URL |
-| `NEXT_PUBLIC_WS_URL` | `ws://localhost:8000/ws` | WebSocket URL |
+| `AETHER_API_URL` | same origin (production) / `http://localhost:8000` (dev) | REST base URL, resolved **on the server per request** and inlined into the page |
+| `AETHER_WS_URL` | same origin `/ws` | WebSocket URL, resolved at runtime in the browser |
+| `BACKEND_ORIGIN` | `http://localhost:8000` | Engine origin used by the studio's same-origin `/api` proxy |
+
+> **Why not `NEXT_PUBLIC_*`?** Next.js inlines `NEXT_PUBLIC_*` variables into the JavaScript bundle at **build** time. A container that receives them at **run** time therefore keeps the build-time default and points the browser at the wrong host. AETHER PITCH resolves the backend coordinates on the server, per request, and inlines them into the HTML — so one image works in every environment.
 
 ## Using the Studio
 
@@ -524,16 +556,33 @@ Run the backend pipeline self-test:
 python backend/test_pipeline.py
 ```
 
-Expected result: `RESULT: ALL PIPELINE TESTS PASSED`.
+Expected result: `RESULT: ALL PIPELINE TESTS PASSED`. The suite also runs the
+**Official Rules & trademark compliance audit** (synthetic metadata, deterministic
+`seed=42` replay, Stage A–E payload keys, zero third-party brand strings, zero
+external media references, encoding hygiene) and validates the Azure ARM
+template.
 
-Build the frontend for a production check:
+Build the frontend and run the server-rendered smoke test:
 
 ```bash
 cd frontend
 npm run build
+npm run smoke
 ```
 
-Browser smoke checks cover 1600 × 900 desktop and 390 × 844 mobile layouts: WebGL canvas initialization, camera/overlay controls, overlay-packet and rubric dialogs, three-act recap, fan tuner dismissal, and the `?overlay=alpha` clean-output path.
+`npm run smoke` boots the production server in-process, requests the page,
+asserts the runtime configuration was injected and the shell rendered with no
+SSR error, then shuts down. `npm run verify` runs both in sequence.
+
+Browser smoke checks cover 1600 × 900 desktop and 390 × 844 mobile layouts: WebGL canvas
+initialization, camera/overlay controls, overlay-packet and rubric dialogs, three-act recap, fan tuner dismissal, and
+the `?overlay=alpha` clean-output path.
+
+Validate the Azure infrastructure template without a subscription:
+
+```bash
+python infra/validate_template.py
+```
 
 Optional backend static check:
 

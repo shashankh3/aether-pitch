@@ -9,6 +9,7 @@ import asyncio
 import copy
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 from typing import Optional
@@ -253,6 +254,26 @@ def test_rules_and_trademark_compliance(
         not bom_files,
         f"{len(bom_files)} files with a BOM"
         + (f" -> {bom_files[:5]}" if bom_files else ""),
+    ))
+
+    # -- Azure infrastructure template still valid ----------------------
+    infra_ok = False
+    infra_detail = "validator not found"
+    infra_script = _repo_root() / "infra" / "validate_template.py"
+    if infra_script.exists():
+        try:
+            proc = subprocess.run(
+                [sys.executable, str(infra_script)],
+                capture_output=True, text=True, timeout=60,
+            )
+            infra_ok = proc.returncode == 0
+            infra_detail = (proc.stdout.strip().splitlines() or [""])[-1]
+        except Exception as exc:  # pragma: no cover - environment dependent
+            infra_detail = f"validator error: {type(exc).__name__}"
+    results.append((
+        "Azure ARM template validates (infra/main.json)",
+        infra_ok,
+        infra_detail,
     ))
 
     report = {
