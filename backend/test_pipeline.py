@@ -1136,6 +1136,84 @@ def main() -> int:
           and state_endpoint["metrics"].get("chaos_index") is not None,
           "state and metrics served from the same publish")
 
+    # ---- Foundry retry policy -------------------------------------------
+    from stage_c_foundry_agents import (
+        RETRYABLE_STATUSES, _is_retryable_status, _retry_after_seconds,
+    )
+    check("Retry policy: only transient statuses are retried",
+          _is_retryable_status(429) and _is_retryable_status(503)
+          and _is_retryable_status(408) and _is_retryable_status(500)
+          and not _is_retryable_status(400)
+          and not _is_retryable_status(401)
+          and not _is_retryable_status(404)
+          and not _is_retryable_status(None)
+          and RETRYABLE_STATUSES == frozenset({408, 429, 500, 502, 503, 504}),
+          "a bad key or a bad request fails fast")
+    check("Retry policy: Retry-After is honoured and bounded",
+          _retry_after_seconds("2.5") == 2.5
+          and _retry_after_seconds("0") == 0.0
+          and _retry_after_seconds(None) == 0.35
+          and _retry_after_seconds("not-a-number") == 0.35
+          and _retry_after_seconds("999") == 5.0,
+          "delta-seconds honoured, capped at 5s")
+
+    class FakeResponse:
+        def __init__(self, status_code, headers=None, body=None):
+            self.status_code = status_code
+            self.headers = headers or {}
+            self._body = body or {}
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                import requests
+                raise requests.HTTPError(f"{self.status_code}", response=self)
+
+        def json(self):
+            return self._body
+
+    import stage_c_foundry_agents as _stage_c
+
+    def with_posts(responses):
+        calls = {"n": 0}
+
+        def fake_post(url, **kwargs):
+            index = min(calls["n"], len(responses) - 1)
+            calls["n"] += 1
+            return responses[index]
+
+        return calls, fake_post
+
+    original_post = _stage_c.requests.post
+    try:
+        # 429 then success: one retry, honoured delay
+        ok_body = {"usage": {"total_tokens": 7}, "id": "req-1",
+                   "choices": [{"message": {"content": "ok"}}]}
+        calls, fake_post = with_posts([
+            FakeResponse(429, {"Retry-After": "0"}),
+            FakeResponse(200, {}, ok_body),
+        ])
+        _stage_c.requests.post = fake_post
+        router_retry = FoundryRouter(settings)
+        out = router_retry._chat("dep", [{"role": "user", "content": "x"}])
+        check("Retry policy: a 429 is retried once and then succeeds",
+              out == "ok" and calls["n"] == 2,
+              f"{calls['n']} calls")
+
+        # 401: no retry at all
+        calls, fake_post = with_posts([FakeResponse(401, {}, {})])
+        _stage_c.requests.post = fake_post
+        router_401 = FoundryRouter(settings)
+        try:
+            router_401._chat("dep", [{"role": "user", "content": "x"}])
+            failed_fast = False
+        except Exception:
+            failed_fast = True
+        check("Retry policy: a 401 fails fast without a second call",
+              failed_fast and calls["n"] == 1,
+              f"{calls['n']} calls")
+    finally:
+        _stage_c.requests.post = original_post
+
     # ---- vectorised territory attribution must equal the scalar reference --
     import math as _pymath
 

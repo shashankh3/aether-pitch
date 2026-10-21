@@ -1,5 +1,5 @@
 # Autonomous Improvement Backlog
-Last Updated: 2026-10-21T21:16:17Z
+Last Updated: 2026-10-21T21:46:05Z
 Was Updated: 2026-10-22T00:00:00Z
 
 Scope: AETHER PITCH (Premier League × Azure "Inside the Game" hackathon).
@@ -9,7 +9,6 @@ Verification gate (all must pass before a commit):
 `cd frontend && npx tsc --noEmit` · `npm run build` · `npm run smoke` · `npm run check:logic`
 
 ## Pending Tasks
-- [ ] [Track A] `Stage C` `_chat()` retry loop re-sends the same request on 429/5xx without honouring `Retry-After`, and a 4xx is retried once unnecessarily
 - [ ] [Track B] Extend the frontend logic checks to cover the `judgeCard` / `telemetry` history cap and the `DVR` scrub clamping
 - [ ] [Track C] Replace the `any` casts in `frontend/scripts/logic-check.ts` with typed helpers so the logic suite is type-safe rather than `any`-driven
 - [ ] [Track C] `frontend/src/lib/types.ts` has drifted to 825 lines of mixed contracts — split the v6.x payload types into a dedicated `types/spatial.ts` and re-export from the barrel so imports stay stable
@@ -18,13 +17,18 @@ Verification gate (all must pass before a commit):
 - [ ] [Track E] Split the 1,623-line `frontend/src/lib/edgeEngine.ts` into `edgeEngine/` (simulation, math, war-room, bio-load) with a barrel re-export so imports stay stable
 - [ ] [Track E] Split the 1,408-line `backend/stage_c_foundry_agents.py` — extract the war-room, counterfactual arbiter and RAI shield into focused modules
 - [ ] [Track E] Split the 1,301-line `backend/main.py` — extract the counterfactual, war-room and compliance routers into a `routers/` package
-- [ ] [Track F] Add `docs/ARCHITECTURE.md` — module map, data flow, the five stages, and the four resilience layers
 - [ ] [Track F] Add a `CONTRIBUTING.md` describing the verification gate, the branch policy and the compliance rules contributors must not break
 
 ## In Progress
 - None
 
 ## Completed
+- [x] [Track A] `Stage C` `_chat()` retry loop re-sends the same request on 429/5xx without honouring `Retry-After`, and a 4xx is retried once unnecessarily
+  - files: backend/stage_c_foundry_agents.py, backend/test_pipeline.py
+  - note: Honour Retry-After (delta-seconds or HTTP-date, capped at 5s) and fail fast on non-retryable 4xx — a bad key or bad request no longer costs a second round trip. 4 new assertions
+- [x] [Track F] Add `docs/ARCHITECTURE.md` — module map, data flow, the five stages, and the four resilience layers
+  - files: docs/ARCHITECTURE.md
+  - note: Module map, data flow, the five stages, the four resilience layers, the sandbox, the verification matrix
 - [x] [Track F] Document the runtime configuration contract (server-side per-request resolution) in a dedicated `docs/RUNTIME_CONFIG.md` and link it from the README
   - files: docs/RUNTIME_CONFIG.md
   - note: Explains why NEXT_PUBLIC_* breaks container deploys and how the studio hydrates coordinates server-side per request

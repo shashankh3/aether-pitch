@@ -38,3 +38,7 @@ Base commit: `d28ccdf`
 ### 2026-10-21T21:16:18Z — Track F — add the architecture, runtime-config and contributing docs
 - Files: docs/ARCHITECTURE.md, docs/RUNTIME_CONFIG.md, CONTRIBUTING.md, README.md
 - Verification: 131 backend assertions; ARM valid; tsc clean; build ok; SSR smoke ok; 22 logic checks ok
+
+### 2026-10-21T21:46:05Z — Track A — fix the Foundry retry policy
+- Files: backend/stage_c_foundry_agents.py, backend/test_pipeline.py
+- Verification: 135 backend assertions; ARM valid; tsc clean; build ok; SSR smoke ok; 22 logic checks ok

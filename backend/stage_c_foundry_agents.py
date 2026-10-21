@@ -20,6 +20,7 @@ import asyncio
 import json
 import re
 import time
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 import requests
@@ -159,6 +160,36 @@ def pick_archetype(ev: Optional[dict], metrics: dict) -> str:
     if metrics.get("chaos_state") == "HIGH CHAOS TRANSITION":
         return "counter_overload"
     return "rhythm_shift"
+
+
+#: HTTP statuses worth a second attempt: request timeout, rate limited and
+#: transient server errors. Everything else (400 bad request, 401 bad key,
+#: 404 unknown deployment) is deterministic and must fail fast.
+RETRYABLE_STATUSES = frozenset({408, 429, 500, 502, 503, 504})
+#: Never sleep longer than this between attempts, however the service asks.
+MAX_RETRY_AFTER_S = 5.0
+
+
+def _is_retryable_status(status: Optional[int]) -> bool:
+    return status is not None and status in RETRYABLE_STATUSES
+
+
+def _retry_after_seconds(header: Optional[str]) -> float:
+    """Honour a `Retry-After` header (delta-seconds or HTTP-date)."""
+    if not header:
+        return 0.35
+    text = header.strip()
+    try:
+        return max(0.0, min(MAX_RETRY_AFTER_S, float(text)))
+    except ValueError:
+        pass
+    try:
+        from email.utils import parsedate_to_datetime
+        when = parsedate_to_datetime(text)
+        delta = (when - datetime.now(timezone.utc)).total_seconds()
+        return max(0.0, min(MAX_RETRY_AFTER_S, delta))
+    except Exception:
+        return 0.35
 
 
 class FoundryRouter:
@@ -411,14 +442,23 @@ class FoundryRouter:
                     json=payload,
                     timeout=timeout,
                 )
-                if r.status_code in (429, 500, 502, 503, 504) and attempt == 0:
-                    time.sleep(0.35)
+                if _is_retryable_status(r.status_code) and attempt == 0:
+                    time.sleep(_retry_after_seconds(r.headers.get("Retry-After")))
                     continue
                 r.raise_for_status()
                 body = r.json()
                 self.last_usage = body.get("usage") or {}
                 self.last_request_id = r.headers.get("x-request-id") or body.get("id")
                 return body["choices"][0]["message"]["content"]
+            except requests.HTTPError as exc:
+                # A 4xx (bad request, bad key, bad deployment) will never
+                # succeed on a retry: fail fast and fall back locally.
+                status = getattr(exc.response, "status_code", None)
+                if status is not None and not _is_retryable_status(status):
+                    raise
+                last_exc = exc
+                if attempt == 0:
+                    time.sleep(0.2)
             except Exception as exc:  # narrow enough: network + JSON shape
                 last_exc = exc
                 if attempt == 0:
