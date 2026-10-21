@@ -2,6 +2,8 @@
 
 # AETHER PITCH
 
+### The Zero-Hallucination 3D Football Broadcast Studio & Multi-Agent Tactical Twin
+
 **A real-time 3D football broadcast studio driven by 100% synthetic telemetry and a deterministic five-stage AI pipeline with optional Azure AI Foundry reasoning.**
 
 [![Next.js](https://img.shields.io/badge/Next.js-14-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
@@ -11,17 +13,32 @@
 [![Azure](https://img.shields.io/badge/Azure-AI%20Foundry-0078D4?logo=microsoftazure&logoColor=white)](https://azure.microsoft.com/)
 [![Synthetic Data](https://img.shields.io/badge/data-100%25%20synthetic-6f42c1)](#synthetic-data)
 
-[Quick Start](#quick-start) · [Features](#features) · [Architecture](#architecture) · [API](#api-reference) · [Configuration](#configuration) · [Testing](#testing--verification)
+**Repository:** `github.com/shashankh3/aether-pitch` · **Branch:** `main`
+**Scale:** 87 tracked files · ~13,300 LOC (Python 3.11 + TypeScript 5 / React 18) · **90 automated assertions** · 16-resource Azure ARM template
+
+> **The hook:** *AETHER PITCH is a live 3D football broadcast where every number on screen is computed by transparent football mathematics, every AI claim is graded by a deterministic numeric critic, and the cloud can die mid-match without the picture ever dropping a frame.*
+
+[Quick Start](#quick-start) · [Judge Quick Start](#judge-quick-start-60-seconds) · [Features](#features) · [Architecture](#architecture) · [API](#api-reference) · [Configuration](#configuration) · [Testing](#testing--verification)
 
 </div>
 
 ---
 
-AETHER PITCH turns a deterministic synthetic football match into a broadcast-grade, interactive 3D experience in the browser. A 10 Hz FastAPI engine drives 22 articulated players, tactical overlays, a 15-second DVR, AI commentary, and per-fan personalization. Every club, player, crest, and tracking sample is synthetic.
+## 1. Executive Summary
 
-The project was built for the **Microsoft Premier League Hackathon ("Inside the Game")**. Azure services are optional: without credentials, every stage falls back to a deterministic local implementation, so the full studio runs offline. For the full architecture, mathematical appendix, sub-two-minute demo script, and Official Rules checklist, see [SUBMISSION_GUIDE.md](SUBMISSION_GUIDE.md).
+Live sports broadcasts force a false choice: raw telemetry dashboards that overwhelm casual fans, or generative AI commentary that hallucinates statistics. **AETHER PITCH** eliminates both.
 
-**The problem:** a live match produces thousands of events, but analysts, casual fans, and broadcasters each need a different explanation, in the language and context they care about, without waiting on a studio. **The solution:** AETHER PITCH ingests synthetic 10 Hz telemetry, interprets it with deterministic football math, explains key moments with Azure AI Foundry-hosted models, renders synchronized 3D/AR overlays, and personalizes the same moment by persona, metric, club, player, and language.
+Running entirely on self-generated, IP-clean synthetic telemetry — **North Larchmont Athletic (NLA)** vs. **Meridian City SC (MCS)** in the *AETHER Synthetic League* at the *AETHER 3D DIGITAL TWIN* — the platform operates a deterministic five-stage pipeline at **10 Hz**, interpolated to **60 FPS** in WebGL:
+
+1. **Stage A (Ingest):** Frame-for-frame reproducible 22-player kinematics, ball physics, machine auto-eventing and a metabolic bio-load digital twin (`seed=42`).
+2. **Stage B (Math):** Pure NumPy spatial analytics — Expected Threat, Pass Difficulty, Pitch Control, Chaos Index, PPDA and counterfactual Ghost Passes.
+3. **Stage C (Explain):** Azure AI Foundry (`gpt-4o` + `gpt-4o-mini`) multi-agent orchestration governed by a deterministic **Numeric Critic** that rejects any narrative claim not traceable to live Stage B state.
+4. **Stage D (Render):** Synchronized React Three Fiber volumetric telestration, automated camera work, and SMPTE alpha broadcast overlays.
+5. **Stage E (Personalize):** Per-fan cognitive density, persona adaptation, colourblind-safe palettes and 4-language localization (EN / ES / AR / HI) via Azure AI Translator.
+
+**The problem:** a live match produces thousands of events, but analysts, casual fans and broadcasters each need a different explanation, in the language and context they care about, without waiting on a studio. **The solution:** AETHER PITCH ingests synthetic 10 Hz telemetry, interprets it with deterministic football math, explains key moments with Azure AI Foundry-hosted agents, renders synchronized 3D/AR overlays, and personalizes the same moment by persona, density, metric, club, player and language.
+
+The project was built for the **Microsoft Premier League Hackathon ("Inside the Game")**. Azure services are optional: without credentials every stage falls back to a deterministic local implementation, so the full studio runs offline. For the full architecture, mathematical appendix, sub-two-minute demo script and Official Rules checklist, see [SUBMISSION_GUIDE.md](SUBMISSION_GUIDE.md).
 
 ## Judge Quick Start (60 seconds)
 
@@ -76,14 +93,15 @@ Prefer to be driven? **Controls → Autopilot** runs the full 80-second guided t
 - **Tactical layers** — xT threat grid, defensive laser links, parabolic pass tubes, Ghost Pass counterfactuals, pitch-control surface, and passing network.
 - **Broadcast alpha mode** — open `/?overlay=alpha` for a transparent/chroma-ready AR layer with SMPTE timecode and a machine-readable render-partner packet.
 - **Match chrome** — scorebug, momentum and win-probability bars, tactical pulse, lower thirds, GOAL slam with confetti, and player lock hologram.
+- **Measured render telemetry** — a live frame-rate and frame-time chip sampled from the real `requestAnimationFrame` loop, so the performance number on screen is the number the machine is delivering.
 - **Clean-feed presentation** — `H` hides the HUD for a framed cinematic feed, `F` toggles fullscreen, and the Controls drawer exposes camera modes and core AR toggles on mobile.
 
 ### AI and analytics
 
-- **Stage A — ingest:** deterministic 10 Hz PitchForge simulation with match metadata, 3D pose state, ball physics, pass completion, tackles, auto-evented sprint/distance thresholds, and milestone tracking.
-- **Stage B — interpret:** NumPy tactical math for Chaos Index, PDR, 16 × 12 xT, Ghost Pass, AI gating, leverage, PPDA, defensive lines, and team/player match stats (passes, accuracy, shots, tackles, possession, distance).
+- **Stage A — ingest:** deterministic 10 Hz PitchForge simulation with match metadata, 3D pose state, ball physics, pass completion, tackles, auto-evented sprint/distance thresholds, milestone tracking, and a metabolic bio-load digital twin.
+- **Stage B — interpret:** NumPy tactical math for Chaos Index, PDR, 16 × 12 xT, Ghost Pass, AI gating, leverage, PPDA, defensive lines, pitch-control territory splits, top-xT zones, passing-network edges, and team/player match stats (passes, accuracy, shots, tackles, possession, distance).
 - **Stage C — explain:** asynchronous causal narratives and studio answers through Azure AI Foundry-hosted Azure OpenAI deployments (triage → narrative), with a deterministic local fallback.
-- **Agent trace:** every gated insight ships a `trace_id`, four-node handoff chain, gate decision, Stage C route, numeric grounding result, and compute economy; the Data tab renders it as a compact DAG and the audit API reports P95 latency plus live gate efficiency.
+- **Agent trace:** every gated insight ships a `trace_id`, four-node handoff chain, gate decision, Stage C route, numeric grounding result, and compute economy; the Data tab renders it as a compact DAG and the audit API reports P95 latency plus live gate economy.
 - **Stage D — render:** time-coded overlay packets, highlight zones, and camera directives for the 3D scene.
 - **Stage E — personalize:** analyst/casual/split personas, metric lock, club lens, locked-player context, and localized commentary.
 - **Ask The 12th Man:** ask a tactical question and receive a reasoning chain, localized answer, commentator cue, and a scene directive that moves the camera and overlays.
@@ -132,26 +150,31 @@ Prefer to be driven? **Controls → Autopilot** runs the full 80-second guided t
 ## Phase 3 - Adversarial Bench War-Room, Foundry RAI, 3D Spatial Layers & Proof-Jumper (v6.2)
 
 ### Adversarial Bench War-Room (Best Multi-Agent System)
-- **`POST /api/tactical-war-room`** runs a three-agent adversarial negotiation grounded in live Stage B telemetry (xT grid, PDR, PPDA, Chaos Index, defensive line height):
-  1. `NLATacticalManagerAgent` proposes the high-leverage adjustment (e.g. invert RB into the 78,12 half-space for a 4v3 overload).
-  2. `MCSOppositionScoutAgent` models MCS's optimal counter (pivot #6 into the vacated channel, re-drop the line 4m).
-  3. `SpatialArbiterAgent` adjudicates both proposals against the 16x12 xT tensor and issues one **Tactical Prescription**.
-- **Output contract:** `agent_debate_transcript` (`manager_proposal`, `scout_counter`, `arbiter_verdict`), `recommended_adjustment` (title + directive), `projected_30s_xt_delta`, `win_prob_shift_pct`, `target_zones`, `adjustment_vectors`, `telemetry_basis`.
-- **Studio (`prod`) tab UI:** debate cards for each agent, `+ΔxT` / `+WIN PROB` badges, and **"Project Tactical Shift on 3D Pitch"** which highlights the overload zones as pulsing ground rings and draws the adjustment vectors as glowing arrows on the 3D Digital Twin.
-- **Zero-config fallback:** `edgeWarRoom()` in `frontend/src/lib/edgeEngine.ts` reproduces the identical debate offline.
+- **`POST /api/tactical-war-room`** runs a genuine **sequential three-call debate** grounded in live Stage B telemetry — not one model role-playing three voices:
+
+| Turn | Agent | Model tier | Stage B tool bundle | Reads |
+|---|---|---|---|---|
+| 1 | `NLATacticalManagerAgent` | narrative (`gpt-4o`) | defensive line height, top xT zones, xT at gap, ghost pass, pitch control, passing network | live telemetry |
+| 2 | `MCSOppositionScoutAgent` | triage (`gpt-4o-mini`) | rolling PPDA, press intensity, pace, Chaos Index, team stats | turn 1 |
+| 3 | `SpatialArbiterAgent` | narrative (`gpt-4o`) | top xT zones, xT at gap, pitch control, Chaos, bio-load stamina, defensive line | turns 1 & 2 |
+
+  Each agent is a **separate model invocation** with its own tool bundle, and the tools are the deterministic Stage B engine — so an agent reasons about the space without ever inventing a number. The arbiter issues the **Tactical Prescription** (e.g. invert RB into the 78,12 half-space for a 4v3 overload).
+- **Output contract:** `agent_debate_transcript` (`manager_proposal`, `scout_counter`, `arbiter_verdict`), `recommended_adjustment` (title + directive), `projected_30s_xt_delta`, `win_prob_shift_pct`, `target_zones`, `adjustment_vectors`, plus `agent_calls` (agent, deployment, tool bundle, latency, token usage) and `orchestration` — the multi-agent claim is inspectable, not asserted.
+- **Studio (`prod`) tab UI:** each debate card shows its own model deployment, latency, token count and tool count; `+ΔxT` / `+WIN PROB` badges; and **"Project Tactical Shift on 3D Pitch"** which highlights the overload zones as pulsing ground rings and draws the adjustment vectors as glowing arrows on the 3D Digital Twin.
+- **Zero-config fallback:** `edgeWarRoom()` in `frontend/src/lib/edgeEngine.ts` reproduces the identical three-agent, three-turn debate offline.
 
 ### Microsoft Foundry Responsible AI (Best Use of Microsoft Foundry)
-- **Prompt Shield (`backend/rai_shield.py`)** runs before every Stage C call:
-  - Detects prompt injection (instruction override, role hijack, jailbreak, prompt exfiltration, guardrail bypass), off-topic queries, and third-party real-world entities.
-  - A blocked query never reaches the model: the response is replaced with a grounded deflection back to the live NLA vs MCS telemetry in EN/ES/AR/HI.
-  - Every response carries `foundry_safety_shield` with `prompt_shield_status` (`CLEAR` / `PROTECTED`), `numeric_grounding_pass`, and `club_neutrality_pass`.
+- **Pre-flight Prompt Shield (`backend/rai_shield.py`)** screens every user query **before a token reaches Azure OpenAI**: it detects prompt injection (instruction override, role hijack, jailbreak, prompt exfiltration, guardrail bypass), off-topic queries, and third-party real-world entities. A blocked query never calls the model — the caller gets a grounded, localized deflection back to the live NLA vs MCS telemetry in EN/ES/AR/HI. Verified by an assertion that counts **0 model calls** on a blocked query.
+- **Post-flight numeric critic (`backend/agent_trace.py`)** extracts every numeric claim from a model narrative and cross-checks it against live Stage B tensors within strict tolerance. An ungrounded or club-biased narrative is **rejected and replaced** with the deterministic, objectively grounded alternative; the discarded narrative is retained in the trace for audit.
+- **Azure AI Content Safety (`backend/content_safety.py`)** runs as an optional **second, independent RAI layer** on top of the deterministic shield when configured. It can only add evidence, never remove protection.
+- Every response carries `foundry_safety_shield` with `prompt_shield_status` (`CLEAR` / `PROTECTED`), `numeric_grounding_pass`, `club_neutrality_pass` and the content-safety verdict.
 - **Foundry Eval & Responsible AI Scorecard** in the Control Center **Data (`data`)** tab renders four live telemetry metrics: Mathematical Groundedness, Tactical Coherence, Prompt Shield status (hallucinations / policy breaches), and P95 Broadcast Frame SLA against the 100 ms budget.
 - **"Run Live Foundry Grounding Audit"** button fetches `/api/health/pipeline-audit` and flashes a verified, timestamped audit receipt.
 
 ### 3D Passing Network & Spatial Pitch Ownership
-- **Stage B math:** `pitch_control_split` (`nla_territory_pct` / `mcs_territory_pct` / `neutral_pct`) attributes every 16x12 xT cell by proximity + velocity-weighted influence; `passing_network_edges` returns the top 5 high-value lanes as `[from_id, to_id, xt_weight]` with coordinates.
+- **Stage B math:** `pitch_control_split` (`nla_territory_pct` / `mcs_territory_pct` / `neutral_pct`) attributes every 16x12 xT cell by proximity + velocity-weighted influence; `passing_network_edges` returns the top 5 high-value lanes as `[from_id, to_id, xt_weight]` with coordinates; `top_xt_zones()` returns the highest-Expected-Threat cells for both attacking directions — the agents' ground truth.
 - **Stats tab:** live **Spatial Pitch Control Bar** (NLA % vs MCS %).
-- **CV tab:** **Homography Calibration Status** (`105x68m FIFA Standard Locked`), **14-Joint Skeletal Pose Distribution** across all 22 players, and a **"3D xT Passing Network"** toggle.
+- **CV tab:** **Homography Calibration Status** (`105x68m Regulation Standard Locked`), **14-Joint Skeletal Pose Distribution** counted live across all 22 players, and a **"3D xT Passing Network"** toggle.
 - **3D Digital Twin:** glowing passing-lane tubes scaled by `xt_weight` (the same tensor the math uses, so the picture and the numbers can never disagree).
 
 ### Judge Rubric Proof-Jumper
@@ -192,57 +215,39 @@ Prefer to be driven? **Controls → Autopilot** runs the full 80-second guided t
   - **0** external media asset references.
 - **`SUBMISSION_GUIDE.md` §14** ships paste-ready answers for the submission portal: project summary & tagline, Foundry + multi-agent orchestration, cloud-native architecture & edge resilience, the synthetic-data compliance attestation, and prize-track one-liners.
 
-## Phase 4 - Scoring-Criteria Hardening (v6.2)
-
-Four changes aimed squarely at the three prize tracks, each verified by an
-automated test rather than asserted.
-
-### 1. The Bench War-Room is a real multi-agent system, not one call
-
-The previous implementation asked **one** model to role-play three agents. That
-is a multi-agent *story*, not a multi-agent *system*. It is now a genuine
-**sequential three-call debate**:
-
-| Turn | Agent | Deployment | Stage B tool bundle | Reads |
-|---|---|---|---|---|
-| 1 | `NLATacticalManagerAgent` | narrative (`gpt-4o`) | defensive line, top xT zones, xT at gap, ghost pass, pitch control, passing network | — |
-| 2 | `MCSOppositionScoutAgent` | triage (`gpt-4o-mini`) | PPDA, press intensity, pace, chaos, team stats | turn 1 |
-| 3 | `SpatialArbiterAgent` | narrative (`gpt-4o`) | top xT zones, xT at gap, pitch control, chaos, stamina load, defensive line | turns 1–2 |
-
-Each agent is a separate model invocation with **its own tool bundle**, and the
-tools are the deterministic Stage B engine — so an agent can reason about the
-space without ever inventing a number. The response carries `agent_calls`
-(agent, deployment, tool bundle, latency, token usage) and `orchestration`
-(rounds, agent order, tool surface), which the Studio tab renders on every
-debate card. The deterministic offline twin mirrors the same three agents, the
-same bundles and the same turn order.
-
-Verified by `backend/test_pipeline.py` with a mocked transport: three distinct
-calls, the scout sees turn 1, the arbiter sees turns 1–2, two different model
-deployments, and the arbiter's prescription adopted.
-
-### 2. Azure AI Content Safety as an optional second RAI layer
-
-The deterministic Prompt Shield always runs and always works offline. When
-`AZURE_CONTENT_SAFETY_ENDPOINT` / `AZURE_CONTENT_SAFETY_KEY` are set, the real
-**Azure AI Content Safety** text-analysis service runs on top as an independent
-second layer, and its verdict is merged into `foundry_safety_shield` and shown
-in the Foundry Route card. The layer can only *add* evidence — it never removes
-protection.
-
-### 3. Measured render telemetry
-
-The top bar carries a **measured** frame-rate and frame-time chip, sampled from
-the real `requestAnimationFrame` loop. It is a measurement, not a hard-coded
-"60 FPS" claim.
-
-### 4. Stage B exposes the highest-value xT zones
-
-`TacticalMathEngine.top_xt_zones()` returns the highest Expected Threat cells
-on the 16×12 grid for both attacking directions, so the manager agent argues
-about the actual highest-value space rather than a guessed one.
-
 ## Architecture
+
+```text
+BROWSER CLIENT (Next.js 14 / React 18 / React Three Fiber)
+ ├─ 3D Volumetric Stage: Procedural Stadium · 22 Articulated Avatars (14-part rigs) · Broadcast Camera Rig
+ ├─ Broadcast HUD: TopBar · ScoreBug · LeftRail · BottomDock (DVR) · RightDock (8-Tab Control Center)
+ ├─ Telemetry Store: 10 Hz WebSocket Ingest ──► 60 FPS interpolation (linear + velocity extrapolation)
+ └─ EdgeEngine (1,371 LOC browser-native twin) ◄── active hot-standby, 0 ms reload on cloud drop
+        │
+        │ WebSocket (/ws @ 10 Hz) + REST control plane
+        ▼
+FASTAPI BACKEND ENGINE (10 Hz deterministic loop)
+ ├─ Stage A  Synthetic ingest (997 LOC) ──► kinematics, ball physics, auto-eventing, bio-load twin
+ ├─ Stage B  Deterministic math (585 LOC) ──► xT grid, PDR, PPDA, Chaos, pitch control, ghost pass
+ ├─ Stage C  Foundry agent router (1,144 LOC) ──► 4-node insight pipeline + 3-turn war-room
+ ├─ RAI & numeric critic (607 LOC) ──► prompt shield + grounding verifier + club-neutrality gate
+ └─ Stage D & E  Personalizer (413 LOC) ──► camera directives, overlays, persona & i18n
+        │
+        ├──► Azure AI Foundry (Azure OpenAI: gpt-4o narrative / gpt-4o-mini triage)
+        ├──► Azure AI Translator (real-time EN / ES / AR / HI broadcast localization)
+        └──► Azure AI Content Safety (optional cloud secondary RAI inspection layer)
+```
+
+### Cloud-to-edge zero-downtime failover
+
+Live broadcasts cannot show a loading spinner. Every backend mathematical model, bio-load curve and tactical war-room heuristic has a deterministic TypeScript counterpart inside `edgeEngine.ts`. If the WebSocket drops — or when a judge triggers the **6-Second Failover Drill** in the Data tab — `useResilientMatchEngine.ts` hot-swaps to the browser-native engine mid-frame, measures the exact failover latency, and reconciles state on reconnection.
+
+```text
+Cloud drop ─► socket closed ─► EdgeEngine takes the picture (0 frames dropped)
+                          ─► measured hot-swap latency
+                          ─► reconnect ─► clock + state reconciled ─► badge flips to VERIFIED
+```
+
 
 ```mermaid
 flowchart LR

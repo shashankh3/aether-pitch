@@ -614,6 +614,15 @@ class FoundryRouter:
         """
         self._reset_trace()
         fallback = self._studio_query_fallback(ctx)
+        # ---- PRE-FLIGHT shield ------------------------------------------
+        # A blocked or off-topic query never reaches the model: no token is
+        # sent to Azure OpenAI, and the caller gets a grounded deflection
+        # back to the live synthetic match.
+        risk = self.preflight_screen(ctx)
+        if risk["severity"] != "clear":
+            self.last_error = f"prompt-shield-{risk['severity']}"
+            return self.apply_safety_shield(
+                {**fallback, "mode": "shield"}, ctx, fallback=fallback)
         if self.s.azure_enabled:
             self.last_attempted = True
             try:
@@ -631,14 +640,24 @@ class FoundryRouter:
                     raw.setdefault("mode", "azure")
                     raw["scene_directive"] = {**fallback["scene_directive"], **raw["scene_directive"]}
                     self.last_used = True
-                    return self.apply_safety_shield(raw, ctx)
+                    return self.apply_safety_shield(raw, ctx, fallback=fallback)
                 self.last_error = "Azure response missed required schema keys"
             except Exception as exc:
                 self.last_error = f"{type(exc).__name__}: {exc}"
-        return self.apply_safety_shield({**fallback, "mode": "fallback"}, ctx)
+        return self.apply_safety_shield(
+            {**fallback, "mode": "fallback"}, ctx, fallback=fallback)
 
     # ------------------------------------------------- Foundry RAI safety shield
-    def apply_safety_shield(self, result: dict, ctx: dict) -> dict:
+    @staticmethod
+    def preflight_screen(ctx: dict) -> dict:
+        """Classify a user query BEFORE any model call is made.
+
+        Returns the risk dict from `rai_shield.detect_prompt_risk`. A result
+        whose severity is not ``"clear"`` must not be sent to the model.
+        """
+        return detect_prompt_risk(ctx.get("query") or "")
+
+    def apply_safety_shield(self, result: dict, ctx: dict, fallback: Optional[dict] = None) -> dict:
         """Attach the `foundry_safety_shield` block and enforce it.
 
         A blocked prompt never reaches the model narrative: the response is
@@ -704,6 +723,23 @@ class FoundryRouter:
             ]
             result["agent_specialist"] = "Prompt Shield"
             result["model"] = f"prompt-shield:{risk['severity']}"
+        elif result.get("mode") == "azure" and (
+            not shield["numeric_grounding_pass"] or not shield["club_neutrality_pass"]
+        ):
+            # ---- POST-FLIGHT critic ------------------------------------
+            # The narrative reached the model but failed the numeric grounding
+            # or club-neutrality check, so it is rejected and replaced with the
+            # deterministic, objectively grounded alternative.
+            rejected = result
+            result = dict(fallback) if fallback else dict(result)
+            result["mode"] = "fallback"
+            result["model"] = "grounding-guard-v1"
+            result["degraded"] = True
+            result["rejected_narrative"] = {
+                "answer": rejected.get("answer"),
+                "reason": "; ".join(shield.get("reasons") or []) or "post-flight critic",
+            }
+            shield["prompt_shield_status"] = "PROTECTED"
         result["foundry_safety_shield"] = shield
         return result
 
@@ -723,6 +759,26 @@ class FoundryRouter:
         """
         self._reset_trace()
         fallback = self._war_room_fallback(ctx)
+        # ---- PRE-FLIGHT shield ------------------------------------------
+        risk = self.preflight_screen(ctx)
+        if risk["severity"] != "clear":
+            self.last_error = f"prompt-shield-{risk['severity']}"
+            return {
+                **fallback,
+                "mode": "shield",
+                "foundry_safety_shield": {
+                    "prompt_shield_status": "PROTECTED",
+                    "severity": risk["severity"],
+                    "categories": list(risk["categories"]),
+                    "numeric_grounding_pass": True,
+                    "club_neutrality_pass": True,
+                    "grounding_status": "not_evaluated",
+                    "deflection": shield_deflection(
+                        ctx.get("query") or "", ctx.get("language") or "en"),
+                    "reasons": [str(risk["reason"])],
+                    "policy_version": "aether-prompt-shield-v1",
+                },
+            }
         if not self.s.azure_enabled:
             return {**fallback, "mode": "fallback"}
         self.last_attempted = True

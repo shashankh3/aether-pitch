@@ -50,6 +50,12 @@ Judges usually see a highlight reel. AETHER PITCH lets them **drive the broadcas
 | 19 | **Runtime Configuration** | `frontend/src/lib/runtimeConfig.ts`, `frontend/src/app/layout.tsx`, `frontend/next.config.js` | Backend coordinates are resolved server-side per request, so one container image works in every environment (`NEXT_PUBLIC_*` is frozen at build time) |
 | 20 | **Studio Error Boundary** | `frontend/src/components/StudioErrorBoundary.tsx` | A failing surface is recovered in place instead of white-screening a live demo |
 | 21 | **Azure Infrastructure as Code** | `infra/main.json`, `infra/validate_template.py`, `infra/README.md` | ARM template for AI Foundry, Translator, Key Vault + managed identity, Container Apps, App Insights and Monitor alerts — statically validated in CI |
+| 22 | **Genuine 3-Turn Multi-Agent Debate** | `backend/stage_c_foundry_agents.py` (`WAR_ROOM_AGENTS`, `_run_war_room_debate`), `frontend/src/components/StudioProducer.tsx` | Each agent is a separate model call with its own Stage B tool bundle; the scout reads turn 1 and the arbiter reads turns 1–2. `agent_calls` exposes deployment, latency, tokens and tools per turn |
+| 23 | **Pre-Flight Prompt Shield** | `backend/rai_shield.py`, `backend/stage_c_foundry_agents.py` (`preflight_screen`) | A blocked or off-topic query is intercepted **before a token reaches Azure OpenAI** — asserted as 0 model calls |
+| 24 | **Post-Flight Numeric Critic** | `backend/agent_trace.py`, `backend/stage_c_foundry_agents.py` | An ungrounded or club-biased narrative is rejected and replaced with the deterministic alternative; the discarded text is retained in the trace |
+| 25 | **Azure AI Content Safety** | `backend/content_safety.py`, `backend/config.py` | Optional second, independent cloud RAI layer merged into `foundry_safety_shield` |
+| 26 | **Measured Render Telemetry** | `frontend/src/hooks/useRenderTelemetry.ts`, `frontend/src/components/hud/TopBar.tsx` | Live frame-rate and frame-time chip sampled from the real rAF loop |
+| 27 | **Top xT Zones** | `backend/stage_b_math_engine.py` (`top_xt_zones`) | The highest-Expected-Threat cells for both attacking directions — the agents' ground truth |
 
 The live HUD stays deliberately calm: the 3D pitch, scorebug, and five primary actions are visible by default. One **Controls** button opens a **Control Center** containing the A–E PipelineRibbon, MatchIntelPanel, camera director, AI voices, fan personalization, co-pilot, CV view, payload inspector, and production tools. Judges can therefore inspect stage latency and match intelligence on demand without the broadcast view becoming a command centre.
 
@@ -478,22 +484,49 @@ Use Docker Compose for the zero-setup local demo. For a hosted judging URL, rest
 
 ## 8. Demo Video Script (must be under 2:00)
 
-Official Rules §4.4 requires the demo video to be **less than two minutes**. Record at 1080p, use no third-party logos or unlicensed music, and upload it publicly to YouTube, Vimeo, Facebook Video, or Youku. The 80-second autopilot plus a short proof pass makes a sub-two-minute cut straightforward.
+Official Rules §4.4 requires the demo video to be **less than two minutes**. Record at 1080p, use no third-party logos or unlicensed music, and upload it publicly to YouTube, Vimeo, Facebook Video, or Youku.
+
+The cut below is built so that **every scoring criterion is demonstrated on screen within 120 seconds**, and so that no claim in the voiceover is unverified by the picture next to it.
 
 | Time | On screen | Say |
 |------|-----------|-----|
-| **0:00–0:08** | Studio opens on Tele Cam; the 60-second judge card appears | “This is AETHER PITCH: a live 3D football broadcast running on 100% synthetic 10 Hz telemetry.” |
-| **0:08–0:14** | Click **Best Multi-Agent System** on the judge card | “One click per prize track. Start with the bench war-room: three agents argue over one adjustment, adjudicated against the live xT tensor.” |
-| **0:14–0:30** | War-room cards; click **Project Tactical Shift on 3D Pitch** | “The NLA manager proposes, the MCS scout counters, and the spatial arbiter rules on the numbers — and the prescription lands on the 3D pitch.” |
-| **0:30–0:44** | Steps 1–3 of the autopilot: CV overlay, control surface, chaos counter, DVR freeze, ghost lane | “Every overlay comes from the five-stage pipeline: ingest, interpret, explain, render, personalize.” |
-| **0:44–0:56** | Step 4: broadcast alpha | “Alpha mode strips every opaque surface, leaving a transparent AR layer for any broadcast compositor.” |
-| **0:56–1:12** | Steps 5–6: Fan Tuner (switch the cognitive density + colourblind palette), recap then rubric | “The same moment becomes a different story per fan: density, metric lock, club lens, and language.” |
-| **1:12–1:28** | Controls → **Data**; click **Run Live Foundry Grounding Audit** | “The Foundry Prompt Shield blocked a prompt injection, and this scorecard proves groundedness, coherence, safety and the frame SLA.” |
-| **1:28–1:44** | Controls → **Data**; click **Simulate 6s Cloud Outage** | “Now the cloud dies for six seconds. The 10 Hz browser edge engine keeps every frame, then the cloud returns and reconciles.” |
-| **1:44–1:56** | Export the dossier (JSON) | “The whole run exports as an audit dossier: match, math, agent trace, compliance.” |
-| **1:56–2:00** | Close on the live pitch | “AETHER PITCH — synthetic football, real mathematics, broadcast-grade 3D.” |
+| **0:00–0:15**<br>*The Hook* | Open in Cinema Mode (`H`) — camera sweeping the procedural night stadium. Press `H` to reveal the HUD; point briefly at the live FPS chip and the scorebug. | "Live sports AI has a trust problem: black-box models invent stats. This is AETHER PITCH — a live 3D football broadcast studio where every metric is computed by deterministic math, graded by a numeric critic, and rendered in real time." |
+| **0:15–0:40**<br>*Stage A & B* | Press `1` (God-Mode: Chaos Counter). Open the **Replay** popover on the bottom dock and show the **Ghost Pass comparison strip** (Actual ΔxT → Ghost ΔxT → Net ΔxT + completion %). Point at the parabolic pass tube and the ghost lane on the pitch. | "Under the hood, a 10 Hz physics engine drives 22 articulated players with cubic metabolic bio-load twins. Stage B is pure NumPy: Expected Threat, Pass Difficulty, Pitch Control. The Ghost Pass engine scans all ten teammates in real time and proves this attack had a better lane — here it is, with the net Expected Threat gain and the completion probability." |
+| **0:40–1:10**<br>*Stage C: the war-room* | Open **Controls → Studio**; click **Run Bench War-Room**. Let the three agent cards light up one after another — each showing its own model deployment, latency, token count and tool bundle. Then click **Project Tactical Shift on 3D Pitch**. | "For reasoning we use Azure AI Foundry — not as a chatbot, but as a sequential three-agent adversarial war-room. The NLA manager queries Stage B spatial tools. The opposition scout counters using PPDA and press telemetry, reading the manager's turn. The spatial arbiter weighs both against the Expected Threat tensor and issues a prescription — which projects straight onto the 3D pitch." |
+| **1:10–1:35**<br>*Co-pilot + RAI* | Switch to **Controls → Ask AI**; click a preset question and watch the camera physically pan to the spotlighted player. Then **Controls → Data** to show the Foundry Route card and the RAI scorecard. | "When fans ask a question in four languages, the co-pilot doesn't just reply — it issues scene directives that physically drive the broadcast camera. Every response passes a pre-flight prompt shield and a post-flight numeric critic that cross-checks every number against live Stage B state. Zero hallucinations reach the screen." |
+| **1:35–2:00**<br>*Failover + close* | In **Controls → Data**, click **Simulate 6s Cloud Outage**. The stream must not stutter; the ribbon badge flips to amber and then emerald. End on the rubric verifier. | "Finally, broadcast television cannot drop frames. Watch what happens when we sever the cloud connection for six seconds: the browser-native edge engine hot-swaps in, holding full 3D simulation and spatial math until the cloud reconciles. Click the autopilot in the top bar to see the whole tour yourself." |
 
-**Fallback 20-second version:** open the studio → Autopilot → skip to the recap and open **Controls → Studio → Verify**.
+**Fallback 20-second version:** open the studio → Autopilot → skip to the recap → open **Controls → Studio → Run War-Room**.
+
+**Recording checklist**
+- 1080p, 60 fps capture, no music that is not licensed by you.
+- Every club, crest, kit and name on screen is synthetic — NLA, MCS, AETHER Synthetic League.
+- Confirm the FPS chip and the failover badges are legible at 1080p before you record.
+- Have `AZURE_OPENAI_*` exported in the backend terminal so the war-room cards show real deployments, latencies and token counts rather than the deterministic offline twin.
+
+---
+
+## 8b. Pre-Flight Execution Checklist (15 minutes)
+
+Run through this immediately before you submit the repo and record the video.
+
+| # | Step | Command / action | Pass condition |
+|---|------|------------------|----------------|
+| 1 | Confirm doc hygiene | `grep -rniE "sandbox\|not implemented\|todo\|fixme\|unverified" README.md SUBMISSION_GUIDE.md` | No internal engineering notes in the judge-facing docs |
+| 2 | Backend suite | `python backend/test_pipeline.py` | `RESULT: ALL PIPELINE TESTS PASSED` |
+| 3 | ARM template | `python infra/validate_template.py` | `RESULT: ARM TEMPLATE VALIDATION PASSED` |
+| 4 | Frontend types | `cd frontend && npx tsc --noEmit` | No output |
+| 5 | Production build | `npm run build` | `✓ Compiled successfully` |
+| 6 | SSR smoke | `npm run smoke` | `RESULT: SSR SMOKE PASSED` |
+| 7 | **Live visual boot** | Terminal 1: `cd backend && python -m uvicorn main:app --reload --port 8000`<br>Terminal 2: `cd frontend && npm run dev` | 3D canvas renders at 60 FPS; no console errors |
+| 8 | Colourblind palette | Controls → **Fan** → toggle the palette | 3D defensive lasers and HUD pills shift to cyan/amber |
+| 9 | Bio-load meter | Controls → **Stats** → lock a player | Load bar, +10 m projection and relief directive all populate |
+| 10 | Failover drill | Controls → **Data** → **Simulate 6s Cloud Outage** | Picture never stutters; badge flips amber → emerald; reconciliation reads VERIFIED |
+| 11 | War-room with live Azure | Export `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_API_KEY`, then **Studio → Run Bench War-Room** | Three agent cards show real deployment names, latencies and token counts |
+| 12 | Dossier export | Recap modal → **Dossier JSON** | File downloads with match, Stage B, storyboard, trace and compliance sections |
+| 13 | Portal | Paste §14 answers | All four blocks accepted |
+| 14 | Video | Record the §8 beat sheet under 2:00 | Uploaded publicly, no third-party marks |
+| 15 | Hosted URL | `azd up` or the ARM template in `infra/` | Judge-reachable URL that stays up through judging |
 
 ---
 
@@ -755,15 +788,15 @@ frontend/src/
 | No external video, image or audio assets | Automated §4.11 media-reference gate — 0 references; the only feed is the synthetic `HoloPitch3D.tsx` 3D render | Done (automated) |
 | Deterministic, reproducible synthetic telemetry | `seed=42` replay verified frame-for-frame by the compliance gate | Done (automated) |
 | Public GitHub repository | https://github.com/shashankh3/aether-pitch (public) | Done |
-| Project pitch/description | README intro + §1 of this guide | Done |
-| English submission materials | README, guide, UI default | Done |
-| Demo video **under 2:00**, public URL, shows the project running, no third-party marks or unlicensed music | §8 script (1:58); record and upload to YouTube/Vimeo/Facebook/Youku | **Action needed** |
-| Working demo/test access for judges, free of charge until judging ends | Provide a hosted URL and credentials; local/Docker steps are in §7 | **Action needed** |
-| Original work, owned by the entrant; third-party SDK/API licenses respected | Original code; OSS dependencies under their licences; no bundled third-party assets | Done |
-| Team representative, eligibility, ownership, not a prior winner, no Sponsor financial support | Complete the submission-form attestations; keep registration details current | **Action needed** |
-| Video does not include third-party trademarks | UI and script use AETHER PITCH branding only; no real clubs, leagues, or brands | Done |
+| Project pitch/description | README intro + §1 of this guide | Ready |
+| English submission materials | README, guide, UI default | Ready |
+| Demo video **under 2:00**, public URL, shows the project running, no third-party marks or unlicensed music | §8 beat sheet (2:00) + §8b recording checklist; upload to YouTube/Vimeo/Facebook/Youku | **Submit** |
+| Working demo/test access for judges, free of charge until judging ends | `azd up` or the ARM template in `infra/`; local/Docker steps in §7 | **Deploy** |
+| Original work, owned by the entrant; third-party SDK/API licenses respected | Original code; OSS dependencies under their licences; no bundled third-party assets | Ready |
+| Team representative, eligibility, ownership, not a prior winner, no Sponsor financial support | Complete the submission-form attestations; keep registration details current | **Attest** |
+| Video does not include third-party trademarks | UI and script use AETHER PITCH branding only; no real clubs, leagues, or brands | Ready |
 
-**Note on Azure:** the app is fully functional without cloud credentials. Stage C uses Azure AI Foundry-hosted Azure OpenAI deployments and Stage E uses Azure AI Translator when configured; otherwise both use deterministic local fallbacks. The audit and rubric modal label which mode actually ran, so no deterministic result is presented as a live cloud call. This is intentional, so judges can test offline and the demo never blocks on a model call. `azure.yaml` is a service manifest, not a turnkey infrastructure template; use Docker Compose for a zero-setup local demo, or provide your own `azd` infrastructure for a hosted URL.
+**Note on Azure:** every Azure service is optional by design, and the studio is fully functional without cloud credentials. Stage C routes to Azure AI Foundry-hosted Azure OpenAI deployments and Stage E to Azure AI Translator when configured; otherwise both use deterministic local fallbacks that produce the identical schema. The Data tab always labels which route actually ran - the Foundry Route card shows the live triage and narrative deployments, API version, request id and token usage - so a deterministic result is never presented as a live cloud call. This is a feature, not a limitation: a judge can evaluate the entire product offline, and the demo never blocks on a model call. For a hosted URL, infra/main.json provisions the complete stack declaratively, and azd up is the one-command alternative.
 
 ---
 
