@@ -31,6 +31,21 @@ import { SpatialPitchControlBar } from "../src/components/PitchForgeDeck";
 import DefensiveLineScrubber from "../src/components/hud/DefensiveLineScrubber";
 import CounterfactualDeltaHUD from "../src/components/hud/CounterfactualDeltaHUD";
 import VisionAutoEventerHUD from "../src/components/VisionAutoEventerHUD";
+import BroadcastAlphaModal from "../src/components/BroadcastAlphaModal";
+import CameraDirectorBar from "../src/components/CameraDirectorBar";
+import MatchIntelPanel from "../src/components/MatchIntelPanel";
+import ScoreBug from "../src/components/ScoreBug";
+import TacticalPulseBar from "../src/components/TacticalPulseBar";
+import TacticalRadarMiniMap from "../src/components/TacticalRadarMiniMap";
+import TelestratorDVRBar from "../src/components/TelestratorDVRBar";
+import BottomDock from "../src/components/hud/BottomDock";
+import LeftRail from "../src/components/hud/LeftRail";
+import ProductionPanel from "../src/components/hud/ProductionPanel";
+import ShortcutsOverlay from "../src/components/hud/ShortcutsOverlay";
+import TopBar from "../src/components/hud/TopBar";
+import JudgeAutopilotTour from "../src/components/JudgeAutopilotTour";
+import MatchRecapStudioModal from "../src/components/MatchRecapStudioModal";
+import StudioErrorBoundary from "../src/components/StudioErrorBoundary";
 
 let failures = 0;
 let checks = 0;
@@ -242,6 +257,177 @@ render("CounterfactualDeltaHUD (what-if deltas)", () =>
 
 render("VisionAutoEventerHUD (CV viewport)", () =>
   createElement(VisionAutoEventerHUD, { events: [] }),
+);
+
+render("BroadcastAlphaModal (SMPTE alpha packet)", () =>
+  createElement(BroadcastAlphaModal, { open: true, onClose: noop, insight: null }),
+);
+
+render("CameraDirectorBar (camera + overlay toggles)", () =>
+  createElement(CameraDirectorBar, {
+    mode: "TELE_BROADCAST",
+    onMode: noop,
+    toggles: { xtGrid: true, ghost: true, lasers: true, pitchControl: false, passingNetwork: false },
+    onToggle: noop,
+    aiDirected: false,
+  }),
+);
+
+render("MatchIntelPanel (match intelligence)", () =>
+  createElement(MatchIntelPanel, { tick: tick as any, metrics: metrics as any }),
+);
+
+render("ScoreBug (scorebug)", () =>
+  createElement(ScoreBug, { tick: tick as any, metrics: metrics as any }),
+);
+
+render("TacticalPulseBar (chaos waveform)", () =>
+  createElement(TacticalPulseBar, { metrics: metrics as any }),
+);
+
+render("TacticalRadarMiniMap (mini radar)", () =>
+  createElement(TacticalRadarMiniMap, {
+    lockedId: "NLA_2",
+    telestrator: {
+      spotlightPlayerIds: [],
+      showOffsideLaserWall: false,
+      showCompactnessPolygon: false,
+      animateGhostReplay: false,
+      customTacticalArrows: [],
+    },
+    onLock: noop,
+  }),
+);
+
+render("TelestratorDVRBar (DVR time machine)", () =>
+  createElement(TelestratorDVRBar, {
+    isDvrPaused: false,
+    dvrOffsetTicks: 0,
+    pausedClock: null,
+    onTogglePause: noop,
+    onScrub: noop,
+    telestrator: {
+      spotlightPlayerIds: [],
+      showOffsideLaserWall: false,
+      showCompactnessPolygon: false,
+      animateGhostReplay: false,
+      customTacticalArrows: [],
+    },
+    onToggleTelestrator: noop,
+    onToggleSpotlight: noop,
+  }),
+);
+
+render("BottomDock (primary dock)", () =>
+  createElement(
+    HudProvider,
+    null,
+    createElement(BottomDock, {
+      tick: tick as any,
+      busy: null,
+      inject: noop,
+      isDvrPaused: false,
+      dvrOffsetTicks: 0,
+      pausedClock: null,
+      togglePause: noop,
+      scrub: noop,
+      telestrator: {
+      spotlightPlayerIds: [],
+      showOffsideLaserWall: false,
+      showCompactnessPolygon: false,
+      animateGhostReplay: false,
+      customTacticalArrows: [],
+    },
+      toggleTelestrator: noop,
+      autoSpotlight: noop,
+      lockedId: null,
+      onLock: noop,
+      events: [],
+      lang: "en",
+      insightLine: null,
+      lowerThird: null,
+      sandboxActive: false,
+      onToggleSandbox: noop,
+    }),
+  ),
+);
+
+render("LeftRail (scorebug rail)", () =>
+  createElement(
+    HudProvider,
+    null,
+    createElement(LeftRail, { tick: tick as any, metrics: metrics as any }),
+  ),
+);
+
+render("ProductionPanel (Studio tools)", () =>
+  createElement(ProductionPanel, {
+    alphaMode: false,
+    alphaBackdrop: "checker",
+    onToggleAlpha: noop,
+    onToggleBackdrop: noop,
+    onShowAlphaModal: noop,
+    onShowRubric: noop,
+    onShowRecap: noop,
+  }),
+);
+
+render("ShortcutsOverlay (keyboard map)", () =>
+  createElement(
+    HudProvider,
+    null,
+    createElement(ShortcutsOverlay, { open: false, onClose: noop }),
+  ),
+);
+
+render("TopBar (brand + engine status)", () =>
+  createElement(
+    HudProvider,
+    null,
+    createElement(TopBar, {
+      connected: true,
+      lang: "en",
+      alphaMode: false,
+      cinemaMode: false,
+      onToggleCinema: noop,
+      isFullscreen: false,
+      onToggleFullscreen: noop,
+      autopilotActive: false,
+      autopilotElapsed: 0,
+      autopilotStep: -1,
+      onToggleAutopilot: noop,
+      isSpeaking: false,
+      isVoiceMuted: false,
+      onToggleMute: noop,
+    }),
+  ),
+);
+
+render("JudgeAutopilotTour (80 s tour banner)", () =>
+  createElement(JudgeAutopilotTour, {
+    active: true,
+    currentStep: 0,
+    elapsed: 12,
+    onInspectProof: noop,
+  }),
+);
+
+render("MatchRecapStudioModal (3-act recap + dossier)", () =>
+  createElement(MatchRecapStudioModal, {
+    open: true,
+    onClose: noop,
+    onLoadAct: noop,
+    lang: "en",
+    tick: tick as any,
+    events: [],
+  }),
+);
+
+render("StudioErrorBoundary (recoverable surface failure)", () =>
+  createElement(
+    StudioErrorBoundary,
+    { label: "test", children: createElement("div", null, "child content") },
+  ),
 );
 
 console.log("");
