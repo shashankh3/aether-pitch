@@ -25,6 +25,7 @@ from typing import Dict, List, Optional
 import requests
 
 from config import settings
+from content_safety import ContentSafetyClient
 from rai_shield import (
     build_safety_shield, detect_prompt_risk, shield_deflection,
 )
@@ -32,6 +33,87 @@ from rai_shield import (
 ARCHETYPES = (
     "counter_overload", "pressing_trap", "inversion",
     "difficult_progression", "threat_surge", "rhythm_shift",
+)
+
+#: The adversarial bench war-room roster. Each entry is a separate agent with
+#: its own system prompt, its own model deployment, its own Stage B tool
+#: bundle and its own turn in the debate. `contract` is the strict JSON shape
+#: that agent must return.
+WAR_ROOM_AGENTS = (
+    {
+        "id": "nla_tactical_manager",
+        "agent": "NLATacticalManagerAgent",
+        "role": "Proposes the high-leverage adjustment",
+        "deployment": "narrative",
+        "turn": 1,
+        "temperature": 0.4,
+        "max_tokens": 320,
+        "timeout": 6.0,
+        "tools": ("defensive_line", "xt_top_zones", "xt_at_gap", "ghost_pass",
+                  "pitch_control", "passing_network"),
+        "system": (
+            "You are the NLATacticalManagerAgent. You are the head coach of NLA. "
+            "Using ONLY the Stage B tools provided to you, propose the single "
+            "highest-leverage tactical adjustment for NLA right now. Name the "
+            "pitch zone with real coordinates, cite the tool values you used, "
+            "and justify it against the opponent's shape. You are the FIRST "
+            "voice in the debate: you have not seen the other agents yet. "
+            "Return STRICT JSON only: {\"statement\": \"<your proposal>\"}."
+        ),
+        "contract": "{\"statement\": string}",
+    },
+    {
+        "id": "mcs_opposition_scout",
+        "agent": "MCSOppositionScoutAgent",
+        "role": "Models the opponent's optimal counter",
+        "deployment": "triage",
+        "turn": 2,
+        "temperature": 0.4,
+        "max_tokens": 320,
+        "timeout": 5.0,
+        "tools": ("ppda", "press_intensity", "pace", "chaos", "team_stats"),
+        "system": (
+            "You are the MCSOppositionScoutAgent. You scout the opponent. "
+            "Using ONLY the Stage B tools provided to you, model how MCS would "
+            "counter the proposal now in the prior turn, and identify the "
+            "spatial risk that would punish it. You are the SECOND voice: read "
+            "the prior turn and argue against it using your own tools. "
+            "Return STRICT JSON only: {\"statement\": \"<your counter>\"}."
+        ),
+        "contract": "{\"statement\": string}",
+    },
+    {
+        "id": "spatial_arbiter",
+        "agent": "SpatialArbiterAgent",
+        "role": "Adjudicates against the 16x12 xT tensor",
+        "deployment": "narrative",
+        "turn": 3,
+        "temperature": 0.2,
+        "max_tokens": 620,
+        "timeout": 7.0,
+        "tools": ("xt_top_zones", "xt_at_gap", "pitch_control", "chaos",
+                  "stamina_load", "defensive_line"),
+        "system": (
+            "You are the SpatialArbiterAgent. You are the neutral referee of an "
+            "adversarial bench war-room. Weigh BOTH prior turns against the "
+            "Stage B tools provided to you and the 16x12 Expected Threat tensor. "
+            "Issue one final Tactical Prescription. Never invent a number that "
+            "is not present in your tools. Return STRICT JSON only with keys: "
+            "statement (your verdict), recommended_adjustment (object with title "
+            "and directive), projected_30s_xt_delta (number), "
+            "win_prob_shift_pct (number), target_zones (array of up to 3 objects "
+            "with x, y, label), adjustment_vectors (array of objects with from, "
+            "to, label)."
+        ),
+        "contract": (
+            "{\"statement\": string, \"recommended_adjustment\": {\"title\": string, "
+            "\"directive\": string}, \"projected_30s_xt_delta\": number, "
+            "\"win_prob_shift_pct\": number, \"target_zones\": [{\"x\": number, "
+            "\"y\": number, \"label\": string}], \"adjustment_vectors\": [{\"from\": "
+            "{\"x\": number, \"y\": number}, \"to\": {\"x\": number, \"y\": number}, "
+            "\"label\": string}]}"
+        ),
+    },
 )
 
 
@@ -573,6 +655,29 @@ class FoundryRouter:
             "event": ctx.get("event") or {},
         }
         shield = build_safety_shield(query, language, grounding, generated, grounding_context)
+        # Optional second RAI layer: the real Azure AI Content Safety service.
+        # The deterministic shield above already ran, so this can only add
+        # evidence — it never removes protection.
+        if self.s.content_safety_enabled and result.get("mode") == "azure":
+            verdict = ContentSafetyClient(
+                self.s.content_safety_endpoint, self.s.content_safety_key
+            ).analyze(generated)
+            shield["content_safety"] = verdict
+            if verdict.get("status") == "FLAGGED":
+                shield["prompt_shield_status"] = "PROTECTED"
+                shield["reasons"] = list(shield.get("reasons", [])) + [
+                    str(verdict.get("note") or "Azure AI Content Safety flagged the response.")
+                ]
+        else:
+            shield["content_safety"] = {
+                "service": "azure-ai-content-safety",
+                "status": "SKIPPED",
+                "configured": False,
+                "categories": [],
+                "max_severity": 0,
+                "host": "",
+                "note": "Not configured — the deterministic Prompt Shield is the active layer.",
+            }
 
         if risk["severity"] != "clear":
             deflection = shield_deflection(query, language)
@@ -606,52 +711,173 @@ class FoundryRouter:
     async def tactical_war_room(self, ctx: dict) -> dict:
         """Three-agent adversarial tactical negotiation over live Stage B state.
 
-        NLATacticalManagerAgent proposes, MCSOppositionScoutAgent counters,
-        and SpatialArbiterAgent adjudicates against the 16x12 xT tensor to
-        produce a single Tactical Prescription.
+        NLATacticalManagerAgent proposes, MCSOppositionScoutAgent counters, and
+        SpatialArbiterAgent adjudicates against the 16x12 xT tensor to produce
+        one Tactical Prescription.
+
+        This is a genuine sequential multi-agent orchestration, not one model
+        role-playing three voices: every agent is a separate model invocation
+        with its own deployment, its own tool bundle and its own turn, and each
+        one reads the turns that came before it. The per-agent calls are
+        returned in `agent_calls` so the trace proves it.
         """
         self._reset_trace()
         fallback = self._war_room_fallback(ctx)
-        if self.s.azure_enabled:
-            self.last_attempted = True
-            try:
-                raw = await asyncio.wait_for(
-                    asyncio.to_thread(self._azure_war_room, ctx, fallback), 9.0
-                )
-                required = ("agent_debate_transcript", "recommended_adjustment",
-                            "projected_30s_xt_delta", "win_prob_shift_pct",
-                            "target_zones")
-                if all(k in raw for k in required):
-                    raw.setdefault("model", f"azure-foundry:{self.s.narrative_deployment}")
-                    raw.setdefault("mode", "azure")
-                    self.last_used = True
-                    return raw
-                self.last_error = "Azure war-room response missed required schema keys"
-            except Exception as exc:
-                self.last_error = f"{type(exc).__name__}: {exc}"
-        return {**fallback, "mode": "fallback"}
+        if not self.s.azure_enabled:
+            return {**fallback, "mode": "fallback"}
+        self.last_attempted = True
+        try:
+            tools = self._war_room_tools(ctx)
+            result = await asyncio.wait_for(
+                asyncio.to_thread(self._run_war_room_debate, ctx, tools, fallback), 22.0
+            )
+            self.last_used = True
+            return result
+        except Exception as exc:
+            self.last_error = f"{type(exc).__name__}: {exc}"
+            return {**fallback, "mode": "fallback", "degraded": True}
 
-    def _azure_war_room(self, ctx: dict, fallback: dict) -> dict:
-        raw = self._chat(
-            self.s.narrative_deployment,
-            [{"role": "system", "content":
-              "You are the SpatialArbiterAgent of an adversarial football bench "
-              "war-room. Three agents debate one tactical adjustment using ONLY "
-              "the provided Stage B telemetry (xT grid, PDR, PPDA, Chaos Index, "
-              "defensive line height). Return STRICT JSON only (no markdown) with "
-              "keys: agent_debate_transcript (object with exactly 3 string keys "
-              "manager_proposal, scout_counter, arbiter_verdict), "
-              "recommended_adjustment (object with title and directive), "
-              "projected_30s_xt_delta (number, e.g. 0.14), "
-              "win_prob_shift_pct (number, e.g. 6.8), "
-              "target_zones (array of up to 3 objects with x, y, label), "
-              "adjustment_vectors (array of objects with from, to, label). "
-              "Never invent numbers that are not derivable from the telemetry."},
-             {"role": "user", "content": json.dumps(self._compact_ctx(ctx))}],
-            max_tokens=700, temperature=0.5, timeout=6.0, json_mode=True,
+    def _war_room_tools(self, ctx: dict) -> dict:
+        """The deterministic Stage B tool surface the agents may query.
+
+        Every agent sees only the tools its role declares, and every number in
+        a tool result is computed by the Stage B engine — so an agent can
+        reason about the space without ever inventing a value.
+        """
+        sp = ctx.get("spatial") or {}
+        metrics = ctx.get("metrics") or {}
+        def_lines = metrics.get("def_lines") or sp.get("def_lines") or {}
+        ppda = metrics.get("ppda") or sp.get("ppda") or {}
+        territory = metrics.get("pitch_control_split") or {}
+        network = metrics.get("passing_network_edges") or []
+        chaos = metrics.get("chaos_index", sp.get("chaos_index", 0.5))
+        bio = metrics.get("bio_load_summary") or {}
+        return {
+            "defensive_line": {
+                "NLA_m": def_lines.get("NLA"),
+                "MCS_m": def_lines.get("MCS"),
+                "note": "Distance from each team's own goal line.",
+            },
+            "xt_top_zones": sp.get("xt_top_zones") or [],
+            "xt_at_gap": sp.get("xt_at_gap"),
+            "ghost_pass": sp.get("ghost") or {},
+            "pitch_control": territory,
+            "passing_network": network[:3],
+            "ppda": ppda,
+            "press_intensity": metrics.get("pressing_intensity"),
+            "pace": sp.get("fastest_sprinter") or {},
+            "chaos": {
+                "index": round(float(chaos or 0.0), 3),
+                "state": metrics.get("chaos_state"),
+                "delta_chaos": metrics.get("delta_chaos"),
+            },
+            "stamina_load": bio,
+            "team_stats": metrics.get("team_stats") or {},
+        }
+
+    def _run_war_room_debate(self, ctx: dict, tools: dict, fallback: dict) -> dict:
+        """Sequential three-turn debate. Each turn is a separate model call."""
+        calls: List[dict] = []
+        turns: List[dict] = []
+        statements: Dict[str, str] = {}
+        arbiter_payload: dict = {}
+
+        for spec in WAR_ROOM_AGENTS:
+            deployment = (
+                self.s.narrative_deployment
+                if spec["deployment"] == "narrative"
+                else self.s.triage_deployment
+            )
+            bundle = {name: tools[name] for name in spec["tools"] if name in tools}
+            t0 = time.perf_counter()
+            raw = self._chat(
+                deployment,
+                [
+                    {"role": "system", "content": spec["system"]},
+                    {"role": "user", "content": json.dumps({
+                        "brief": ctx.get("query") or "Adversarial bench war-room on the live match.",
+                        "telemetry": self._compact_ctx(ctx),
+                        "your_tools": bundle,
+                        "prior_turns": turns,
+                        "output_contract": spec["contract"],
+                    })},
+                ],
+                max_tokens=spec["max_tokens"],
+                temperature=spec["temperature"],
+                timeout=spec["timeout"],
+                json_mode=True,
+            )
+            latency = round((time.perf_counter() - t0) * 1000.0, 1)
+            parsed = self._parse_agent_json(raw)
+            usage = self.last_usage or {}
+            calls.append({
+                "id": spec["id"],
+                "agent": spec["agent"],
+                "role": spec["role"],
+                "deployment": deployment,
+                "tools": list(bundle.keys()),
+                "latency_ms": latency,
+                "prompt_tokens": usage.get("prompt_tokens"),
+                "completion_tokens": usage.get("completion_tokens"),
+                "total_tokens": usage.get("total_tokens"),
+            })
+            turn_text = (
+                parsed.get("statement")
+                or parsed.get("arbiter_verdict")
+                or (raw or "").strip()[:700]
+            )
+            turns.append({"agent": spec["agent"], "turn": spec["turn"], "statement": turn_text})
+            statements[spec["id"]] = turn_text
+            if spec["id"] == "spatial_arbiter":
+                arbiter_payload = parsed
+
+        # The prescription numbers always come from the arbiter when it
+        # produced them; otherwise we keep the deterministic Stage B numbers and
+        # only adopt the model's narrative.
+        prescription = fallback
+        required = (
+            "recommended_adjustment", "projected_30s_xt_delta",
+            "win_prob_shift_pct", "target_zones",
         )
+        if all(k in arbiter_payload for k in required):
+            prescription = {
+                **fallback,
+                "recommended_adjustment": arbiter_payload["recommended_adjustment"],
+                "projected_30s_xt_delta": arbiter_payload["projected_30s_xt_delta"],
+                "win_prob_shift_pct": arbiter_payload["win_prob_shift_pct"],
+                "target_zones": arbiter_payload["target_zones"],
+                "adjustment_vectors": arbiter_payload.get(
+                    "adjustment_vectors", fallback["adjustment_vectors"]),
+            }
+
+        return {
+            **prescription,
+            "agent_debate_transcript": {
+                "manager_proposal": statements.get("nla_tactical_manager", ""),
+                "scout_counter": statements.get("mcs_opposition_scout", ""),
+                "arbiter_verdict": statements.get("spatial_arbiter", ""),
+            },
+            "agent_calls": calls,
+            "orchestration": {
+                "mode": "sequential_debate",
+                "rounds": len(calls),
+                "agents": [c["agent"] for c in calls],
+                "tool_surface": sorted(tools.keys()),
+                "note": "Each agent is a separate model call with its own tool bundle; "
+                        "the scout reads the manager and the arbiter reads both.",
+            },
+            "mode": "azure",
+            "model": f"azure-foundry:{self.s.narrative_deployment}",
+        }
+
+    @staticmethod
+    def _parse_agent_json(raw: str) -> dict:
         cleaned = re.sub(r"^```(json)?|```$", "", (raw or "").strip(), flags=re.M).strip()
-        return json.loads(cleaned)
+        try:
+            parsed = json.loads(cleaned)
+            return parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            return {}
 
     def _war_room_fallback(self, ctx: dict) -> dict:
         """Deterministic zero-key 3-agent debate over the live Stage B state."""
@@ -748,6 +974,28 @@ class FoundryRouter:
                 {"id": "spatial_arbiter", "agent": "SpatialArbiterAgent",
                  "role": "Adjudicates against the 16x12 xT tensor", "status": "completed"},
             ],
+            "agent_calls": [
+                {
+                    "id": spec["id"],
+                    "agent": spec["agent"],
+                    "role": spec["role"],
+                    "deployment": "deterministic-stage-b",
+                    "tools": list(spec["tools"]),
+                    "latency_ms": 0.0,
+                    "prompt_tokens": None,
+                    "completion_tokens": None,
+                    "total_tokens": None,
+                }
+                for spec in WAR_ROOM_AGENTS
+            ],
+            "orchestration": {
+                "mode": "sequential_debate",
+                "rounds": len(WAR_ROOM_AGENTS),
+                "agents": [spec["agent"] for spec in WAR_ROOM_AGENTS],
+                "tool_surface": sorted(self._war_room_tools(ctx).keys()),
+                "note": "Deterministic offline twin of the cloud debate: the same "
+                        "three agents, the same tool bundles, the same turn order.",
+            },
             "telemetry_basis": {
                 "chaos_index": round(chaos, 3),
                 "backline_stretch_m": round(stretch, 1),

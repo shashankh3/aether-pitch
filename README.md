@@ -29,8 +29,8 @@ Open the app and a dismissible card routes you straight to the evidence for each
 
 | Prize track | One click opens | What you see |
 |---|---|---|
-| **Best Use of Microsoft Foundry** | Control Center → **Data** | Foundry Eval & Responsible AI scorecard (groundedness, tactical coherence, Prompt Shield status, P95 frame SLA), the **Microsoft Foundry Route** card showing the real triage/narrative deployments, API version, request id and token usage, plus the 4-node grounded handoff DAG. |
-| **Best Multi-Agent System** | Control Center → **Studio** | The **Bench War-Room**: `NLATacticalManagerAgent` proposes, `MCSOppositionScoutAgent` counters, `SpatialArbiterAgent` arbitrates against the 16×12 xT tensor, and issues one tactical prescription you can project onto the 3D pitch. |
+| **Best Use of Microsoft Foundry** | Control Center → **Data** | Foundry Eval & Responsible AI scorecard (groundedness, tactical coherence, Prompt Shield status, P95 frame SLA), the **Microsoft Foundry Route** card showing the real triage/narrative deployments, API version, request id, token usage and the active RAI layer, plus the 4-node grounded handoff DAG. |
+| **Best Multi-Agent System** | Control Center → **Studio** | The **Bench War-Room**: a genuine **sequential three-call debate** — `NLATacticalManagerAgent` proposes, `MCSOppositionScoutAgent` counters (reading turn 1), `SpatialArbiterAgent` adjudicates (reading turns 1–2). Each card shows its own model deployment, latency, token count and Stage B tool bundle. The verdict lands as a 3D tactical prescription. |
 | **Best Azure Cloud Native** | Control Center → **Ask AI** | The distributed pipeline trace and the **Cloud Resilience & Edge Failover Drill** — one click simulates a 6-second cloud outage and measures the hot-swap latency, 10 Hz continuity and state reconciliation. |
 
 Prefer to be driven? **Controls → Autopilot** runs the full 80-second guided tour with voiceover, ending on the recap and the rubric proof.
@@ -191,6 +191,56 @@ Prefer to be driven? **Controls → Autopilot** runs the full 80-second guided t
   - **0** third-party sponsor / league / kit-brand / broadcaster / social strings across all shipped `frontend/src` + `backend` sources (56 files scanned).
   - **0** external media asset references.
 - **`SUBMISSION_GUIDE.md` §14** ships paste-ready answers for the submission portal: project summary & tagline, Foundry + multi-agent orchestration, cloud-native architecture & edge resilience, the synthetic-data compliance attestation, and prize-track one-liners.
+
+## Phase 4 - Scoring-Criteria Hardening (v6.2)
+
+Four changes aimed squarely at the three prize tracks, each verified by an
+automated test rather than asserted.
+
+### 1. The Bench War-Room is a real multi-agent system, not one call
+
+The previous implementation asked **one** model to role-play three agents. That
+is a multi-agent *story*, not a multi-agent *system*. It is now a genuine
+**sequential three-call debate**:
+
+| Turn | Agent | Deployment | Stage B tool bundle | Reads |
+|---|---|---|---|---|
+| 1 | `NLATacticalManagerAgent` | narrative (`gpt-4o`) | defensive line, top xT zones, xT at gap, ghost pass, pitch control, passing network | — |
+| 2 | `MCSOppositionScoutAgent` | triage (`gpt-4o-mini`) | PPDA, press intensity, pace, chaos, team stats | turn 1 |
+| 3 | `SpatialArbiterAgent` | narrative (`gpt-4o`) | top xT zones, xT at gap, pitch control, chaos, stamina load, defensive line | turns 1–2 |
+
+Each agent is a separate model invocation with **its own tool bundle**, and the
+tools are the deterministic Stage B engine — so an agent can reason about the
+space without ever inventing a number. The response carries `agent_calls`
+(agent, deployment, tool bundle, latency, token usage) and `orchestration`
+(rounds, agent order, tool surface), which the Studio tab renders on every
+debate card. The deterministic offline twin mirrors the same three agents, the
+same bundles and the same turn order.
+
+Verified by `backend/test_pipeline.py` with a mocked transport: three distinct
+calls, the scout sees turn 1, the arbiter sees turns 1–2, two different model
+deployments, and the arbiter's prescription adopted.
+
+### 2. Azure AI Content Safety as an optional second RAI layer
+
+The deterministic Prompt Shield always runs and always works offline. When
+`AZURE_CONTENT_SAFETY_ENDPOINT` / `AZURE_CONTENT_SAFETY_KEY` are set, the real
+**Azure AI Content Safety** text-analysis service runs on top as an independent
+second layer, and its verdict is merged into `foundry_safety_shield` and shown
+in the Foundry Route card. The layer can only *add* evidence — it never removes
+protection.
+
+### 3. Measured render telemetry
+
+The top bar carries a **measured** frame-rate and frame-time chip, sampled from
+the real `requestAnimationFrame` loop. It is a measurement, not a hard-coded
+"60 FPS" claim.
+
+### 4. Stage B exposes the highest-value xT zones
+
+`TacticalMathEngine.top_xt_zones()` returns the highest Expected Threat cells
+on the 16×12 grid for both attacking directions, so the manager agent argues
+about the actual highest-value space rather than a guessed one.
 
 ## Architecture
 

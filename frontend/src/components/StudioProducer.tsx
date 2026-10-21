@@ -8,7 +8,7 @@
 import { useRef, useState } from "react";
 import {
   ArrowUpRight, Clapperboard, Film, Mic, X, Zap, Camera, Send, Sparkles, Loader2, Quote,
-  Swords, ShieldAlert, Gavel, Radar, Crosshair,
+  Swords, ShieldAlert, Gavel, Crosshair, Radar,
 } from "lucide-react";
 import type {
   Insight, LangCode, Recap, StudioQueryResponse, StudioSuggestedAction, WarRoomResponse,
@@ -19,6 +19,7 @@ import { useModalA11y } from "@/lib/useModalA11y";
 import { API_BASE } from "@/lib/api";
 import { telemetry } from "@/lib/telemetry";
 import { edgeWarRoom } from "@/lib/edgeEngine";
+import { cn } from "@/lib/utils";
 
 interface Props {
   latest: Insight | null;
@@ -580,31 +581,64 @@ export function BenchWarRoomPanel({ metrics, lang, onProjectShift }: WarRoomProp
           </div>
 
           <div className="space-y-1">
-            <div className="border-l-2 border-pitch/60 bg-pitch/[0.06] px-2 py-1.5">
-              <div className="flex items-center gap-1 font-tech text-[8.5px] font-bold uppercase tracking-wider text-pitch">
-                <Crosshair size={9} /> NLATacticalManagerAgent
-              </div>
-              <p className="mt-0.5 text-[10px] leading-relaxed text-slate-300">
-                {transcript.manager_proposal}
-              </p>
-            </div>
-            <div className="border-l-2 border-crimson/60 bg-crimson/[0.06] px-2 py-1.5">
-              <div className="flex items-center gap-1 font-tech text-[8.5px] font-bold uppercase tracking-wider text-crimson">
-                <ShieldAlert size={9} /> MCSOppositionScoutAgent
-              </div>
-              <p className="mt-0.5 text-[10px] leading-relaxed text-slate-300">
-                {transcript.scout_counter}
-              </p>
-            </div>
-            <div className="border-l-2 border-tactical/60 bg-tactical/[0.06] px-2 py-1.5">
-              <div className="flex items-center gap-1 font-tech text-[8.5px] font-bold uppercase tracking-wider text-tactical">
-                <Gavel size={9} /> SpatialArbiterAgent · Verdict
-              </div>
-              <p className="mt-0.5 text-[10px] leading-relaxed text-slate-300">
-                {transcript.arbiter_verdict}
-              </p>
-            </div>
+            {(
+              [
+                {
+                  id: "nla_tactical_manager",
+                  label: "NLATacticalManagerAgent",
+                  body: transcript.manager_proposal,
+                  icon: Crosshair,
+                  tone: "text-pitch",
+                  edge: "border-pitch/60 bg-pitch/[0.06]",
+                },
+                {
+                  id: "mcs_opposition_scout",
+                  label: "MCSOppositionScoutAgent",
+                  body: transcript.scout_counter,
+                  icon: ShieldAlert,
+                  tone: "text-crimson",
+                  edge: "border-crimson/60 bg-crimson/[0.06]",
+                },
+                {
+                  id: "spatial_arbiter",
+                  label: "SpatialArbiterAgent",
+                  body: transcript.arbiter_verdict,
+                  icon: Gavel,
+                  tone: "text-tactical",
+                  edge: "border-tactical/60 bg-tactical/[0.06]",
+                },
+              ] as const
+            ).map((row) => {
+              const call = warRoom.agent_calls?.find((c) => c.id === row.id);
+              const Icon = row.icon;
+              return (
+                <div key={row.id} className={cn("border-l-2 px-2 py-1.5", row.edge)}>
+                  <div className="flex items-center gap-1 font-tech text-[8.5px] font-bold uppercase tracking-wider">
+                    <Icon size={9} className={row.tone} />
+                    <span className={row.tone}>{row.label}</span>
+                    {call && (
+                      <span className="ml-auto flex items-center gap-1 font-tech text-[7.5px] font-normal uppercase tracking-wider text-slate-500">
+                        <span className="text-slate-400">{call.deployment}</span>
+                        {call.latency_ms > 0 && <span>· {call.latency_ms.toFixed(0)}ms</span>}
+                        {call.total_tokens != null && <span>· {call.total_tokens} tok</span>}
+                        {call.tools.length > 0 && (
+                          <span title={call.tools.join(", ")}>· {call.tools.length} tools</span>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-[10px] leading-relaxed text-slate-300">{row.body}</p>
+                </div>
+              );
+            })}
           </div>
+
+          {warRoom.orchestration && (
+            <p className="font-tech text-[7.5px] uppercase leading-relaxed tracking-wider text-slate-600">
+              {warRoom.orchestration.rounds} sequential agent calls ·{" "}
+              {warRoom.orchestration.mode.replace(/_/g, " ")} · {warRoom.orchestration.note}
+            </p>
+          )}
 
           <div className="border border-white/10 bg-black/25 px-2 py-1.5">
             <div className="font-tech text-[8.5px] font-bold uppercase tracking-wider text-slate-500">

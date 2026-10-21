@@ -10,6 +10,7 @@ import {
 import type { LangCode } from "@/lib/types";
 import { LANG_LABELS } from "@/lib/types";
 import { AUTOPILOT_TOTAL_SECONDS } from "@/components/JudgeAutopilotTour";
+import { useRenderTelemetry } from "@/hooks/useRenderTelemetry";
 import { useHud } from "@/lib/hudContext";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +37,7 @@ export default function TopBar({
   isSpeaking, isVoiceMuted, onToggleMute,
 }: Props) {
   const { controlCenterOpen, openControlCenter, palette } = useHud();
+  const { fps, frameMs } = useRenderTelemetry();
 
   return (
     <header className="clip-ea panel-lux pointer-events-auto flex h-[52px] items-center gap-2 px-3">
@@ -58,6 +60,13 @@ export default function TopBar({
             />
             <span className="font-tech text-[8.5px] font-semibold uppercase tracking-[0.3em] text-slate-400">
               Live 3D Broadcast · 10 Hz
+            </span>
+            <span
+              className="border border-white/10 bg-black/40 px-1 py-px font-mono text-[8.5px] font-bold tabular-nums text-slate-300"
+              title="Measured render frame rate and frame time from the requestAnimationFrame loop"
+            >
+              {fps > 0 ? `${fps} FPS` : "-- FPS"}
+              <span className="ml-1 text-slate-500">{frameMs > 0 ? `${frameMs.toFixed(1)}ms` : ""}</span>
             </span>
           </div>
         </div>

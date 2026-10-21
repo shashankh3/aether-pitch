@@ -627,6 +627,7 @@ export interface FoundrySafetyShield {
   grounding_status: string;
   numbers_checked?: number;
   unmatched_numbers?: string[];
+  content_safety?: ContentSafetyVerdict;
   deflection: string | null;
   reasons: string[];
   policy_version: string;
@@ -652,6 +653,18 @@ export interface WarRoomVector {
   label: string;
 }
 
+export interface WarRoomAgentCall {
+  id: string;
+  agent: string;
+  role: string;
+  deployment: string;
+  tools: string[];
+  latency_ms: number;
+  prompt_tokens?: number | null;
+  completion_tokens?: number | null;
+  total_tokens?: number | null;
+}
+
 export interface WarRoomResponse {
   agent_debate_transcript: {
     manager_proposal: string;
@@ -669,6 +682,14 @@ export interface WarRoomResponse {
   target_zones: WarRoomZone[];
   adjustment_vectors: WarRoomVector[];
   agents: WarRoomAgent[];
+  agent_calls?: WarRoomAgentCall[];
+  orchestration?: {
+    mode: string;
+    rounds: number;
+    agents: string[];
+    tool_surface: string[];
+    note: string;
+  };
   telemetry_basis: Record<string, unknown>;
   foundry_safety_shield?: FoundrySafetyShield;
   mode?: string;
@@ -690,6 +711,17 @@ export interface FoundryEvalScorecard {
   sla_met: boolean;
   evaluated_at: string;
   eval_suite: string;
+  content_safety?: ContentSafetyVerdict;
+}
+
+export interface ContentSafetyVerdict {
+  service: string;
+  status: "CLEAR" | "FLAGGED" | "SKIPPED" | "ARMED" | "ERROR";
+  configured: boolean;
+  categories: { category: string | null; severity: number }[];
+  max_severity: number;
+  host: string;
+  note: string;
 }
 
 /* ------------------------------------------------ v4.0 rubric audit */

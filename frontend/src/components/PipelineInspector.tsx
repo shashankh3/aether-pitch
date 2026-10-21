@@ -10,7 +10,8 @@ import {
   FlaskConical, Loader2, BadgeCheck, Gauge, CloudOff, RadioTower, Zap, CloudCog,
 } from "lucide-react";
 import type {
-  AgentTrace, AgentTraceSpan, EngineStatus, FoundryEvalScorecard, Pipeline, PipelineAudit,
+  AgentTrace, AgentTraceSpan, ContentSafetyVerdict, EngineStatus, FoundryEvalScorecard,
+  Pipeline, PipelineAudit,
 } from "@/lib/types";
 import type { FailoverDrillState } from "@/hooks/useResilientMatchEngine";
 import { STANDARD_PALETTE, type BroadcastPalette } from "@/lib/hudContext";
@@ -251,11 +252,15 @@ interface ScorecardProps {
   receipt: { at: string; source: string } | null;
   onRunAudit: () => void;
   azure?: PipelineAudit["azure"];
+  contentSafety?: ContentSafetyVerdict;
 }
 
 /* ------------------------------------------- v6.2 Foundry connection panel */
 
-function FoundryConnectionCard({ azure }: { azure?: PipelineAudit["azure"] }) {
+function FoundryConnectionCard({ azure, contentSafety }: {
+  azure?: PipelineAudit["azure"];
+  contentSafety?: ContentSafetyVerdict;
+}) {
   if (!azure) return null;
   const configured = !!azure.configured;
   const attempted = !!azure.last_attempted;
@@ -325,6 +330,28 @@ function FoundryConnectionCard({ azure }: { azure?: PipelineAudit["azure"] }) {
         )}
       </div>
 
+      {contentSafety && (
+        <div className="mt-1.5 flex items-center gap-1.5 border-t border-white/10 pt-1.5 font-tech text-[8px] uppercase tracking-wider">
+          <span className="text-slate-500">RAI layer 2</span>
+          <span
+            className={cn(
+              "px-1 py-0.5 font-bold",
+              contentSafety.status === "FLAGGED"
+                ? "bg-crimson/20 text-crimson"
+                : contentSafety.configured
+                  ? "bg-pitch/20 text-pitch"
+                  : "bg-white/10 text-slate-500",
+            )}
+          >
+            {contentSafety.service}
+          </span>
+          <span className="text-slate-400">{contentSafety.status}</span>
+          <span className="truncate text-slate-600" title={contentSafety.note}>
+            {contentSafety.host || "not configured"}
+          </span>
+        </div>
+      )}
+
       <p className="mt-1.5 border-t border-white/10 pt-1.5 font-tech text-[7.5px] leading-relaxed text-slate-500">
         {configured
           ? "Azure AI Foundry credentials detected: Stage C routes to the cloud, Stage E to Azure AI Translator, and every call is recorded in the handoff trace."
@@ -370,7 +397,7 @@ function ScoreMetric({
 }
 
 function FoundryEvalScorecardPanel({
-  scorecard, trace, auditing, receipt, onRunAudit, azure,
+  scorecard, trace, auditing, receipt, onRunAudit, azure, contentSafety,
 }: ScorecardProps) {
   const groundingPct = scorecard?.mathematical_groundedness_pct
     ?? (trace ? Math.round(trace.grounding.score * 100) : 100);
@@ -446,7 +473,7 @@ function FoundryEvalScorecardPanel({
         {scorecard?.evaluated_at ?? "on demand"} · deterministic offline fallback
       </p>
 
-      <FoundryConnectionCard azure={azure} />
+      <FoundryConnectionCard azure={azure} contentSafety={contentSafety} />
     </div>
   );
 }
@@ -599,6 +626,7 @@ export function PipelinePanel({
   const [auditReceipt, setAuditReceipt] = useState<{ at: string; source: string } | null>(null);
   const [auditing, setAuditing] = useState(false);
   const [azureBlock, setAzureBlock] = useState<PipelineAudit["azure"] | undefined>(undefined);
+  const [contentSafety, setContentSafety] = useState<ContentSafetyVerdict | undefined>(undefined);
 
   const runGroundingAudit = useCallback(async () => {
     setAuditing(true);
@@ -608,6 +636,7 @@ export function PipelinePanel({
       const data = (await r.json()) as PipelineAudit;
       if (data.foundry_eval) setEvalCard(data.foundry_eval);
       if (data.azure) setAzureBlock(data.azure);
+      if (data.foundry_eval?.content_safety) setContentSafety(data.foundry_eval.content_safety);
       setAuditReceipt({
         at: new Date().toISOString(),
         source: data.foundry_eval?.eval_suite ?? "aether-foundry-eval-v1",
@@ -635,6 +664,7 @@ export function PipelinePanel({
         if (cancelled || !data) return;
         if (data.foundry_eval) setEvalCard(data.foundry_eval);
         if (data.azure) setAzureBlock(data.azure);
+        if (data.foundry_eval?.content_safety) setContentSafety(data.foundry_eval.content_safety);
       })
       .catch(() => undefined);
     return () => {
@@ -669,6 +699,7 @@ export function PipelinePanel({
         receipt={auditReceipt}
         onRunAudit={runGroundingAudit}
         azure={azureBlock}
+        contentSafety={contentSafety}
       />
 
       {onTriggerDrill && (

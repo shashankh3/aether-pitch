@@ -20,6 +20,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 from agent_trace import build_agent_trace, gate_snapshot, p95, verify_grounding
+from content_safety import ContentSafetyClient, content_safety_status
 from rai_shield import check_club_neutrality, check_numeric_grounding, detect_prompt_risk
 from stage_a_synthetic_engine import MATCH_METADATA, PitchForgeEngine
 from stage_b_math_engine import TacticalMathEngine, XT_MAX, XT_MIN
@@ -627,6 +628,90 @@ def main() -> int:
           {a["id"] for a in war_room.get("agents", [])}
           == {"nla_tactical_manager", "mcs_opposition_scout", "spatial_arbiter"})
 
+    # ---- the cloud path must be a REAL sequential 3-call debate ---------
+    # Mock the transport so the orchestration is verified without keys:
+    # three separate calls, each with its own tool bundle, each reading the
+    # turns before it.
+    debate_calls: list = []
+
+    def fake_chat(deployment, messages, **kwargs):
+        debate_calls.append({"deployment": deployment, "messages": messages, "kwargs": kwargs})
+        user = json.loads(messages[1]["content"])
+        turn = len(debate_calls)
+        if turn == 1:
+            return json.dumps({"statement": "Invert the right fullback into the 78,12 space."})
+        if turn == 2:
+            return json.dumps({"statement": "MCS pivots #6 to exploit the vacated channel."})
+        return json.dumps({
+            "statement": "Accept the overload: the seam is worth +0.14 xT.",
+            "recommended_adjustment": {
+                "title": "Invert Right Fullback — 78,12 Overload",
+                "directive": "Drop the right fullback into the 78,12 half-space.",
+            },
+            "projected_30s_xt_delta": 0.14,
+            "win_prob_shift_pct": 6.8,
+            "target_zones": [{"x": 78.0, "y": 12.0, "label": "OVERLOAD ZONE"}],
+            "adjustment_vectors": [
+                {"from": {"x": 84.0, "y": -2.0}, "to": {"x": 78.0, "y": 12.0}, "label": "INVERT RB"},
+            ],
+        })
+
+    class _AzureEnabledSettings:
+        """Settings proxy that reports Azure as configured, without mutating
+        the shared dataclass."""
+
+        def __init__(self, base):
+            self._base = base
+
+        def __getattr__(self, name):
+            return getattr(self._base, name)
+
+        @property
+        def azure_enabled(self) -> bool:
+            return True
+
+    debate_router = FoundryRouter(settings)
+    debate_router._chat = fake_chat  # type: ignore[assignment]
+    debate_router.s = _AzureEnabledSettings(settings)  # type: ignore[assignment]
+    debate_ctx = {
+        "query": "Run a multi-agent bench war-room on the live match state.",
+        "language": "en", "persona": "analyst", "locked_player_id": None,
+        "spatial": spatial, "metrics": math.snapshot(st),
+        "recent_events": [], "top_inflections": [], "match_metadata": None,
+        "personalization": {},
+    }
+    debate = asyncio.get_event_loop().run_until_complete(
+        debate_router.tactical_war_room(debate_ctx))
+    check("War room: cloud path runs 3 separate agent calls",
+          len(debate_calls) == 3
+          and len(debate.get("agent_calls") or []) == 3
+          and debate.get("orchestration", {}).get("rounds") == 3,
+          f"{len(debate_calls)} model calls")
+    check("War room: each agent gets its own tool bundle",
+          len({tuple(c["tools"]) for c in (debate.get("agent_calls") or [])}) == 3
+          and all(c["tools"] for c in (debate.get("agent_calls") or []))
+          and all("deployment" in c and "latency_ms" in c
+                  for c in (debate.get("agent_calls") or [])))
+    scout_seen = json.loads(debate_calls[1]["messages"][1]["content"])["prior_turns"]
+    arbiter_seen = json.loads(debate_calls[2]["messages"][1]["content"])["prior_turns"]
+    check("War room: the debate is sequential, not one call",
+          len(scout_seen) == 1 and "NLATacticalManagerAgent" == scout_seen[0]["agent"]
+          and len(arbiter_seen) == 2
+          and {t["agent"] for t in arbiter_seen}
+          == {"NLATacticalManagerAgent", "MCSOppositionScoutAgent"},
+          "scout reads turn 1, arbiter reads turns 1-2")
+    check("War room: the arbiter's prescription is adopted",
+          debate.get("projected_30s_xt_delta") == 0.14
+          and debate.get("win_prob_shift_pct") == 6.8
+          and debate.get("recommended_adjustment", {}).get("title", "").startswith("Invert")
+          and debate["agent_debate_transcript"]["manager_proposal"]
+          == "Invert the right fullback into the 78,12 space."
+          and debate["agent_debate_transcript"]["arbiter_verdict"]
+          == "Accept the overload: the seam is worth +0.14 xT.")
+    check("War room: agents use two different model deployments",
+          len({c["deployment"] for c in debate_calls}) == 2,
+          ", ".join(sorted({c["deployment"] for c in debate_calls})))
+
     # ---- v6.2 TASK 2: Foundry RAI shield -------------------------------
     injection = asyncio.get_event_loop().run_until_complete(
         app_main._studio_query_handler(
@@ -691,6 +776,24 @@ def main() -> int:
           and eval_card.get("p95_budget_ms") == 100.0
           and eval_card.get("p95_frame_sla_pct") is not None
           and eval_card.get("eval_suite") == "aether-foundry-eval-v1")
+
+    # ---- Azure AI Content Safety: optional second RAI layer ---------------
+    cs = ContentSafetyClient("", "")
+    check("Content safety: unconfigured layer is skipped cleanly",
+          cs.enabled is False
+          and cs.analyze("anything")["status"] == "SKIPPED"
+          and content_safety_status(cs)["configured"] is False)
+    cs_armed = ContentSafetyClient(
+        "https://aether-safety.cognitiveservices.azure.com", "key")
+    armed = content_safety_status(cs_armed)
+    check("Content safety: configured layer is armed and reports its host",
+          cs_armed.enabled is True
+          and armed["status"] == "ARMED"
+          and armed["configured"] is True
+          and armed["host"] == "aether-safety.cognitiveservices.azure.com")
+    check("Content safety: audit publishes the RAI layer state",
+          (eval_card.get("content_safety") or {}).get("service")
+          == "azure-ai-content-safety")
 
     # ---- v6.2 TASK 2: predictive bio-load digital twin ------------------
     bio_profiles = [p.get("bio_load_profile") or {} for p in st["players"]]

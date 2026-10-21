@@ -30,6 +30,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from agent_trace import build_agent_trace, gate_snapshot, p95, verify_grounding
 from config import settings
+from content_safety import ContentSafetyClient, content_safety_status
 from rai_shield import build_safety_shield, detect_prompt_risk
 from stage_a_synthetic_engine import PitchForgeEngine
 from stage_b_math_engine import TacticalMathEngine
@@ -618,6 +619,7 @@ def _spatial_context(team: Optional[str] = None) -> dict:
         "gap_defender": gap_defender,
         "fastest_sprinter": dict(fastest) if fastest else {},
         "xt_at_gap": round(math.xt_value(team, gap_center["x"], gap_center["y"]), 3),
+        "xt_top_zones": math.top_xt_zones(3),
         "ghost": ({"x": last_ghost[1][0], "y": last_ghost[1][1],
                    "delta_xt": last_ghost[2], "actual_delta_xt": last_ghost[3],
                    "target_id": last_ghost[4], "completion_probability": last_ghost[5],
@@ -820,12 +822,15 @@ async def pipeline_audit() -> dict:
     audit_p95 = {k: p95(v) for k, v in latency_samples.items()}
     eval_shield = build_safety_shield(
         "live pipeline audit", "en", sample_trace.get("grounding"), "")
+    eval_shield["content_safety"] = content_safety_status(ContentSafetyClient(
+        settings.content_safety_endpoint, settings.content_safety_key))
     foundry_eval = FoundryRouter.eval_scorecard(
         grounding=sample_trace.get("grounding"),
         gate_stats={**gate_stats, "chaos_index": mets.get("chaos_index", 0.0)},
         latency_p95=audit_p95,
         shield=eval_shield,
     )
+    foundry_eval["content_safety"] = eval_shield["content_safety"]
     return {
         "status": "ok",
         "synthetic_data_compliance": True,

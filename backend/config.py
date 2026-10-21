@@ -56,6 +56,10 @@ class Settings:
     )
     translator_region: str = _env("AZURE_TRANSLATOR_REGION", "global")
 
+    # ---- Azure AI Content Safety (optional second RAI layer) --------------
+    content_safety_endpoint: str = _env("AZURE_CONTENT_SAFETY_ENDPOINT")
+    content_safety_key: str = _env("AZURE_CONTENT_SAFETY_KEY")
+
     # ---- Broadcast pacing ---------------------------------------------------
     min_seconds_between_insights: float = 10.0      # studio co-pilot rate limit
 
@@ -66,6 +70,10 @@ class Settings:
     @property
     def translator_enabled(self) -> bool:
         return bool(self.translator_key)
+
+    @property
+    def content_safety_enabled(self) -> bool:
+        return bool(self.content_safety_endpoint and self.content_safety_key)
 
     @property
     def webpubsub_enabled(self) -> bool:

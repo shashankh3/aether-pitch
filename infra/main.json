@@ -56,6 +56,16 @@
       "defaultValue": "",
       "metadata": { "description": "Azure AI Translator key. Leave empty to use the local phrase atlas." }
     },
+    "deployContentSafety": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": { "description": "Provision Azure AI Content Safety as the optional second RAI layer." }
+    },
+    "contentSafetyKey": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": { "description": "Azure AI Content Safety key. Leave empty to keep the deterministic Prompt Shield as the only layer." }
+    },
     "engineImage": {
       "type": "string",
       "defaultValue": "ghcr.io/shashankh3/aether-engine:latest",
@@ -80,6 +90,7 @@
   "variables": {
     "foundryName": "[concat(parameters('prefix'), '-foundry')]",
     "translatorName": "[concat(parameters('prefix'), '-translator')]",
+    "contentSafetyName": "[concat(parameters('prefix'), '-safety')]",
     "keyVaultName": "[concat(parameters('prefix'), '-kv')]",
     "identityName": "[concat(parameters('prefix'), '-engine-id')]",
     "envName": "[concat(parameters('prefix'), '-env')]",
@@ -180,6 +191,19 @@
       }
     },
     {
+      "type": "Microsoft.CognitiveServices/accounts",
+      "apiVersion": "2023-05-01",
+      "name": "[variables('contentSafetyName')]",
+      "location": "[parameters('location')]",
+      "kind": "ContentSafety",
+      "sku": { "name": "F0" },
+      "properties": {
+        "customSubDomainName": "[variables('contentSafetyName')]",
+        "publicNetworkAccess": "Enabled"
+      },
+      "condition": "[parameters('deployContentSafety')]"
+    },
+    {
       "type": "Microsoft.KeyVault/vaults",
       "apiVersion": "2023-07-01",
       "name": "[variables('keyVaultName')]",
@@ -258,6 +282,10 @@
             {
               "name": "azure-translator-key",
               "value": "[parameters('translatorKey')]"
+            },
+            {
+              "name": "azure-content-safety-key",
+              "value": "[parameters('contentSafetyKey')]"
             }
           ],
           "ingress": {
@@ -288,6 +316,11 @@
                 { "name": "AZURE_TRANSLATOR_ENDPOINT", "value": "[variables('translatorEndpoint')]" },
                 { "name": "AZURE_TRANSLATOR_KEY", "secretRef": "azure-translator-key" },
                 { "name": "AZURE_TRANSLATOR_REGION", "value": "global" },
+                {
+                  "name": "AZURE_CONTENT_SAFETY_ENDPOINT",
+                  "value": "[if(parameters('deployContentSafety'), concat('https://', variables('contentSafetyName'), '.cognitiveservices.azure.com'), '')]"
+                },
+                { "name": "AZURE_CONTENT_SAFETY_KEY", "secretRef": "azure-content-safety-key" },
                 { "name": "APPLICATIONINSIGHTS_CONNECTION_STRING", "value": "[reference(resourceId('Microsoft.Insights/components', variables('appInsightsName')), '2020-02-02').ConnectionString]" }
               ],
               "probes": [

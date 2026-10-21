@@ -524,6 +524,32 @@ class TacticalMathEngine:
             "most_at_risk": at_risk[:3],
         }
 
+    def top_xt_zones(self, limit: int = 3) -> List[dict]:
+        """The highest-value Expected Threat cells on the 16x12 grid.
+
+        Returned for both attacking directions so an agent can reason about
+        where the space actually is, not where it assumes it is.
+        """
+        cells: List[Tuple[float, float, float]] = []
+        for row in range(XT_ROWS):
+            for col in range(XT_COLS):
+                x = (col + 0.5) * PITCH_L / XT_COLS
+                y = (row + 0.5) * PITCH_W / XT_ROWS
+                cells.append((float(self.xt_grid[row, col]), x, y))
+        cells.sort(reverse=True)
+        out: List[dict] = []
+        for value, x, y in cells[:max(1, limit)]:
+            out.append({
+                "x": round(x, 1),
+                "y": round(y, 1),
+                "xt": round(value, 4),
+                "label": "HIGH xT ZONE",
+                "attacking_team": "NLA",
+                "mirror_x": round(PITCH_L - x, 1),
+                "mirror_attacking_team": "MCS",
+            })
+        return out
+
     def snapshot(self, state: dict, t: Optional[float] = None) -> dict:
         t = t if t is not None else state["t_match"]
         window = [s for s in self.stream if s[0] >= t - self.window_s]
