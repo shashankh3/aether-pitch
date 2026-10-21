@@ -1,9 +1,9 @@
 "use client";
 // AETHER PITCH v2.0 — BroadcastCameraRig
 // Four damped camera modes for the 3D WebGL broadcast:
-//   1. TELE_BROADCAST          classic Premier League TV camera
-//   2. PLAYER_LOCK_3RD_PERSON  EA FC Pro Cam behind the locked avatar
-//   3. TACTICAL_DRONE_ORBIT    Lenovo 3D Digital Twin — free 360 orbit
+//   1. TELE_BROADCAST          classic broadcast TV camera
+//   2. PLAYER_LOCK_3RD_PERSON  pro cam behind the locked avatar
+//   3. TACTICAL_DRONE_ORBIT    3D digital twin — free 360 orbit
 //   4. AUTO_DIRECTOR           "The 12th Man" AI cam: tele during buildup,
 //                              dramatic low-angle swoop on high chaos /
 //                              Stage (d) overlay triggers

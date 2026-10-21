@@ -13,8 +13,8 @@ body {
   font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
-/* ------------------------------------------------ EA FC 27 broadcast shapes */
-/* Angled polygon panel: cut TR + BL corners (EA FC 27 chrome) */
+/* ------------------------------------------------ broadcast panel shapes */
+/* Angled polygon panel: cut TR + BL corners (broadcast chrome) */
 .clip-ea {
   clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
 }
@@ -32,13 +32,13 @@ body {
 
 /* ------------------------------------------------ surfaces */
 .glass {
-  backdrop-filter: blur(14px);
+  backdrop-filter: blur(10px);
   background: rgba(7, 11, 19, 0.78);
   border: 1px solid rgba(148, 163, 184, 0.16);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
 }
 .glass-soft {
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(6px);
   background: rgba(7, 11, 19, 0.6);
   border: 1px solid rgba(148, 163, 184, 0.12);
 }
@@ -259,7 +259,7 @@ a:focus-visible,
     inset 0 1px 0 var(--panel-hi),
     inset 0 -1px 0 rgba(0, 0, 0, 0.4),
     0 18px 46px rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(12px) saturate(1.2);
 }
 
 .panel-lux::after {
@@ -274,7 +274,7 @@ a:focus-visible,
   background: linear-gradient(155deg, rgba(11, 18, 30, 0.82), rgba(5, 9, 15, 0.86));
   border: 1px solid rgba(148, 163, 184, 0.14);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055), 0 12px 32px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(14px) saturate(1.15);
+  backdrop-filter: blur(10px) saturate(1.15);
 }
 
 .hud-enter {
@@ -378,7 +378,7 @@ a:focus-visible,
   background:
     radial-gradient(ellipse at 50% 32%, rgba(0, 240, 255, 0.06), transparent 55%),
     rgba(2, 5, 10, 0.78);
-  backdrop-filter: blur(16px) saturate(1.2);
+  backdrop-filter: blur(10px) saturate(1.2);
   animation: modal-fade 0.24s ease-out both;
 }
 
@@ -494,3 +494,86 @@ a:focus-visible,
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ================================================================ v6.0 */
+/* Mode-tab HUD shell (LIVE / ANALYSIS / STUDIO).                         */
+/*                                                                        */
+/* Z-INDEX LADDER (authoritative — keep new surfaces on an existing tier, */
+/* or extend the ladder here instead of sprinkling ad-hoc z-* values):    */
+/*   0   WebGL canvas + alpha chroma backdrop                             */
+/*   1   cinematic scene FX (aurora / grade / scanlines / grain)          */
+/*   10  HUD shell grid (20 while alpha mode is active)                   */
+/*   18  broadcast frame corners                                          */
+/*   20  lower-third graphic                                              */
+/*   30  GOAL slam banner                                                 */
+/*   35  bottom-dock popovers (player hologram, pipeline payloads)        */
+/*   40  cinema clean-feed chrome, mobile panel sheet, studio recap modal */
+/*   50  alpha / rubric modals + expanded CV viewport                     */
+/*   56  autopilot step banner                                            */
+/*   60  recap studio modal                                               */
+
+.panel-enter {
+  animation: panel-enter 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes panel-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* HUD mode tabs in the TopBar */
+.hud-tab {
+  position: relative;
+  padding: 4px 12px;
+  font-family: var(--font-rajdhani), ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgb(148 163 184);
+  transition: color 180ms ease, background-color 180ms ease;
+}
+.hud-tab:hover { color: #e2e8f0; }
+.hud-tab[aria-pressed="true"] { color: #ffffff; }
+.hud-tab[data-mode="live"][aria-pressed="true"] {
+  background: rgba(0, 255, 133, 0.16);
+  color: rgb(0 255 133);
+}
+.hud-tab[data-mode="analysis"][aria-pressed="true"] {
+  background: rgba(0, 240, 255, 0.16);
+  color: rgb(0 240 255);
+}
+.hud-tab[data-mode="studio"][aria-pressed="true"] {
+  background: rgba(255, 194, 77, 0.16);
+  color: rgb(255 194 77);
+}
+.hud-tab[aria-pressed="true"]::after {
+  content: "";
+  position: absolute;
+  inset-inline: 8px;
+  bottom: -1px;
+  height: 2px;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+
+/* Right-dock tab strip */
+.dock-tab {
+  flex: 1 1 0;
+  padding: 5px 4px;
+  font-family: var(--font-rajdhani), ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgb(100 116 139);
+  transition: color 160ms ease, background-color 160ms ease;
+}
+.dock-tab:hover { color: rgb(226 232 240); }
+.dock-tab[aria-selected="true"] {
+  background: rgba(0, 240, 255, 0.14);
+  color: rgb(0 240 255);
+}
+
+.backdrop-blur-xl { --tw-backdrop-blur: blur(12px); }
+.backdrop-blur-md { --tw-backdrop-blur: blur(6px); }

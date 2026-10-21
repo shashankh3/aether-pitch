@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ShieldCheck, X, Loader2, CheckCircle2 } from "lucide-react";
 import type { PipelineAudit } from "@/lib/types";
+import { API_BASE } from "@/lib/api";
 import { useModalA11y } from "@/lib/useModalA11y";
 
 interface Props {
@@ -14,9 +15,9 @@ interface Props {
 }
 
 const REQUIREMENTS: { label: string; key: keyof PipelineAudit["audit"] | null; note: string }[] = [
-  { label: "Stage (a) Ingest & CV Auto-Eventing (10Hz Stream + YOLOv8 Homography)", key: "stage_a_ingest_ms", note: "PitchForge physics sim + auto-eventer + optical CV PiP" },
+  { label: "Stage (a) Ingest & CV Auto-Eventing (10Hz Stream + Homography)", key: "stage_a_ingest_ms", note: "PitchForge physics sim + auto-eventer + synthetic CV PiP" },
   { label: "Stage (b) Real-Time Math (Control vs Chaos Entropy, Pass Difficulty PDR, 16x12 xT)", key: "stage_b_interpret_ms", note: "Deterministic NumPy — zero LLM guessing" },
-  { label: "Stage (c) Causal Explainability (Azure AI Foundry Multi-Agent + Bi-Directional Co-Pilot)", key: "stage_c_explain_ms", note: "Ask The 12th Man + scene directives" },
+  { label: "Stage (c) Causal Explainability (Azure AI Foundry Triage + Narrative Router + Bi-Directional Co-Pilot)", key: "stage_c_explain_ms", note: "Ask The 12th Man + scene directives" },
   { label: "Stage (d) Synchronized Broadcast Render (3D WebGL AR + SMPTE Alpha Overlay JSON)", key: "stage_d_render_ms", note: "AETHER_RENDER_PARTNER_V2 machine packets" },
   { label: "Stage (e) Dual-Persona & Multi-Language (Analyst vs Casual + PlayerLock 360 + EN/ES/AR/HI Voice)", key: "stage_e_personalize_ms", note: "Deterministic atlas + Azure Translator-ready" },
 ];
@@ -34,8 +35,7 @@ export default function RubricVerifierModal({ open, onClose }: Props) {
     setLoading(true);
     setError(null);
     setAudit(null);
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    fetch(`${API_URL}/api/health/pipeline-audit`, { signal: controller.signal })
+    fetch(`${API_BASE}/api/health/pipeline-audit`, { signal: controller.signal })
       .then((r) => {
         if (!r.ok) throw new Error(`audit HTTP ${r.status}`);
         return r.json();

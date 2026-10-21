@@ -94,8 +94,12 @@ function TeamLinks({ team, color }: { team: "NLA" | "MCS"; color: string }) {
     geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(3 * 3), 3));
     return new THREE.Line(geo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.5 }));
   }, [color]);
+  const lastAt = useRef(0);
 
   useFrame(() => {
+    const now = performance.now();
+    if (now - lastAt.current < 100) return;
+    lastAt.current = now;
     const players = Array.from(telemetry.players.values()).filter((p) => p.team === team);
     const backs = players.filter((p) => p.role === "DEF").sort((a, b) => a.y - b.y).slice(0, 4);
     const mids = players.filter((p) => p.role === "MID").sort((a, b) => a.y - b.y).slice(0, 3);
@@ -131,17 +135,17 @@ export function DefensiveLasers({ visible, metrics }: { visible: boolean; metric
       <TeamLinks team="NLA" color="#FF1E56" />
       <TeamLinks team="MCS" color="#00F0FF" />
       <Html position={[-44, 1.6, 0]} center distanceFactor={60} zIndexRange={[15, 0]}>
-        <div className="clip-ea pointer-events-none whitespace-nowrap border border-crimson/50 bg-slate-950/80 px-2 py-0.5 font-tech text-[11px] font-bold tracking-wide text-crimson backdrop-blur-md">
+        <div className="clip-ea pointer-events-none whitespace-nowrap border border-crimson/50 bg-slate-950/80 px-2 py-0.5 font-tech text-[11px] font-bold tracking-wide text-crimson">
           NLA LINE {nla.toFixed(1)}m
         </div>
       </Html>
       <Html position={[44, 1.6, 0]} center distanceFactor={60} zIndexRange={[15, 0]}>
-        <div className="clip-ea pointer-events-none whitespace-nowrap border border-tactical/50 bg-slate-950/80 px-2 py-0.5 font-tech text-[11px] font-bold tracking-wide text-tactical backdrop-blur-md">
+        <div className="clip-ea pointer-events-none whitespace-nowrap border border-tactical/50 bg-slate-950/80 px-2 py-0.5 font-tech text-[11px] font-bold tracking-wide text-tactical">
           MCS LINE {mcs.toFixed(1)}m
         </div>
       </Html>
       <Html position={[0, 2.2, 24]} center distanceFactor={60} zIndexRange={[15, 0]}>
-        <div className="clip-ea pointer-events-none whitespace-nowrap border border-gold/50 bg-slate-950/80 px-2 py-0.5 font-tech text-[11px] font-bold tracking-wide text-gold backdrop-blur-md">
+        <div className="clip-ea pointer-events-none whitespace-nowrap border border-gold/50 bg-slate-950/80 px-2 py-0.5 font-tech text-[11px] font-bold tracking-wide text-gold">
           BACKLINE STRETCH {stretch.toFixed(1)}m
         </div>
       </Html>

@@ -1,5 +1,5 @@
 "use client";
-// AETHER PITCH v2.0 — top-left Premier League dynamic scorebug:
+// AETHER PITCH v2.0 — top-left dynamic scorebug:
 // crests, live score, match clock, possession indicator and a
 // win-probability / momentum bar.
 

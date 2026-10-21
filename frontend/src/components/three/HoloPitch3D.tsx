@@ -6,12 +6,12 @@
 // Broadcast Alpha mode: strips every opaque surface and keeps only the AR
 // layer over a transparent / chroma-green canvas for live TV compositing.
 
-import { memo, useMemo, useRef, useState, type MutableRefObject } from "react";
+import { memo, useCallback, useMemo, useRef, useState, type MutableRefObject } from "react";
 import * as THREE from "three";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { EffectComposer, Bloom, Vignette, ChromaticAberration, Noise, BrightnessContrast } from "@react-three/postprocessing";
 import { BlendFunction } from "postprocessing";
-import { Sparkles, Trail } from "@react-three/drei";
+import { PerformanceMonitor, Sparkles, Trail } from "@react-three/drei";
 import StadiumEnvironment3D from "./StadiumEnvironment3D";
 import PlayerAvatar3D from "./PlayerAvatar3D";
 import PassVectors3D from "./PassVectors3D";
@@ -26,6 +26,22 @@ import type {
 } from "@/lib/types";
 
 const CA_OFFSET = new THREE.Vector2(0.00045, 0.00045);
+const MAX_DPR = 1.5;
+const DPR_RANGE: [number, number] = [1, MAX_DPR];
+const GL_CONFIG = {
+  antialias: false,
+  powerPreference: "high-performance" as const,
+  alpha: true,
+  stencil: false,
+  toneMapping: THREE.ACESFilmicToneMapping,
+  toneMappingExposure: 1.08,
+};
+const CAMERA_CONFIG = {
+  fov: 42,
+  position: [0, 72, 118] as [number, number, number],
+  near: 0.5,
+  far: 700,
+};
 
 export interface OverlayToggles {
   xtGrid: boolean;
@@ -163,6 +179,51 @@ function AvatarLayer({ lockedId, keyIds, alphaOnly, onLock }: {
   );
 }
 
+/* --------------------------------------------------------- adaptive quality */
+function AdaptiveQuality() {
+  const dpr = useThree((state) => state.viewport.dpr);
+  const setDpr = useThree((state) => state.setDpr);
+  const baseDpr = useMemo(
+    () => Math.min(MAX_DPR, typeof window === "undefined" ? 1 : window.devicePixelRatio || 1),
+    []
+  );
+  const applyFactor = useCallback(
+    (factor: number) => {
+      const next = Math.max(0.75, baseDpr * factor);
+      if (Math.abs(next - dpr) > 0.001) setDpr(next);
+    },
+    [baseDpr, dpr, setDpr]
+  );
+  return (
+    <PerformanceMonitor
+      factor={1}
+      flipflops={4}
+      onChange={(api) => applyFactor(api.factor)}
+      onFallback={() => applyFactor(0.75)}
+    />
+  );
+}
+
+const PostFX = memo(function PostFX({ alphaMode }: { alphaMode: boolean }) {
+  if (alphaMode) {
+    return (
+      <EffectComposer multisampling={4}>
+        <Bloom intensity={0.85} luminanceThreshold={0.6} mipmapBlur radius={0.76} />
+        <Vignette eskil={false} offset={0.18} darkness={0.72} />
+      </EffectComposer>
+    );
+  }
+  return (
+    <EffectComposer multisampling={4}>
+      <Bloom intensity={0.92} luminanceThreshold={0.58} mipmapBlur radius={0.76} />
+      <BrightnessContrast brightness={0.02} contrast={0.12} />
+      <ChromaticAberration offset={CA_OFFSET} radialModulation={false} modulationOffset={0.15} />
+      <Noise opacity={0.022} blendFunction={BlendFunction.OVERLAY} />
+      <Vignette eskil={false} offset={0.16} darkness={0.78} />
+    </EffectComposer>
+  );
+});
+
 /* ------------------------------------------------------------------ scene */
 function Scene({
   camMode, override, toggles, lockedId, keyIds, metrics,
@@ -172,6 +233,7 @@ function Scene({
     <>
       {!alphaMode && <color attach="background" args={["#02040A"]} />}
       {!alphaMode && <fog attach="fog" args={["#06101C", 150, 460]} />}
+      <AdaptiveQuality />
 
       {/* lighting: one shadow-casting floodlight + atmospheric fills */}
       <hemisphereLight args={["#3A4D6E", "#06100C", 0.5]} />
@@ -181,7 +243,7 @@ function Scene({
         intensity={1.55}
         color="#EAF2FF"
         castShadow
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={[1024, 1024]}
         shadow-camera-left={-70}
         shadow-camera-right={70}
         shadow-camera-top={55}
@@ -212,20 +274,7 @@ function Scene({
 
       <BroadcastCameraRig mode={camMode} lockedId={lockedId} override={override} />
 
-      {alphaMode ? (
-        <EffectComposer>
-          <Bloom intensity={0.85} luminanceThreshold={0.6} mipmapBlur radius={0.76} />
-          <Vignette eskil={false} offset={0.18} darkness={0.72} />
-        </EffectComposer>
-      ) : (
-        <EffectComposer>
-          <Bloom intensity={0.92} luminanceThreshold={0.58} mipmapBlur radius={0.76} />
-          <BrightnessContrast brightness={0.02} contrast={0.12} />
-          <ChromaticAberration offset={CA_OFFSET} radialModulation={false} modulationOffset={0.15} />
-          <Noise opacity={0.022} blendFunction={BlendFunction.OVERLAY} />
-          <Vignette eskil={false} offset={0.16} darkness={0.78} />
-        </EffectComposer>
-      )}
+      <PostFX alphaMode={alphaMode} />
     </>
   );
 }
@@ -242,15 +291,9 @@ export default function HoloPitch3D(props: Props) {
     >
       <Canvas
         shadows
-        dpr={[1, 1.7]}
-        gl={{
-          antialias: true,
-          powerPreference: "high-performance",
-          alpha: true,
-          toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.08,
-        }}
-        camera={{ fov: 42, position: [0, 72, 118], near: 0.5, far: 700 }}
+        dpr={DPR_RANGE}
+        gl={GL_CONFIG}
+        camera={CAMERA_CONFIG}
       >
         <MemoScene {...props} />
       </Canvas>

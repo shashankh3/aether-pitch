@@ -1,6 +1,6 @@
 "use client";
 // AETHER PITCH v3.0 — Telestrator3DOverlays
-// Monday Night Football / Lenovo 3D Digital Twin telestration layer:
+// Broadcast 3D telestration layer:
 //   * volumetric stadium spotlight pillars + ground reticles + callouts
 //   * 3D offside / defensive-line laser wall with attacker-distance marker
 //   * glowing compactness polygon (convex hull of the defensive block)
@@ -28,6 +28,7 @@ function SpotlightPillar({ index }: { index: number }) {
   const reticleMat = useRef<THREE.MeshBasicMaterial>(null);
   const reticle = useRef<THREE.Mesh>(null);
   const label = useRef<HTMLSpanElement>(null);
+  const labelAt = useRef(0);
   useFrame((state, delta) => {
     const g = grp.current;
     if (!g) return;
@@ -41,7 +42,11 @@ function SpotlightPillar({ index }: { index: number }) {
     if (pillarMat.current) pillarMat.current.opacity = pulse;
     if (reticleMat.current) reticleMat.current.opacity = 0.5 + 0.3 * Math.sin(state.clock.elapsedTime * 5);
     if (reticle.current) reticle.current.rotation.z += delta * 1.4;
-    if (label.current) label.current.textContent = `${s.name} · ${s.speed_kmh.toFixed(1)} km/h`;
+    const now = performance.now();
+    if (label.current && now - labelAt.current >= 100) {
+      labelAt.current = now;
+      label.current.textContent = `${s.name} · ${s.speed_kmh.toFixed(1)} km/h`;
+    }
   });
   return (
     <group ref={grp} visible={false}>
@@ -71,7 +76,7 @@ function SpotlightPillar({ index }: { index: number }) {
         />
       </mesh>
       <Html center distanceFactor={42} position={[0, 4.2, 0]} zIndexRange={[18, 0]}>
-        <div className="pointer-events-none whitespace-nowrap border border-gold/60 bg-slate-950/85 px-2 py-0.5 font-tech text-[11px] font-bold tracking-wide text-gold backdrop-blur-md">
+        <div className="pointer-events-none whitespace-nowrap border border-gold/60 bg-slate-950/85 px-2 py-0.5 font-tech text-[11px] font-bold tracking-wide text-gold">
           🔦 <span ref={label} />
         </div>
       </Html>
@@ -84,30 +89,36 @@ function OffsideWall() {
   const grp = useRef<THREE.Group>(null);
   const mat = useRef<THREE.MeshBasicMaterial>(null);
   const label = useRef<HTMLSpanElement>(null);
+  const calcAt = useRef(0);
   useFrame(() => {
     const g = grp.current;
     if (!g) return;
-    const poss = telemetry.match.possession;
-    const defending = poss === "NLA" ? "MCS" : "NLA";
-    const attackers = Array.from(telemetry.players.values()).filter((p) => p.team === poss && p.role !== "GK");
-    const defs = Array.from(telemetry.players.values())
-      .filter((p) => p.team === defending && p.role === "DEF")
-      .sort((a, b) => attackProgress(defending, a.x) - attackProgress(defending, b.x));
-    const wallDef = defs[1] ?? defs[0]; // second-deepest defender
-    g.visible = !!wallDef;
-    if (!wallDef) return;
-    const wallX = wallDef.x;
-    g.position.set(wallX - 52.5, 2.25, 0);
-    // distance from the wall to the deepest attacker (offside margin)
-    let nearest = 999;
-    for (const a of attackers) {
-      nearest = Math.min(nearest, attackProgress(poss, a.x) - attackProgress(defending, wallX));
+    const now = performance.now();
+    if (now - calcAt.current >= 100) {
+      calcAt.current = now;
+      const poss = telemetry.match.possession;
+      const defending = poss === "NLA" ? "MCS" : "NLA";
+      const attackers = Array.from(telemetry.players.values()).filter((p) => p.team === poss && p.role !== "GK");
+      const defs = Array.from(telemetry.players.values())
+        .filter((p) => p.team === defending && p.role === "DEF")
+        .sort((a, b) => attackProgress(defending, a.x) - attackProgress(defending, b.x));
+      const wallDef = defs[1] ?? defs[0]; // second-deepest defender
+      g.visible = !!wallDef;
+      if (wallDef) {
+        const wallX = wallDef.x;
+        g.position.set(wallX - 52.5, 2.25, 0);
+        // distance from the wall to the deepest attacker (offside margin)
+        let nearest = 999;
+        for (const a of attackers) {
+          nearest = Math.min(nearest, attackProgress(poss, a.x) - attackProgress(defending, wallX));
+        }
+        if (label.current) {
+          label.current.textContent =
+            `OFFSIDE WALL · ${wallDef.name} · ${nearest >= 0 ? "+" : ""}${nearest.toFixed(1)}m TO NEAREST ATTACKER`;
+        }
+      }
     }
-    if (label.current) {
-      label.current.textContent =
-        `OFFSIDE WALL · ${wallDef.name} · ${nearest >= 0 ? "+" : ""}${nearest.toFixed(1)}m TO NEAREST ATTACKER`;
-    }
-    if (mat.current) mat.current.opacity = 0.16 + 0.06 * Math.sin(performance.now() / 220);
+    if (mat.current && g.visible) mat.current.opacity = 0.16 + 0.06 * Math.sin(now / 220);
   });
   return (
     <group ref={grp} visible={false}>
@@ -125,7 +136,7 @@ function OffsideWall() {
         />
       </mesh>
       <Html center distanceFactor={55} position={[0, 3.4, 0]} zIndexRange={[18, 0]}>
-        <div className="pointer-events-none whitespace-nowrap border border-crimson/60 bg-slate-950/85 px-2 py-0.5 font-tech text-[11px] font-bold tracking-wide text-crimson backdrop-blur-md">
+        <div className="pointer-events-none whitespace-nowrap border border-crimson/60 bg-slate-950/85 px-2 py-0.5 font-tech text-[11px] font-bold tracking-wide text-crimson">
           <span ref={label} />
         </div>
       </Html>
@@ -159,6 +170,7 @@ function CompactnessPolygon() {
   const grp = useRef<THREE.Group>(null);
   const label = useRef<HTMLSpanElement>(null);
   const badge = useRef<THREE.Group>(null);
+  const calcAt = useRef(0);
   const borderGeo = useMemo(() => {
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(12 * 3), 3));
@@ -168,6 +180,9 @@ function CompactnessPolygon() {
   useFrame(() => {
     const g = grp.current;
     if (!g) return;
+    const now = performance.now();
+    if (now - calcAt.current < 100) return;
+    calcAt.current = now;
     const poss = telemetry.match.possession;
     const defending = poss === "NLA" ? "MCS" : "NLA";
     const block = Array.from(telemetry.players.values())
@@ -227,7 +242,7 @@ function CompactnessPolygon() {
       </lineLoop>
       <group ref={badge} visible={false}>
         <Html center distanceFactor={55} zIndexRange={[18, 0]}>
-          <div className="pointer-events-none whitespace-nowrap border border-tactical/60 bg-slate-950/85 px-2 py-0.5 font-tech text-[11px] font-bold tracking-wide text-tactical backdrop-blur-md">
+          <div className="pointer-events-none whitespace-nowrap border border-tactical/60 bg-slate-950/85 px-2 py-0.5 font-tech text-[11px] font-bold tracking-wide text-tactical">
             <span ref={label} />
           </div>
         </Html>
@@ -316,7 +331,7 @@ function HighlightZoneMesh({ zone }: { zone: HighlightZone | null }) {
         <lineBasicMaterial color={0xffc24d} transparent opacity={0.9} toneMapped={false} />
       </lineSegments>
       <Html center distanceFactor={55} position={[0, 1.2, 0]} zIndexRange={[18, 0]}>
-        <div className="pointer-events-none whitespace-nowrap border border-gold/60 bg-slate-950/85 px-2 py-0.5 font-tech text-[11px] font-bold tracking-wide text-gold backdrop-blur-md">
+        <div className="pointer-events-none whitespace-nowrap border border-gold/60 bg-slate-950/85 px-2 py-0.5 font-tech text-[11px] font-bold tracking-wide text-gold">
           ⚠ {zone.label}
         </div>
       </Html>

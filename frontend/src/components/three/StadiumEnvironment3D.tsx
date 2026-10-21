@@ -361,7 +361,6 @@ function Bowl() {
               position={[0, BASE_Y + r * ROW_RISE, FRONT_Z - r * ROW_DEPTH]}
               material={stepMat}
               receiveShadow
-              castShadow
             >
               <boxGeometry args={[side.width + 2, ROW_RISE, ROW_DEPTH + 0.06]} />
             </mesh>
@@ -418,7 +417,6 @@ function Floodlight({ pos }: { pos: [number, number, number] }) {
       <sprite position={[0, 29, 1.2]} scale={[16, 10, 1]}>
         <spriteMaterial map={glow} transparent opacity={0.55} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
       </sprite>
-      <pointLight position={[0, 28.5, 1]} color="#FFF4D8" intensity={1.1} distance={95} decay={2} />
     </group>
   );
 }

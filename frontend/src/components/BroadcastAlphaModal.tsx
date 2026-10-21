@@ -4,7 +4,7 @@
 //
 // The alpha mode hides every opaque surface (turf fill, stands, crowd, boards,
 // avatar bodies) and keeps ONLY the volumetric AR graphics — proving the stack
-// can sit downstream of an OBS / Vizrt / Singular.live production truck with
+// can sit downstream of a standards-based production truck with
 // the WebGL canvas composited over the real broadcast camera feed.
 
 import { useEffect, useRef, useState } from "react";
@@ -174,7 +174,7 @@ export default function BroadcastAlphaModal({ open, onClose, insight }: Props) {
               <Clapperboard size={16} /> Production Overlay JSON
             </h3>
             <p className="modal-kicker mt-0.5">
-              AETHER_RENDER_PARTNER_V2 · Singular.live / Vizrt machine-readable
+              AETHER_RENDER_PARTNER_V2 · broadcast-compositor machine-readable
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">

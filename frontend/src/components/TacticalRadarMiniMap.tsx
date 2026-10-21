@@ -1,8 +1,8 @@
 "use client";
 // AETHER PITCH v4.0 — TacticalRadarMiniMap
-// EA Sports FC 27 translucent 2D pitch radar (230x148) anchored bottom-center:
+// Translucent 2D pitch radar (230x148) anchored bottom-center:
 // real-time 22-player dots, pulsing gold ring on the locked player, ball flare,
-// live pass vector, dashed Lenovo ghost vector, telestrator spotlight rings —
+// live pass vector, dashed ghost vector, telestrator spotlight rings —
 // and click-to-lock that flies the 3D camera to the picked player.
 
 import { useEffect, useRef } from "react";

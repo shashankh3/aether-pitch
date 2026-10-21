@@ -3,7 +3,7 @@
 export type Team = "NLA" | "MCS";
 export type Role = "GK" | "DEF" | "MID" | "FWD";
 export type PoseState = "SPRINT" | "KICK" | "PRESS" | "JOG" | "IDLE";
-export type PlayStyleBadge = "RAPID+" | "INCISIVE_PASS+" | "INTERCEPT+";
+export type PlayStyleBadge = "RAPID" | "INCISIVE_PASS" | "INTERCEPT";
 export type CameraMode =
   | "TELE_BROADCAST"
   | "PLAYER_LOCK_3RD_PERSON"
@@ -140,7 +140,7 @@ export type MetricFocus =
 
 export type PersonaModeV5 = "ANALYST_HUD" | "CASUAL_STORY" | "TWINCAST_SPLIT";
 export type ClubBias = "NEUTRAL" | "NLA_LOYALIST" | "MCS_LOYALIST";
-export type EngineStatus = "CONNECTED_AZURE_LIVE" | "EDGE_SYNTHETIC_FALLBACK";
+export type EngineStatus = "CONNECTED_PIPELINE_LIVE" | "EDGE_SYNTHETIC_FALLBACK";
 
 export interface PersonalizationState {
   persona_mode: PersonaModeV5;
@@ -289,8 +289,8 @@ export type PersonaMode = "analyst" | "casual" | "split";
 export type LangCode = "en" | "es" | "ar" | "hi";
 
 export const TEAM_COLORS: Record<Team, string> = {
-  NLA: "#FF1E56", // North London Athletic — crimson / gold
-  MCS: "#00F0FF", // Manchester Cityscape — electric cyan / navy
+  NLA: "#FF1E56", // North Larchmont Athletic — crimson / gold
+  MCS: "#00F0FF", // Meridian City SC — electric cyan / navy
 };
 
 export const TEAM_KIT: Record<Team, { primary: string; shorts: string; gk: string }> = {

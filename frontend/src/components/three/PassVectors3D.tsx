@@ -2,7 +2,7 @@
 // AETHER PITCH v2.0 — PassVectors3D
 //   * 3D parabolic ballistic pass tube (QuadraticBezierCurve3, peak 6.5m when
 //     lofted / 1.2m ground passes) glowing neon green -> gold
-//   * Lenovo counterfactual "Ghost Pass" — dashed cyan 3D curve to the optimal
+//   * Counterfactual "Ghost Pass" — dashed cyan 3D curve to the optimal
 //     teammate with a floating "+xT" badge
 
 import { useMemo, useRef } from "react";
@@ -111,21 +111,26 @@ export default function PassVectors3D({ showGhost }: { showGhost: boolean }) {
 function GhostBadge() {
   const holder = useRef<THREE.Group>(null);
   const label = useRef<HTMLSpanElement>(null);
+  const shown = useRef<object | null>(null);
   useFrame(() => {
     const g = telemetry.ghost;
     if (!holder.current) return;
     if (g && performance.now() - g.at < 4200) {
       holder.current.visible = true;
       holder.current.position.set(g.x - 52.5, 1.4, g.y - 34);
-      if (label.current) label.current.textContent = `OPTIMAL GHOST PASS: +${g.delta_xt.toFixed(2)} xT`;
+      if (label.current && shown.current !== g) {
+        shown.current = g;
+        label.current.textContent = `OPTIMAL GHOST PASS: +${g.delta_xt.toFixed(2)} xT`;
+      }
     } else {
       holder.current.visible = false;
+      shown.current = null;
     }
   });
   return (
     <group ref={holder} visible={false}>
       <Html center distanceFactor={40} zIndexRange={[15, 0]}>
-        <div className="pointer-events-none whitespace-nowrap border border-tactical/60 bg-slate-950/85 px-2 py-0.5 font-tech text-[11px] font-bold tracking-wide text-tactical backdrop-blur-md">
+        <div className="pointer-events-none whitespace-nowrap border border-tactical/60 bg-slate-950/85 px-2 py-0.5 font-tech text-[11px] font-bold tracking-wide text-tactical">
           <span ref={label}>OPTIMAL GHOST PASS</span>
         </div>
       </Html>

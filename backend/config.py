@@ -7,8 +7,8 @@ out of the box. Copy `.env.example` to `.env` and fill in keys to go cloud.
 
 Stage (a)  Synthetic ingest            — local engine (always local)
 Stage (b)  Deterministic math          — local NumPy (always local)
-Stage (c)  Azure AI Foundry agents     — AZURE_OPENAI_* (fallback: deterministic)
-Stage (d)  Broadcast render packets    — local WebSocket (optional Azure Web PubSub)
+Stage (c)  Azure AI Foundry models     — AZURE_OPENAI_* (fallback: deterministic)
+Stage (d)  Broadcast render packets    — local WebSocket (Azure Web PubSub reserved)
 Stage (e)  Personalize / translate     — AZURE_TRANSLATOR_* (fallback: static atlas)
 """
 import os
@@ -45,7 +45,7 @@ class Settings:
     triage_deployment: str = _env("AZURE_OPENAI_TRIAGE_DEPLOYMENT", "gpt-4o-mini")
     narrative_deployment: str = _env("AZURE_OPENAI_NARRATIVE_DEPLOYMENT", "gpt-4o")
 
-    # ---- Stage (d) Azure Web PubSub (optional; local WS is the default) ----
+    # ---- Stage (d) Azure Web PubSub (reserved; local WS is the default) ----
     webpubsub_connection_string: str = _env("AZURE_WEBPUBSUB_CONNECTION_STRING")
     webpubsub_hub: str = _env("AZURE_WEBPUBSUB_HUB", "aether")
 

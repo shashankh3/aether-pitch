@@ -1,6 +1,6 @@
 "use client";
 // AETHER PITCH v3.0 — PlayerAvatar3D
-// EA SPORTS FC 27 HyperMotion V: 14-part biomechanical humanoid rig with
+// Broadcast 14-part biomechanical humanoid rig with
 // velocity-locked inverse-kinematics-style procedural animation.
 //
 // GPU model: the geometry/material pool below is instantiated ONCE at module
@@ -15,10 +15,10 @@
 //     backward) + counter-swinging 2-segment arms + sprint torso lean + bob
 //   * KICK: ballistic right-leg strike (+ left-arm counter-balance)
 //   * GK: widened ready stance, crouched knees, parrying forearms
-//   * HyperMotion dual foot-rings, vision cone, PlayStyle+ plumbob,
+//   * dual foot-rings, vision cone, signature-trait plumbob,
 //     <Text> jersey numbers back+chest, smart-culled <Html> telemetry pill
 
-import { useMemo, useRef } from "react";
+import { memo, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { Html, Text } from "@react-three/drei";
@@ -90,7 +90,7 @@ interface Props {
   onLock: (id: string | null) => void;
 }
 
-export default function PlayerAvatar3D({ id, locked, showPill, alphaOnly, onLock }: Props) {
+function PlayerAvatar3D({ id, locked, showPill, alphaOnly, onLock }: Props) {
   const root = useRef<THREE.Group>(null);
   const body = useRef<THREE.Group>(null);
   const torsoGroup = useRef<THREE.Group>(null);
@@ -112,6 +112,7 @@ export default function PlayerAvatar3D({ id, locked, showPill, alphaOnly, onLock
   const plumbobMat = useRef<THREE.MeshStandardMaterial>(null);
   const pillSpeed = useRef<HTMLSpanElement>(null);
   const pillPdr = useRef<HTMLSpanElement>(null);
+  const pillAt = useRef(0);
   const stridePhase = useRef(0);
   const kickT0 = useRef(-9999);
   const lastPose = useRef("IDLE");
@@ -238,7 +239,7 @@ export default function PlayerAvatar3D({ id, locked, showPill, alphaOnly, onLock
       headGroup.current.rotation.x = clamp(-Math.atan2(b.z - 1.68, bdist) * 0.5, -0.35, 0.3);
     }
 
-    // ---- HyperMotion dual foot-ring ----
+    // ---- dual foot-ring ----
     const sprinting = s.speed_kmh >= 30;
     const isCarrier = telemetry.match.carrier === id;
     const active = locked || isCarrier;
@@ -246,13 +247,15 @@ export default function PlayerAvatar3D({ id, locked, showPill, alphaOnly, onLock
       const vis = active || sprinting;
       ringOuter.current.visible = vis;
       ringInner.current.visible = vis;
-      ringOuter.current.rotation.z += delta * 2.2;
-      ringInner.current.rotation.z -= delta * 3.1;
-      const pulse = 0.55 + 0.3 * Math.sin(t * 5);
-      ringMatA.current.opacity = vis ? (active ? pulse : 0.35) : 0;
-      ringMatB.current.opacity = vis ? (active ? pulse * 0.9 : 0.3) : 0;
-      ringMatA.current.color.setHex(active ? 0xffc24d : sprinting ? 0xff1e56 : teamHex);
-      ringMatB.current.color.setHex(active ? 0x00f0ff : sprinting ? 0xff1e56 : teamHex);
+      if (vis) {
+        ringOuter.current.rotation.z += delta * 2.2;
+        ringInner.current.rotation.z -= delta * 3.1;
+        const pulse = 0.55 + 0.3 * Math.sin(t * 5);
+        ringMatA.current.opacity = active ? pulse : 0.35;
+        ringMatB.current.opacity = active ? pulse * 0.9 : 0.3;
+        ringMatA.current.color.setHex(active ? 0xffc24d : sprinting ? 0xff1e56 : teamHex);
+        ringMatB.current.color.setHex(active ? 0x00f0ff : sprinting ? 0xff1e56 : teamHex);
+      }
     }
 
     // ---- vision cone ----
@@ -262,7 +265,7 @@ export default function PlayerAvatar3D({ id, locked, showPill, alphaOnly, onLock
       mat.opacity = 0.04 + Math.min(0.1, s.speed_kmh * 0.012);
     }
 
-    // ---- PlayStyle+ plumbob ----
+    // ---- signature-trait plumbob ----
     if (plumbob.current && plumbobMat.current) {
       const badge = s.playstyle_badge;
       const vis = locked || isCarrier || !!badge;
@@ -273,19 +276,21 @@ export default function PlayerAvatar3D({ id, locked, showPill, alphaOnly, onLock
         plumbobMat.current.color.setHex(
           locked ? 0xffc24d
           : isCarrier ? 0x00f0ff
-          : badge === "INTERCEPT+" ? 0xff1e56
-          : badge === "INCISIVE_PASS+" ? 0x00f0ff
+          : badge === "INTERCEPT" ? 0xff1e56
+          : badge === "INCISIVE_PASS" ? 0x00f0ff
           : 0xffc24d
         );
         plumbobMat.current.emissiveIntensity = 1.6 + Math.sin(t * 6) * 0.5;
       }
     }
 
-    // ---- live pill values ----
-    if (pillSpeed.current) pillSpeed.current.textContent = `${s.speed_kmh.toFixed(1)} km/h`;
-    if (pillPdr.current) {
-      const pdr = telemetry.pdrByPlayer.get(id);
-      pillPdr.current.textContent = pdr != null ? `PDR ${pdr.toFixed(0)}%` : "—";
+    if (now - pillAt.current >= 100) {
+      pillAt.current = now;
+      if (pillSpeed.current) pillSpeed.current.textContent = `${s.speed_kmh.toFixed(1)} km/h`;
+      if (pillPdr.current) {
+        const pdr = telemetry.pdrByPlayer.get(id);
+        pillPdr.current.textContent = pdr != null ? `PDR ${pdr.toFixed(0)}%` : "—";
+      }
     }
   });
 
@@ -342,13 +347,13 @@ export default function PlayerAvatar3D({ id, locked, showPill, alphaOnly, onLock
           <group ref={leftShoulder} position={[-0.31, 0.44, 0]}>
             <mesh geometry={UPPER_ARM_GEO} material={mats.kit} position={[0, -0.17, 0]} castShadow />
             <group ref={leftElbow} position={[0, -0.34, 0]}>
-              <mesh geometry={FOREARM_GEO} material={skinMat} position={[0, -0.14, 0]} castShadow />
+              <mesh geometry={FOREARM_GEO} material={skinMat} position={[0, -0.14, 0]} />
             </group>
           </group>
           <group ref={rightShoulder} position={[0.31, 0.44, 0]}>
             <mesh geometry={UPPER_ARM_GEO} material={mats.kit} position={[0, -0.17, 0]} castShadow />
             <group ref={rightElbow} position={[0, -0.34, 0]}>
-              <mesh geometry={FOREARM_GEO} material={skinMat} position={[0, -0.14, 0]} castShadow />
+              <mesh geometry={FOREARM_GEO} material={skinMat} position={[0, -0.14, 0]} />
             </group>
           </group>
         </group>
@@ -358,19 +363,19 @@ export default function PlayerAvatar3D({ id, locked, showPill, alphaOnly, onLock
           <mesh geometry={THIGH_GEO} material={mats.shorts} position={[0, -0.23, 0]} castShadow />
           <group ref={leftKnee} position={[0, -0.46, 0]}>
             <mesh geometry={CALF_GEO} material={mats.sock} position={[0, -0.21, 0]} castShadow />
-            <mesh geometry={BOOT_GEO} material={bootMat} position={[0, -0.42, 0.05]} castShadow />
+            <mesh geometry={BOOT_GEO} material={bootMat} position={[0, -0.42, 0.05]} />
           </group>
         </group>
         <group ref={rightHip} position={[0.12, 0.92, 0]}>
           <mesh geometry={THIGH_GEO} material={mats.shorts} position={[0, -0.23, 0]} castShadow />
           <group ref={rightKnee} position={[0, -0.46, 0]}>
             <mesh geometry={CALF_GEO} material={mats.sock} position={[0, -0.21, 0]} castShadow />
-            <mesh geometry={BOOT_GEO} material={bootMat} position={[0, -0.42, 0.05]} castShadow />
+            <mesh geometry={BOOT_GEO} material={bootMat} position={[0, -0.42, 0.05]} />
           </group>
         </group>
       </group>
 
-      {/* ======== HyperMotion AR layer (always visible, even in alpha) ======== */}
+      {/* ======== AR layer (always visible, even in alpha) ======== */}
       <mesh ref={ringOuter} geometry={FOOT_RING_OUTER_GEO} position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <meshBasicMaterial ref={ringMatA} transparent opacity={0.6} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
@@ -387,7 +392,7 @@ export default function PlayerAvatar3D({ id, locked, showPill, alphaOnly, onLock
       {/* smart-culled floating telemetry pill (max ~4 live at once) */}
       {showPill && (
         <Html center distanceFactor={26} position={[0, 2.15, 0]} zIndexRange={[20, 0]}>
-          <div className="clip-ea pointer-events-none flex items-center gap-2 border border-white/25 bg-slate-950/80 px-2.5 py-1 backdrop-blur-md"
+          <div className="clip-ea pointer-events-none flex items-center gap-2 border border-white/25 bg-slate-950/80 px-2.5 py-1"
             style={{ boxShadow: "0 4px 18px rgba(0,0,0,0.5)" }}>
             <span className="font-display text-[15px] leading-none text-white">#{num} {name}</span>
             <span ref={pillSpeed} className="font-tech text-[12px] font-bold leading-none text-tactical">0.0 km/h</span>
@@ -398,3 +403,5 @@ export default function PlayerAvatar3D({ id, locked, showPill, alphaOnly, onLock
     </group>
   );
 }
+
+export default memo(PlayerAvatar3D);

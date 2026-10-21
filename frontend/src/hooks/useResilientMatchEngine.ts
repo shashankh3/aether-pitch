@@ -6,9 +6,9 @@ import type {
 } from "@/lib/types";
 import { telemetry } from "@/lib/telemetry";
 import { EdgeEngine } from "@/lib/edgeEngine";
+import { API_BASE } from "@/lib/api";
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws";
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export interface ResilientStudioState {
   connected: boolean;
@@ -112,7 +112,7 @@ export function useResilientMatchEngine(): ResilientStudioState {
       ws.onopen = () => {
         if (disposed) return;
         setConnected(true);
-        setStatus("CONNECTED_AZURE_LIVE");
+        setStatus("CONNECTED_PIPELINE_LIVE");
         stopEdge();
       };
 
@@ -222,7 +222,7 @@ export function useResilientMatchEngine(): ResilientStudioState {
 
   const sendScenario = useCallback(async (name: string) => {
     try {
-      const response = await fetch(`${API_URL}/api/scenario/${name}`, { method: "POST" });
+      const response = await fetch(`${API_BASE}/api/scenario/${name}`, { method: "POST" });
       if (!response.ok) throw new Error(`scenario HTTP ${response.status}`);
     } catch {
       if (name === "halftime_recap") return;

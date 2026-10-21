@@ -12,8 +12,8 @@ Per-player telemetry (10Hz):
                   when idle, with shortest-arc smoothing
   pose_state    — KICK (0.5s after pass/shot) > SPRINT (>= 28 km/h) >
                   PRESS (within 5 m of the carrier) > JOG (>= 3 km/h) > IDLE
-  playstyle_badge — RAPID+ (>= 30 km/h) computed here; INCISIVE_PASS+ and
-                  INTERCEPT+ are pushed in by the orchestrator (Stage b/c)
+  playstyle_badge — RAPID (>= 30 km/h) computed here; INCISIVE_PASS and
+                  INTERCEPT are pushed in by the orchestrator (Stage b/c)
 
 Ball telemetry: x, y, z, vx, vy, vz, speed_kmh, pass_start, pass_end,
                 is_lofted (long balls / shots arc at 6.5 m, passes at 1.2 m)
@@ -25,7 +25,7 @@ TACTICAL_INVERSION, SCENARIO_END.
 "God Mode" injection: chaos_counter | high_press_turnover | tactical_inversion.
 
 100% synthetic: no real clubs, players, or proprietary tracking data.
-Clubs: North London Athletic (NLA, crimson/gold) vs Manchester Cityscape
+Clubs: North Larchmont Athletic (NLA, crimson/gold) vs Meridian City SC (MCS, cyan/navy)
 (MCS, electric cyan/navy).
 """
 from __future__ import annotations
@@ -386,9 +386,9 @@ class PitchForgeEngine:
         target = self.events if self._in_tick else self._pending_events
         target.append(ev)
 
-    # --------------------------------------------- PlayStyle+ badge registry
+    # --------------------------------------------- Signature-trait badge registry
     def set_badge(self, pids: List[str], name: str, duration_s: float) -> None:
-        """Orchestrator pushes INCISIVE_PASS+ / INTERCEPT+ badges here."""
+        """Orchestrator pushes INCISIVE_PASS / INTERCEPT badges here."""
         expire = self.t_match + duration_s
         for pid in pids:
             if pid in self.by_id:
@@ -820,7 +820,7 @@ class PitchForgeEngine:
         if active and active[1] > self.t_match:
             return active[0]
         if p.speed_kmh >= SPRINT_THRESHOLD_KMH:
-            return "RAPID+"
+            return "RAPID"
         return None
 
     def clock(self) -> str:

@@ -1,6 +1,6 @@
 "use client";
 // AETHER PITCH v4.0 — "The 12th Man" bi-directional agentic studio co-pilot.
-// Judges ask tactical questions (typed or spoken); the multi-agent backend
+// Judges ask tactical questions (typed or spoken); the triage + narrative backend
 // reasons over the live 60s spatial buffer and returns a scene_directive that
 // physically drives the 3D camera, spotlight beams, offside wall, compactness
 // mesh and ghost replay — plus localized answers and a 15s commentator cue.
@@ -10,8 +10,7 @@ import { Clapperboard, Film, Mic, X, Zap, Camera, Send, Sparkles, Loader2 } from
 import type { Insight, LangCode, Recap, StudioQueryResponse } from "@/lib/types";
 import { useSpeechController } from "@/hooks/useSpeechController";
 import { useModalA11y } from "@/lib/useModalA11y";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_BASE } from "@/lib/api";
 
 interface Props {
   latest: Insight | null;
@@ -64,7 +63,7 @@ export default function StudioProducer({
     setBusy(true);
     setResponse(null);
     try {
-      const r = await fetch(`${API_URL}/api/studio-query`, {
+      const r = await fetch(`${API_BASE}/api/studio-query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: q, language: lang, persona: "analyst", locked_player_id: lockedId }),
@@ -226,7 +225,7 @@ export default function StudioProducer({
             <div className="scroll-slim mt-1.5 max-h-[210px] overflow-y-auto border border-tactical/30 bg-tactical/[0.06] p-2 clip-chamfer">
               {busy && !response && (
                 <div className="flex items-center gap-1.5 font-tech text-[10px] font-bold uppercase tracking-wider text-tactical">
-                  <Loader2 size={11} className="animate-spin" /> Azure AI Foundry agents reasoning over 60s spatial buffer…
+                  <Loader2 size={11} className="animate-spin" /> Azure AI Foundry models reasoning over 60s spatial buffer…
                 </div>
               )}
               {response && (

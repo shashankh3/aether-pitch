@@ -176,7 +176,7 @@ function PassingNetwork() {
           zIndexRange={[12, 0]}
         >
           <div
-            className="pointer-events-none whitespace-nowrap border border-white/25 bg-slate-950/80 px-1.5 py-0.5 font-tech text-[9px] font-bold tracking-wide backdrop-blur-md"
+            className="pointer-events-none whitespace-nowrap border border-white/25 bg-slate-950/80 px-1.5 py-0.5 font-tech text-[9px] font-bold tracking-wide"
             style={{ color: link.team === "NLA" ? "#FF4D7D" : "#3DF5FF" }}
           >
             {link.count}x · {link.deltaXt >= 0 ? "+" : ""}{link.deltaXt.toFixed(2)} xT

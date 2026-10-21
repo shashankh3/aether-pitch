@@ -1,7 +1,7 @@
 """
 AETHER PITCH — Stage (c): Causal Explainability via Multi-Model Routing
 =======================================================================
-Azure AI Foundry multi-agent router:
+Azure AI Foundry-hosted two-stage router:
 
   * Fast Triage Agent      (gpt-4o-mini / Phi-3.5-mini) — classifies the
     tactical archetype in <250ms.

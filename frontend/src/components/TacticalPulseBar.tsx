@@ -7,6 +7,8 @@ import type { Metrics } from "@/lib/types";
 
 interface Props {
   metrics: Metrics | null;
+  /** compact chip for STUDIO mode: gauge + state, no waveform / segment bar */
+  compact?: boolean;
 }
 
 const SEGS = 24;
@@ -35,7 +37,7 @@ function Sparkline({ history }: { history: number[] }) {
   );
 }
 
-export default function TacticalPulseBar({ metrics }: Props) {
+export default function TacticalPulseBar({ metrics, compact = false }: Props) {
   const chaos = metrics?.chaos_index ?? 0;
   const state = metrics?.chaos_state ?? "BALANCED RHYTHM";
   const critical = chaos > 0.68;
@@ -44,6 +46,35 @@ export default function TacticalPulseBar({ metrics }: Props) {
   const runway = critical
     ? Math.max(0, Math.round((chaos - 0.68) * 45))
     : 0;
+
+  if (compact) {
+    return (
+      <div
+        className={`clip-skew panel-lux panel-enter pointer-events-auto flex items-center gap-2 border px-2.5 py-1 backdrop-blur-xl ${
+          critical ? "animate-pulse-crimson border-crimson/60" : "border-white/15"
+        }`}
+        title="Tactical Pulse · Control vs Chaos"
+      >
+        <span className="font-display text-[9px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+          Pulse
+        </span>
+        <span
+          className={`font-tech text-[16px] font-bold leading-none ${
+            critical ? "text-crimson text-glow-crimson" : "text-tactical text-glow-cyan"
+          }`}
+        >
+          {chaos.toFixed(2)}
+        </span>
+        {critical ? (
+          <span className="clip-skew animate-breathe bg-crimson/25 px-1.5 py-0.5 font-tech text-[9px] font-bold uppercase tracking-[0.14em] text-crimson">
+            ⚡ Counter-Attack · {runway}s
+          </span>
+        ) : (
+          <span className="font-tech text-[9.5px] uppercase tracking-[0.16em] text-slate-500">{state}</span>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div

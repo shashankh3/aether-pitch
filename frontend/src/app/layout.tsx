@@ -33,7 +33,7 @@ export const metadata: Metadata = {
     template: "%s · AETHER PITCH",
   },
   description:
-    "A cinematic 3D WebGL football broadcast: articulated avatars, autonomous camera direction, volumetric AR tactics, DVR telestration and a 5-stage Azure AI pipeline over 100% synthetic 10 Hz telemetry.",
+    "A cinematic 3D WebGL football broadcast: articulated avatars, autonomous camera direction, volumetric AR tactics, DVR telestration and an Azure-ready 5-stage AI pipeline over 100% synthetic 10 Hz telemetry.",
   applicationName: "AETHER PITCH",
   keywords: [
     "3D football broadcast", "WebGL", "React Three Fiber", "Azure AI Foundry",
@@ -46,13 +46,13 @@ export const metadata: Metadata = {
     siteName: "AETHER PITCH",
     title: "AETHER PITCH — Cinematic 3D Football Broadcast & AI Studio",
     description:
-      "A cinematic 3D WebGL football broadcast with autonomous cameras, volumetric AR and a 5-stage Azure AI pipeline.",
+      "A cinematic 3D WebGL football broadcast with autonomous cameras, volumetric AR and an Azure-ready 5-stage AI pipeline.",
   },
   twitter: {
     card: "summary",
     title: "AETHER PITCH — Cinematic 3D Football Broadcast & AI Studio",
     description:
-      "A cinematic 3D WebGL football broadcast with autonomous cameras, volumetric AR and a 5-stage Azure AI pipeline.",
+      "A cinematic 3D WebGL football broadcast with autonomous cameras, volumetric AR and an Azure-ready 5-stage AI pipeline.",
   },
   robots: { index: true, follow: true },
 };

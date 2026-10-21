@@ -69,7 +69,7 @@ export default function RecapPassTubes({ arc }: { arc: RecapPassArc | null }) {
         distanceFactor={48}
         zIndexRange={[20, 0]}
       >
-        <div className="pointer-events-none whitespace-nowrap border border-gold/60 bg-slate-950/85 px-2 py-0.5 font-tech text-[10px] font-bold tracking-wide text-gold backdrop-blur-md">
+        <div className="pointer-events-none whitespace-nowrap border border-gold/60 bg-slate-950/85 px-2 py-0.5 font-tech text-[10px] font-bold tracking-wide text-gold">
           ACTUAL BALL
         </div>
       </Html>
@@ -79,7 +79,7 @@ export default function RecapPassTubes({ arc }: { arc: RecapPassArc | null }) {
         distanceFactor={48}
         zIndexRange={[20, 0]}
       >
-        <div className="pointer-events-none whitespace-nowrap border border-tactical/60 bg-slate-950/85 px-2 py-0.5 font-tech text-[10px] font-bold tracking-wide text-tactical backdrop-blur-md">
+        <div className="pointer-events-none whitespace-nowrap border border-tactical/60 bg-slate-950/85 px-2 py-0.5 font-tech text-[10px] font-bold tracking-wide text-tactical">
           GHOST LANE {arc.deltaXt >= 0 ? "+" : ""}{arc.deltaXt.toFixed(3)} xT
           {arc.targetId ? ` · ${arc.targetId}` : ""}
         </div>

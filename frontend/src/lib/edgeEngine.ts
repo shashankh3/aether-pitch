@@ -345,7 +345,7 @@ export class EdgeEngine {
           tactical_note: ghost
             ? `Optimal alternative was ${ghost.target_id ?? "a free man"} (+${ghost.delta_xt.toFixed(2)} xT, ${(ghost.openness_m ?? 0).toFixed(0)}m of space) vs ${dxt.toFixed(2)} on the actual ball.`
             : `No higher-value option available — the executed ball was already the spatial optimum.`,
-          metric_focus_note: "EDGE AUTONOMOUS ENGINE: full metric set unavailable while Azure reconnects.",
+          metric_focus_note: "EDGE AUTONOMOUS ENGINE: full metric set unavailable while the backend reconnects.",
         },
         casual_fan_mode: { story_card: story, excitement_rating: Math.round(clamp(52 + metrics.chaos_index * 40 + pdr * 0.08, 44, 99)) },
         player_lock_insight: event.player_id
@@ -669,12 +669,12 @@ export class EdgeEngine {
 
   private updateBadges(): void {
     for (const p of this.players) {
-      p.badge = p.speedKmh >= 30 ? "RAPID+" : null;
+      p.badge = p.speedKmh >= 30 ? "RAPID" : null;
     }
     if (this.scenarioName === "chaos_counter") {
       const p = this.byId.get("NLA_7");
       if (p) {
-        p.badge = "RAPID+";
+        p.badge = "RAPID";
         p.stamina = clamp(p.stamina - 0.004, 42, 100);
       }
     }

@@ -3,6 +3,8 @@ __pycache__/
 *.pyc
 .venv/
 .env
+.env.local
+.env.*.local
 
 # Node / Next.js
 node_modules/
@@ -13,3 +15,4 @@ out/
 # Misc
 *.log
 .DS_Store
+.zcode/

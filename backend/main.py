@@ -5,7 +5,7 @@ Runs the full 5-stage pipeline on one event loop and broadcasts over WebSocket:
 
   Stage (a) Ingest     — PitchForge 10Hz synthetic tracking + auto-events
   Stage (b) Interpret  — deterministic math: Chaos Index, PDR, ΔxT, ghost passes
-  Stage (c) Explain    — Azure AI Foundry multi-agent causal reasoning (fallback: local)
+  Stage (c) Explain    — Azure AI Foundry-hosted triage + narrative reasoning (fallback: local)
   Stage (d) Render     — time-coded broadcast overlay packets
   Stage (e) Personalize— analyst/casual fork + EN/ES/AR/HI localization
 
@@ -376,17 +376,17 @@ async def match_loop() -> None:
             ev["id"] = f"evt_{event_seq:06d}"
             enriched.append(ev)
 
-        # PlayStyle+ badge registry: INCISIVE_PASS+ / INTERCEPT+ from Stage (b/c)
+        # Signature-trait badge registry: INCISIVE_PASS / INTERCEPT from Stage (b/c)
         for ev in enriched:
             if ev.get("type") == "PASS":
                 if (ev.get("pdr") or 0) > 80 and ev.get("player_id"):
-                    engine.set_badge([ev["player_id"]], "INCISIVE_PASS+", 4.0)
+                    engine.set_badge([ev["player_id"]], "INCISIVE_PASS", 4.0)
                 ghost = ev.get("ghost_pass")
                 if ghost:
                     last_ghost = (state["t_match"] + 4.0, [ghost["x"], ghost["y"]],
                                   ghost.get("delta_xt", 0.0))
             elif ev.get("type") == "PRESSURE_TRAP" and ev.get("players"):
-                engine.set_badge(list(ev["players"])[:3], "INTERCEPT+", 4.0)
+                engine.set_badge(list(ev["players"])[:3], "INTERCEPT", 4.0)
         if last_ghost and state["t_match"] < last_ghost[0]:
             state["ball"]["ghost_end"] = last_ghost[1]
             state["ball"]["ghost_delta_xt"] = round(last_ghost[2], 3)
@@ -587,9 +587,9 @@ async def health() -> dict:
         "status": "ok",
         "stages": {
             "a": "local-pitchforge", "b": "local-numpy",
-            "c": f"azure-foundry:{settings.narrative_deployment}" if settings.azure_enabled
+            "c": f"azure-openai:{settings.narrative_deployment}" if settings.azure_enabled
                  else "deterministic-fallback",
-            "d": "azure-webpubsub" if settings.webpubsub_enabled else "local-websocket",
+            "d": "local-websocket",
             "e": "azure-translator" if settings.translator_enabled else "deterministic-atlas",
         },
         "clients": len(hub.clients),

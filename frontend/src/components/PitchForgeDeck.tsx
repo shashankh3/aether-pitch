@@ -1,20 +1,17 @@
 "use client";
 // AETHER PITCH — PitchForge "God Mode" deck: chamfered judge scenario buttons
 // with live scenario countdown, scan-line sheen and activation glow.
+// variant="dock" renders the compact segment embedded in the unified bottom
+// dock; variant="deck" keeps the legacy standalone footer.
 
 import { Zap, ShieldAlert, Shuffle, Clapperboard, Loader2 } from "lucide-react";
 import type { MatchTick } from "@/lib/types";
-
-interface Props {
-  tick: MatchTick | null;
-  busy: string | null;
-  onInject: (name: string) => void;
-}
 
 const SCENARIOS = [
   {
     id: "chaos_counter",
     label: "33km/h Chaos Counter",
+    short: "Chaos Counter",
     detail: "⚡ 3v2 overload · line-breaking pass · AI cam swoop",
     icon: <Zap size={16} />,
     accent: "#FF1E56",
@@ -23,6 +20,7 @@ const SCENARIOS = [
   {
     id: "high_press_turnover",
     label: "High-Press Trap",
+    short: "Press Trap",
     detail: "🎯 52 m line · forced turnover outside the box",
     icon: <ShieldAlert size={16} />,
     accent: "#FFC24D",
@@ -31,6 +29,7 @@ const SCENARIOS = [
   {
     id: "tactical_inversion",
     label: "Invert Right Fullback",
+    short: "Inversion",
     detail: "📐 60 s inversion · reshapes control polygons",
     icon: <Shuffle size={16} />,
     accent: "#00F0FF",
@@ -39,6 +38,7 @@ const SCENARIOS = [
   {
     id: "halftime_recap",
     label: "Studio Match Recap",
+    short: "Recap",
     detail: "🎬 top-3 causal inflections · 4 languages",
     icon: <Clapperboard size={16} />,
     accent: "#00FF85",
@@ -46,9 +46,69 @@ const SCENARIOS = [
   },
 ];
 
-export default function PitchForgeDeck({ tick, busy, onInject }: Props) {
+interface Props {
+  tick: MatchTick | null;
+  busy: string | null;
+  onInject: (name: string) => void;
+  /** "deck": legacy standalone footer · "dock": compact segment of the unified bottom dock */
+  variant?: "deck" | "dock";
+}
+
+export default function PitchForgeDeck({ tick, busy, onInject, variant = "deck" }: Props) {
   const active = tick?.scenario ?? null;
   const left = tick?.scenario_left ?? null;
+
+  if (variant === "dock") {
+    return (
+      <div className="flex shrink-0 items-center gap-1" role="group" aria-label="God-Mode scenario injector">
+        {SCENARIOS.map((s, i) => {
+          const isActive = active === s.id;
+          const isBusy = busy === s.id;
+          const progress =
+            isActive && s.duration > 0 && left != null
+              ? Math.max(0, Math.min(1, left / s.duration))
+              : 0;
+          return (
+            <button
+              key={s.id}
+              onClick={() => onInject(s.id)}
+              disabled={!!busy}
+              aria-label={`${s.label} (key ${i + 1})`}
+              title={`${s.detail} · shortcut ${i + 1}`}
+              className={`clip-skew relative flex min-w-0 flex-1 items-center justify-center gap-1 overflow-hidden border px-2 py-1.5 font-tech text-[10px] font-bold uppercase tracking-wider transition disabled:opacity-60 ${
+                isActive ? "text-white" : "border-white/10 bg-white/[0.02] text-slate-400 hover:text-white"
+              }`}
+              style={
+                isActive
+                  ? { background: `${s.accent}30`, border: `1px solid ${s.accent}`, color: s.accent, boxShadow: `0 0 14px ${s.accent}44` }
+                  : undefined
+              }
+            >
+              {/* countdown drain */}
+              {isActive && s.duration > 0 && (
+                <span
+                  className="absolute bottom-0 left-0 h-[3px] transition-all duration-300"
+                  style={{ width: `${progress * 100}%`, background: s.accent, boxShadow: `0 0 8px ${s.accent}` }}
+                />
+              )}
+              <span className="relative z-10 shrink-0">
+                {isBusy ? <Loader2 size={12} className="animate-spin" /> : s.icon}
+              </span>
+              <span className="relative z-10 hidden truncate min-[1440px]:inline">{s.short}</span>
+              <kbd className="relative z-10 hidden border border-white/15 px-1 py-px text-[8px] text-slate-500 min-[1440px]:inline">
+                {i + 1}
+              </kbd>
+              {isActive && s.duration > 0 && (
+                <span className="relative z-10 font-tech text-[10px]" style={{ color: s.accent }}>
+                  {Math.ceil(left ?? 0)}s
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <footer className="relative z-20 flex min-h-[70px] shrink-0 items-center gap-2 border-t border-white/10 bg-gradient-to-b from-[#0A101C] to-[#070B13] px-3">

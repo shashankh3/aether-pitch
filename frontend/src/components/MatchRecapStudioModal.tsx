@@ -5,11 +5,10 @@ import {
   Clapperboard, Download, Loader2, Play, RefreshCw, Sparkles, X,
 } from "lucide-react";
 import { useModalA11y } from "@/lib/useModalA11y";
+import { API_BASE } from "@/lib/api";
 import type {
   LangCode, MatchEvent, MatchRecapStoryboard, MatchTick, RecapAct,
 } from "@/lib/types";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 interface Props {
   open: boolean;
@@ -122,7 +121,7 @@ export default function MatchRecapStudioModal({
     const controller = new AbortController();
     setLoading(true);
     setError(null);
-    fetch(`${API_URL}/api/match-recap`, { signal: controller.signal })
+    fetch(`${API_BASE}/api/match-recap`, { signal: controller.signal })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json() as Promise<MatchRecapStoryboard>;
@@ -133,7 +132,7 @@ export default function MatchRecapStudioModal({
       .catch(() => {
         if (cancelled || controller.signal.aborted) return;
         setData(fallbackStoryboard(live.current.tick, live.current.events));
-        setError("Azure storyboard unreachable — showing the edge-generated 3-act cut.");
+        setError("Storyboard service unreachable — showing the edge-generated 3-act cut.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

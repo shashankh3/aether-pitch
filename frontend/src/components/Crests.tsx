@@ -3,7 +3,7 @@
 
 export function NLACrest({ size = 26 }: { size?: number }) {
   return (
-    <svg width={size} height={size * 1.08} viewBox="0 0 40 44" aria-label="North London Athletic crest">
+    <svg width={size} height={size * 1.08} viewBox="0 0 40 44" aria-label="North Larchmont Athletic crest">
       <defs>
         <linearGradient id="nla-g" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stopColor="#FF4D6E" />
@@ -26,7 +26,7 @@ export function NLACrest({ size = 26 }: { size?: number }) {
 
 export function MCSCrest({ size = 26 }: { size?: number }) {
   return (
-    <svg width={size} height={size * 1.08} viewBox="0 0 40 44" aria-label="Manchester Cityscape crest">
+    <svg width={size} height={size * 1.08} viewBox="0 0 40 44" aria-label="Meridian City SC crest">
       <defs>
         <linearGradient id="mcs-g" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stopColor="#7DD3FC" />

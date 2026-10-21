@@ -1,7 +1,7 @@
 "use client";
-// AETHER PITCH v2.0 — PlayerLock 360: EA FC 27 Ultimate-Team style
+// AETHER PITCH v2.0 — PlayerLock 360: collectible-card style
 // telemetry hologram card. Quick-roster strip + 3D pitch click-to-lock,
-// kit silhouette with PlayStyle+ hex badge, radial speedometer with 30 km/h
+// kit silhouette with signature-trait hex badge, radial speedometer with 30 km/h
 // overdrive zone, stamina / PDR / ΔxT chips and localized live voice synthesis.
 
 import { useMemo } from "react";
@@ -86,9 +86,9 @@ function KitSilhouette({ player }: { player: PlayerTick }) {
 }
 
 function HexBadge({ badge }: { badge: string }) {
-  const color = badge === "INTERCEPT+" ? "#FF1E56" : badge === "INCISIVE_PASS+" ? "#00F0FF" : "#FFC24D";
+  const color = badge === "INTERCEPT" ? "#FF1E56" : badge === "INCISIVE_PASS" ? "#00F0FF" : "#FFC24D";
   return (
-    <div className="relative flex h-[44px] w-[44px] items-center justify-center" title={`PlayStyle+ ${badge}`}>
+    <div className="relative flex h-[44px] w-[44px] items-center justify-center" title={`Signature trait ${badge}`}>
       <svg viewBox="0 0 44 44" className="absolute inset-0">
         <polygon points="22,2 40,12 40,32 22,42 4,32 4,12" fill={`${color}22`} stroke={color} strokeWidth="2" />
       </svg>
@@ -177,7 +177,7 @@ export default function PlayerLock360({ tick, lockedId, onLock, events, lang, in
         {!player && (
           <p className="flex items-center gap-2 py-2 text-[12px] text-slate-500">
             <Lock size={13} className="text-slate-600" />
-            Click any 3D avatar — or pick from the roster — to lock the HyperMotion telemetry hologram.
+            Click any 3D avatar — or pick from the roster — to lock the biomechanical telemetry hologram.
           </p>
         )}
 
@@ -196,8 +196,8 @@ export default function PlayerLock360({ tick, lockedId, onLock, events, lang, in
                   {player.team} · {player.role} · #{player.shirt_number}
                 </div>
                 <div className="mt-1 flex items-center gap-2">
-                  {(player.playstyle_badge || (sprinting && "RAPID+")) && (
-                    <HexBadge badge={player.playstyle_badge ?? "RAPID+"} />
+                  {(player.playstyle_badge || (sprinting && "RAPID")) && (
+                    <HexBadge badge={player.playstyle_badge ?? "RAPID"} />
                   )}
                   {sprinting && (
                     <span className="flex items-center gap-1 bg-crimson/20 px-1.5 py-0.5 font-tech text-[10px] font-bold text-crimson">

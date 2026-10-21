@@ -2,7 +2,7 @@
 
 # AETHER PITCH
 
-**A real-time 3D football broadcast studio driven by 100% synthetic telemetry and a deterministic five-stage Azure AI pipeline.**
+**A real-time 3D football broadcast studio driven by 100% synthetic telemetry and a deterministic five-stage AI pipeline with optional Azure AI Foundry reasoning.**
 
 [![Next.js](https://img.shields.io/badge/Next.js-14-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
 [![React Three Fiber](https://img.shields.io/badge/React%20Three%20Fiber-8-61DAFB?logo=react&logoColor=black)](https://docs.pmnd.rs/react-three-fiber)
@@ -19,7 +19,9 @@
 
 AETHER PITCH turns a deterministic synthetic football match into a broadcast-grade, interactive 3D experience in the browser. A 10 Hz FastAPI engine drives 22 articulated players, tactical overlays, a 15-second DVR, AI commentary, and per-fan personalization. Every club, player, crest, and tracking sample is synthetic.
 
-The project was built for the **Premier League × Microsoft Azure "Inside the Game" hackathon**. Azure services are optional: without credentials, every stage falls back to a deterministic local implementation, so the full studio runs offline. For the full architecture, mathematical appendix, and demo script, see [SUBMISSION_GUIDE.md](SUBMISSION_GUIDE.md).
+The project was built for the **Microsoft Premier League Hackathon ("Inside the Game")**. Azure services are optional: without credentials, every stage falls back to a deterministic local implementation, so the full studio runs offline. For the full architecture, mathematical appendix, sub-two-minute demo script, and Official Rules checklist, see [SUBMISSION_GUIDE.md](SUBMISSION_GUIDE.md).
+
+**The problem:** a live match produces thousands of events, but analysts, casual fans, and broadcasters each need a different explanation, in the language and context they care about, without waiting on a studio. **The solution:** AETHER PITCH ingests synthetic 10 Hz telemetry, interprets it with deterministic football math, explains key moments with Azure AI Foundry-hosted models, renders synchronized 3D/AR overlays, and personalizes the same moment by persona, metric, club, player, and language.
 
 ## Highlights
 
@@ -28,7 +30,7 @@ The project was built for the **Premier League × Microsoft Azure "Inside the Ga
 - **Explainable analytics** — Pass Difficulty Rating, Expected Threat, Ghost Pass, Chaos Index, pressing metrics, and defensive line analysis.
 - **Fan runtime** — persona modes, metric locking, club bias, locked players, and EN/ES/AR/HI commentary without restarting the stream.
 - **Studio-grade interactions** — focus-managed dialogs, Escape/outside-click dismissal, ARIA live regions, reduced-motion support, and a responsive mobile production dock.
-- **Resilient by design** — a 10 Hz browser edge engine takes over if the WebSocket or Azure pipeline drops, then hot-swaps back when it returns.
+- **Resilient by design** — a 10 Hz browser edge engine takes over if the WebSocket or backend pipeline drops, then hot-swaps back when it returns.
 
 ## Contents
 
@@ -51,7 +53,7 @@ The project was built for the **Premier League × Microsoft Azure "Inside the Ga
 
 - **Cinematic night stadium** — procedural mowed turf, regulation markings, goalposts and nets, LED advertising boards, a tiered bowl with roof lighting, 1,600 instanced crowd figures, camera flashes, floodlight beams, twin jumbotrons, stars, moon, and a procedural ball trail.
 - **Camera choreography** — a cinematic intro move, broadcast-grade dynamic field of view, ball-following push, score-impact shake, and clamped Pro Cam / auto-director framing.
-- **22 articulated avatars** with procedural gait, sprint lean, kick animation, goalkeeper stance, jersey numbers, and PlayStyle badges.
+- **22 articulated avatars** with procedural gait, sprint lean, kick animation, goalkeeper stance, jersey numbers, and signature-trait badges.
 - **Four camera modes** — Tele Cam, Pro Cam, Drone Orbit, and Auto-Director. AI camera directives can take over temporarily; a manual camera choice cancels the takeover.
 - **15-second DVR and 3D telestrator** — freeze and scrub live play, inspect sprint/chaos markers, and draw spotlight pillars, an offside wall, a compactness hull, ghost-ball replays, and tactical arrows.
 - **Tactical layers** — xT threat grid, defensive laser links, parabolic pass tubes, Ghost Pass counterfactuals, pitch-control surface, and passing network.
@@ -63,7 +65,7 @@ The project was built for the **Premier League × Microsoft Azure "Inside the Ga
 
 - **Stage A — ingest:** deterministic 10 Hz PitchForge simulation with 3D pose state, ball physics, event detection, and milestone tracking.
 - **Stage B — interpret:** NumPy tactical math for Chaos Index, PDR, 16 × 12 xT, Ghost Pass, AI gating, leverage, PPDA, and defensive lines.
-- **Stage C — explain:** asynchronous causal narratives and studio answers through Azure AI Foundry / Azure OpenAI, with a local fallback.
+- **Stage C — explain:** asynchronous causal narratives and studio answers through Azure AI Foundry-hosted Azure OpenAI deployments (triage → narrative), with a deterministic local fallback.
 - **Stage D — render:** time-coded overlay packets, highlight zones, and camera directives for the 3D scene.
 - **Stage E — personalize:** analyst/casual/split personas, metric lock, club lens, locked-player context, and localized commentary.
 - **Ask The 12th Man:** ask a tactical question and receive a reasoning chain, localized answer, commentator cue, and a scene directive that moves the camera and overlays.
@@ -115,7 +117,7 @@ The 10 Hz loop never waits on Stage C. Cloud reasoning is dispatched as an async
 |---|---|---|---|
 | **A — Ingest** | Synthetic physics, player/ball state, event and milestone detection | 22 players, ball, pose state, raw events, milestones | Yes, 10 Hz heartbeat |
 | **B — Interpret** | Deterministic NumPy tactical analysis | Chaos, PDR, xT, Ghost Pass, gate, leverage | Yes, sub-millisecond |
-| **C — Explain** | Azure AI Foundry agents and local fallback narratives | Commentary, studio answers, recap acts | No, asynchronous |
+| **C — Explain** | Azure AI Foundry-hosted models (triage → narrative) and local fallback narratives | Commentary, studio answers, recap acts | No, asynchronous |
 | **D — Render** | Broadcast overlay and camera packets | Overlays, highlight zones, camera directives | Yes, cheap |
 | **E — Personalize** | Persona, metric, club, player, and language adaptation | Localized fan story and HUD payload | Yes, cheap |
 
@@ -125,7 +127,7 @@ The 10 Hz loop never waits on Stage C. Cloud reasoning is dispatched as an async
 |---|---|
 | **Frontend** | Next.js 14 (App Router), React 18, TypeScript, React Three Fiber, Three.js, Drei, postprocessing, Tailwind CSS |
 | **Backend** | Python, FastAPI, Uvicorn, NumPy, Pydantic, python-dotenv |
-| **AI and cloud (optional)** | Azure AI Foundry / Azure OpenAI, Azure AI Translator, Azure Web PubSub configuration, Azure Container Apps |
+| **AI and cloud (optional)** | Azure AI Foundry-hosted Azure OpenAI, Azure AI Translator; Docker and an optional Azure Container Apps deployment path |
 | **Delivery** | Docker, Docker Compose, Azure Developer CLI (`azd`), start scripts for Windows and macOS/Linux |
 
 ## Quick Start
@@ -223,8 +225,8 @@ All Azure settings are optional. Without them, the studio runs on deterministic 
 | `AZURE_TRANSLATOR_KEY` | empty | Azure AI Translator key for Stage E |
 | `AZURE_TRANSLATOR_ENDPOINT` | `https://api.cognitive.microsofttranslator.com` | Translator endpoint |
 | `AZURE_TRANSLATOR_REGION` | `global` | Translator region |
-| `AZURE_WEBPUBSUB_CONNECTION_STRING` | empty | Optional Web PubSub configuration; local WebSocket is the default |
-| `AZURE_WEBPUBSUB_HUB` | `aether` | Web PubSub hub name |
+| `AZURE_WEBPUBSUB_CONNECTION_STRING` | empty | Reserved; the shipped hub uses the local WebSocket (Web PubSub is not wired) |
+| `AZURE_WEBPUBSUB_HUB` | `aether` | Reserved; unused by the shipped hub |
 | `MATCH_START_MINUTE` | `62.0` | Match clock at engine startup |
 | `AETHER_SEED` | `42` | Deterministic simulation seed |
 | `AETHER_HOST` | `0.0.0.0` | Backend bind address |
@@ -418,7 +420,7 @@ Set `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` to the public backend endpoin
 ## Synthetic Data
 
 - All clubs, players, crests, names, and tracking data are fictional and generated locally.
-- No Opta, StatsBomb, Second Spectrum, broadcast footage, or other proprietary source is used.
+- No proprietary tracking feeds, broadcast footage, or other third-party data sources are used.
 - The simulation is seeded (`AETHER_SEED`) for reproducible runs.
 - This is a hackathon demonstration, not a production match-data or betting system.
 

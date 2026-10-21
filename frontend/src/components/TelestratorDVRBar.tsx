@@ -1,23 +1,84 @@
 "use client";
 // AETHER PITCH v3.0 — TelestratorDVRBar
-// 15-second circular DVR time-machine + telestrator quick actions, docked
-// above the PitchForge deck. The scrubber tick markers show exactly where
+// 15-second circular DVR time-machine + telestrator quick actions, embedded
+// in the unified bottom dock. The scrubber tick markers show exactly where
 // high-chaos spikes / 30+ km/h sprint bursts occurred on the timeline.
+// Tool labels are always visible; the row is also exported standalone for
+// the mobile panel sheet.
 
 import { Pause, Play, Focus, BrickWall, Hexagon, Ghost } from "lucide-react";
 import type { TelestratorState } from "@/lib/types";
 import { telemetry } from "@/lib/telemetry";
 import { cn } from "@/lib/utils";
 
-interface Props {
+interface ToolsProps {
+  telestrator: TelestratorState;
+  onToggleTelestrator: (key: keyof Omit<TelestratorState, "customTacticalArrows" | "spotlightPlayerIds">) => void;
+  onToggleSpotlight: () => void;
+}
+
+export function TelestratorTools({ telestrator, onToggleTelestrator, onToggleSpotlight }: ToolsProps) {
+  const tools = [
+    {
+      key: "spotlight" as const,
+      label: "Spotlight",
+      icon: <Focus size={12} />,
+      active: telestrator.spotlightPlayerIds.length > 0,
+      onClick: onToggleSpotlight,
+      title: "Spotlight Key Players (carrier + nearest presser + ghost receiver; click any 3D player to toggle their beam)",
+    },
+    {
+      key: "showOffsideLaserWall" as const,
+      label: "Offside Wall",
+      icon: <BrickWall size={12} />,
+      active: telestrator.showOffsideLaserWall,
+      onClick: () => onToggleTelestrator("showOffsideLaserWall"),
+      title: "3D Offside / Line Wall",
+    },
+    {
+      key: "showCompactnessPolygon" as const,
+      label: "Block Mesh",
+      icon: <Hexagon size={12} />,
+      active: telestrator.showCompactnessPolygon,
+      onClick: () => onToggleTelestrator("showCompactnessPolygon"),
+      title: "Defensive Block Mesh",
+    },
+    {
+      key: "animateGhostReplay" as const,
+      label: "Ghost Pass",
+      icon: <Ghost size={12} />,
+      active: telestrator.animateGhostReplay,
+      onClick: () => onToggleTelestrator("animateGhostReplay"),
+      title: "Replay Ghost Pass",
+    },
+  ];
+  return (
+    <>
+      {tools.map((t) => (
+        <button
+          key={t.key}
+          onClick={t.onClick}
+          className={cn(
+            "clip-skew flex flex-1 items-center justify-center gap-1 py-1 font-tech text-[9.5px] font-bold uppercase tracking-wider transition",
+            t.active ? "bg-gold/20 text-gold" : "bg-white/[0.03] text-slate-500 hover:text-slate-300"
+          )}
+          title={t.title}
+          aria-pressed={t.active}
+        >
+          {t.icon}
+          {t.label}
+        </button>
+      ))}
+    </>
+  );
+}
+
+interface Props extends ToolsProps {
   isDvrPaused: boolean;
   dvrOffsetTicks: number;
   pausedClock?: string | null;
   onTogglePause: () => void;
   onScrub: (offsetTicks: number) => void;
-  telestrator: TelestratorState;
-  onToggleTelestrator: (key: keyof Omit<TelestratorState, "customTacticalArrows" | "spotlightPlayerIds">) => void;
-  onToggleSpotlight: () => void;
 }
 
 const MAX_BACK = -150; // -15.0 s at 10 Hz
@@ -37,7 +98,8 @@ export default function TelestratorDVRBar({
     .slice(-24);
 
   return (
-    <div className="clip-ea pointer-events-auto border border-white/15 bg-slate-950/85 px-3 py-2 backdrop-blur-xl">
+    <div className="flex min-w-0 flex-1 flex-col gap-1">
+      {/* transport + time-machine scrubber */}
       <div className="flex items-center gap-2">
         <button
           onClick={onTogglePause}
@@ -45,12 +107,12 @@ export default function TelestratorDVRBar({
             "clip-skew flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1 font-tech text-[11px] font-bold uppercase tracking-wider transition",
             isDvrPaused ? "bg-gold/25 text-gold" : "bg-crimson/20 text-crimson hover:bg-crimson/35"
           )}
+          title={isDvrPaused ? "Resume the live 10Hz stream" : "Freeze the feed and telestrate"}
         >
           {isDvrPaused ? <Play size={12} /> : <Pause size={12} />}
-          {isDvrPaused ? "Resume Live" : "Freeze & Telestrate"}
+          {isDvrPaused ? "Resume Live" : "Freeze"}
         </button>
 
-        {/* time-machine scrubber */}
         <div className="relative min-w-0 flex-1 px-1">
           <div className="pointer-events-none absolute inset-x-1 top-0 h-1.5">
             {markers.map(({ i, s }) => (
@@ -84,39 +146,13 @@ export default function TelestratorDVRBar({
         </div>
       </div>
 
-      {/* telestrator quick actions */}
-      <div className="mt-1.5 flex gap-1.5 border-t border-white/10 pt-1.5">
-        <button
-          onClick={onToggleSpotlight}
-          className={cn(
-            "clip-skew flex flex-1 items-center justify-center gap-1 py-1 font-tech text-[9.5px] font-bold uppercase tracking-wider transition",
-            telestrator.spotlightPlayerIds.length > 0
-              ? "bg-gold/20 text-gold"
-              : "bg-white/[0.03] text-slate-500 hover:text-slate-300"
-          )}
-          title="Spotlight Key Players (carrier + nearest presser + ghost receiver; click any 3D player to toggle their beam)"
-        >
-          <Focus size={12} />
-          <span className="hidden 2xl:inline">Spotlight Key Players</span>
-        </button>
-        {([
-          { key: "showOffsideLaserWall" as const, label: "3D Offside / Line Wall", icon: <BrickWall size={12} /> },
-          { key: "showCompactnessPolygon" as const, label: "Defensive Block Mesh", icon: <Hexagon size={12} /> },
-          { key: "animateGhostReplay" as const, label: "Replay Ghost Pass", icon: <Ghost size={12} /> },
-        ]).map((t) => (
-          <button
-            key={t.key}
-            onClick={() => onToggleTelestrator(t.key)}
-            className={cn(
-              "clip-skew flex flex-1 items-center justify-center gap-1 py-1 font-tech text-[9.5px] font-bold uppercase tracking-wider transition",
-              telestrator[t.key] ? "bg-gold/20 text-gold" : "bg-white/[0.03] text-slate-500 hover:text-slate-300"
-            )}
-            title={t.label}
-          >
-            {t.icon}
-            <span className="hidden 2xl:inline">{t.label}</span>
-          </button>
-        ))}
+      {/* telestrator quick actions — labels always visible */}
+      <div className="hidden gap-1.5 border-t border-white/10 pt-1 xl:flex">
+        <TelestratorTools
+          telestrator={telestrator}
+          onToggleTelestrator={onToggleTelestrator}
+          onToggleSpotlight={onToggleSpotlight}
+        />
       </div>
     </div>
   );

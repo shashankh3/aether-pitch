@@ -3,7 +3,7 @@
 // Stage (A/II) Computer-Vision "Auto-Eventing" pipeline viewport: a
 // picture-in-picture simulated optical broadcast feed synchronized with the
 // live 3D match state. Projects the 8 ball-nearest players through a 2D->3D
-// homography onto the frame and draws YOLOv8 + ByteTrack style boxes, skeletal
+// homography onto the frame and draws detector-style boxes, skeletal
 // keypoints, a ball tracker with velocity vector, a toggleable homography
 // calibration grid, and the machine-detected auto-event emission log.
 
@@ -159,7 +159,7 @@ export default function VisionAutoEventerHUD({ events, expandedOverride = null }
         const bw = 40, bh = 54;
         const boxColor = p.speed_kmh >= 30 ? "#00FF85" : p.team === "NLA" ? "#FF1E56" : "#00F0FF";
         const jitter = Math.sin(frame * 0.31 + p.shirt_number) * 1.2;
-        // YOLOv8 + ByteTrack bounding box
+        // detector-style bounding box
         ctx.strokeStyle = boxColor;
         ctx.lineWidth = 1.5;
         ctx.strokeRect(sx - bw / 2 + jitter, sy - bh / 2 + jitter, bw, bh);
@@ -231,7 +231,7 @@ export default function VisionAutoEventerHUD({ events, expandedOverride = null }
       ctx.fillRect(8, Hh - 18, 6, 6);
       ctx.fillStyle = "#E2E8F0";
       ctx.font = "700 9px 'Rajdhani', sans-serif";
-      ctx.fillText(`OPTICAL TRACKING CAM 01 · ${telemetry.match.clock} · YOLOv8+ByteTrack`, 18, Hh - 11);
+      ctx.fillText(`OPTICAL TRACKING CAM 01 · ${telemetry.match.clock} · SYNTHETIC CV`, 18, Hh - 11);
     };
 
     raf = requestAnimationFrame(draw);

@@ -1,7 +1,7 @@
 "use client";
 // AETHER PITCH v2.0 — TwinCast HUD: dual-persona feed (Tactical Analyst vs
-// Casual Fan vs Split TwinCast) with the persona + language switchers living
-// right in the dock, EN/ES/AR/HI localization and live voice synthesis.
+// Casual Fan vs Split TwinCast). The market-language switcher lives in the
+// TopBar; EN/ES/AR/HI localization and live voice synthesis drive the cards.
 
 import { useEffect, useRef } from "react";
 import { Volume2, VolumeX, Gauge, BrainCircuit, Sparkles, Users, Heart, Layers } from "lucide-react";
@@ -17,7 +17,6 @@ interface Props {
   persona: PersonaMode;
   onPersona: (p: PersonaMode) => void;
   lang: LangCode;
-  onLang: (l: LangCode) => void;
   metrics: Metrics | null;
   tick: MatchTick | null;
   latestEvent: MatchEvent | null;
@@ -141,7 +140,7 @@ const PERSONAS: { id: PersonaMode; label: string; icon: React.ReactNode }[] = [
 ];
 
 export default function TwinCastHUD({
-  insights, persona, onPersona, lang, onLang, metrics, tick, latestEvent, metricFocus, clubBias,
+  insights, persona, onPersona, lang, metrics, tick, latestEvent, metricFocus, clubBias,
 }: Props) {
   const { isSpeaking, isVoiceMuted, speakInsight, toggleMute } = useSpeechController();
   const spokenRef = useRef<string>("");
@@ -208,20 +207,8 @@ export default function TwinCastHUD({
             </button>
           ))}
         </div>
-        <div className="mt-1 flex gap-1">
-          {(["en", "es", "ar", "hi"] as LangCode[]).map((l) => (
-            <button
-              key={l}
-              onClick={() => onLang(l)}
-              className={cn(
-                "flex-1 py-0.5 font-tech text-[10px] font-bold uppercase tracking-wider transition",
-                lang === l ? "bg-pitch/20 text-pitch" : "text-slate-500 hover:text-slate-300"
-              )}
-            >
-              {l === "en" ? "EN" : l === "es" ? "ES" : l === "ar" ? "AR" : "HI"}
-            </button>
-          ))}
-        </div>
+        {/* market language lives in the TopBar so one switcher drives every
+            localized surface (TwinCast, co-pilot, recap, Stage-E POST) */}
       </div>
 
       <div className="scroll-slim min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
