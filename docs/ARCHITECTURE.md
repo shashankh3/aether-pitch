@@ -153,12 +153,13 @@ The 3D stage is not an observer feed — it is a sandbox.
 
 | Suite | Command | Covers |
 |---|---|---|
-| Backend | `python backend/test_pipeline.py` | 131 assertions: all five stages, the gate, the trace, the war-room, the counterfactual arbiter, the line shift, the RAI shield, the hub, the compliance audit |
+| Backend | `python backend/test_pipeline.py` | 143 assertions: all five stages, the gate, the trace, the war-room, the counterfactual arbiter, the line shift, the RAI shield, the hub, the retry policy, the compliance audit |
 | ARM | `python infra/validate_template.py` | JSON validity, ARM symbol resolution, dependency integrity, secret handling |
 | Types | `cd frontend && npx tsc --noEmit` | The whole contract surface |
 | Build | `npm run build` | Production compile |
 | SSR | `npm run smoke` | In-process server render, runtime config injection, no SSR error |
-| Logic | `npm run check:logic` | 22 headless assertions over the browser twin, the sandbox, the ledger and the dossier |
+| Logic | `npm run check:logic` | 28 headless assertions over the browser twin, the sandbox, the ledger, the dossier and the DVR buffer |
+| UI render | `npm run smoke:ui` | 15 assertions — every judge-facing surface renders without throwing |
 
 The backend suite also runs the **Official Rules compliance audit** — synthetic
 metadata, deterministic replay, Stage A–E payload keys, zero third-party brand

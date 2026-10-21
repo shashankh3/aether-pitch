@@ -22,12 +22,15 @@ npm run smoke
 
 # 6. Headless browser-side logic checks (Stage B twin, sandbox, ledger, dossier)
 npm run check:logic
+
+# 7. Judge-facing surfaces all render without throwing
+npm run smoke:ui
 ```
 
 Or in one line, from `frontend/`:
 
 ```bash
-npm run verify      # build + smoke + check:logic
+npm run verify      # build + smoke + check:logic + smoke:ui
 ```
 
 **A commit that breaks any of these is not ready.** If a change genuinely

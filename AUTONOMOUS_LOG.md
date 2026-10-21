@@ -54,3 +54,7 @@ Base commit: `d28ccdf`
 ### 2026-10-21T22:10:41Z — Track E — extract the counterfactual core out of main.py
 - Files: backend/counterfactual.py, backend/main.py, backend/test_pipeline.py
 - Verification: 143 backend assertions; ARM valid; tsc clean; build ok; SSR smoke ok; 28 logic checks ok
+
+### 2026-10-21T22:18:56Z — Track B — add a judge-facing component render suite
+- Files: frontend/scripts/ui-smoke.ts, frontend/scripts/tsconfig.json, frontend/package.json, frontend/package-lock.json
+- Verification: 143 backend assertions; 28 logic checks; 15 UI render checks; ARM valid; tsc clean; build ok; SSR smoke ok
