@@ -14,6 +14,7 @@ import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import { telemetry } from "@/lib/telemetry";
 import { lineShiftedPlayers } from "@/lib/sandboxStore";
+import { useDisposable } from "./useDisposable";
 import type { HighlightZone, TelestratorState } from "@/lib/types";
 
 const MAX_SPOTLIGHTS = 3;
@@ -174,7 +175,7 @@ function CompactnessPolygon() {
   const label = useRef<HTMLSpanElement>(null);
   const badge = useRef<THREE.Group>(null);
   const calcAt = useRef(0);
-  const borderGeo = useMemo(() => {
+  const borderGeo = useDisposable(() => {
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(12 * 3), 3));
     return g;
@@ -264,7 +265,7 @@ function GhostReplayBall() {
   const light = useRef<THREE.PointLight>(null);
   const ringA = useRef<THREE.Mesh>(null);
   const ringB = useRef<THREE.Mesh>(null);
-  const trail = useMemo(() => {
+  const trail = useDisposable(() => {
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(24 * 3), 3));
     const line = new THREE.Line(
@@ -346,7 +347,7 @@ function clamp01(v: number) {
 function HighlightZoneMesh({ zone }: { zone: HighlightZone | null }) {
   const grp = useRef<THREE.Group>(null);
   const key = zone ? `${zone.x_min},${zone.x_max},${zone.y_min},${zone.y_max}` : "";
-  const geo = useMemo(() => {
+  const geo = useDisposable(() => {
     if (!zone) return null;
     const w = zone.x_max - zone.x_min;
     const d = zone.y_max - zone.y_min;

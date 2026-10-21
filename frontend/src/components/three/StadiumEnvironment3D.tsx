@@ -4,6 +4,7 @@
 // meshes, metallic goalposts + translucent nets, animated scrolling LED
 // perimeter boards, floodlight towers, an instanced 3D crowd and night-sky fog.
 
+import { useDisposable } from "./useDisposable";
 import { memo, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
@@ -697,7 +698,7 @@ function Jumbotron({ z, flipped }: { z: number; flipped: boolean }) {
     c.height = 384;
     return c;
   }, []);
-  const texture = useMemo(() => {
+  const texture = useDisposable(() => {
     const t = new THREE.CanvasTexture(canvas);
     t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = 8;

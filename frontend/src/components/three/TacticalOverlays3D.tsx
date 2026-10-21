@@ -11,6 +11,7 @@ import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import { telemetry } from "@/lib/telemetry";
+import { useDisposable } from "./useDisposable";
 import type { Metrics } from "@/lib/types";
 import { STANDARD_PALETTE, type BroadcastPalette } from "@/lib/hudContext";
 
@@ -85,12 +86,12 @@ export function XTGrid({ visible, possession }: { visible: boolean; possession: 
 
 /* ------------------------------------------------ defensive laser links */
 function TeamLinks({ team, color }: { team: "NLA" | "MCS"; color: string }) {
-  const backLine = useMemo(() => {
+  const backLine = useDisposable(() => {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(4 * 3), 3));
     return new THREE.Line(geo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.75 }));
   }, [color]);
-  const midLine = useMemo(() => {
+  const midLine = useDisposable(() => {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(3 * 3), 3));
     return new THREE.Line(geo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.5 }));

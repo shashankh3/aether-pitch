@@ -10,6 +10,7 @@ import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import { telemetry } from "@/lib/telemetry";
+import { useDisposable } from "./useDisposable";
 
 function world(p: [number, number]): THREE.Vector3 {
   return new THREE.Vector3(p[0] - 52.5, 0, p[1] - 34);
@@ -21,7 +22,7 @@ export default function PassVectors3D({ showGhost }: { showGhost: boolean }) {
   const tubeKey = useRef<string>("");
 
   // ghost dashed line built imperatively (THREE.Line plays nicest with TS)
-  const ghost = useMemo(() => {
+  const ghost = useDisposable(() => {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(49 * 3), 3));
     const mat = new THREE.LineDashedMaterial({
