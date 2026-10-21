@@ -50,6 +50,8 @@ Open the app and a dismissible card routes you straight to the evidence for each
 | **Best Multi-Agent System** | Control Center → **Studio** | The **Bench War-Room**: a genuine **sequential three-call debate** — `NLATacticalManagerAgent` proposes, `MCSOppositionScoutAgent` counters (reading turn 1), `SpatialArbiterAgent` adjudicates (reading turns 1–2). Each card shows its own model deployment, latency, token count and Stage B tool bundle. The verdict lands as a 3D tactical prescription. |
 | **Best Azure Cloud Native** | Control Center → **Ask AI** | The distributed pipeline trace and the **Cloud Resilience & Edge Failover Drill** — one click simulates a 6-second cloud outage and measures the hot-swap latency, 10 Hz continuity and state reconciliation. |
 
+**And if you only have 30 seconds:** open the bottom dock → **Replay** → **What-If Sandbox**, grab a player and drag him. The pitch-control surface and Expected Threat recalculate live under your cursor — the 3D stage is a tactical sandbox, not a video.
+
 Prefer to be driven? **Controls → Autopilot** runs the full 80-second guided tour with voiceover, ending on the recap and the rubric proof.
 
 ## Highlights
@@ -193,6 +195,13 @@ Prefer to be driven? **Controls → Autopilot** runs the full 80-second guided t
 - **`failoverDrillState`** reports `active`, `swapLatencyMs`, `framesDropped` (always 0), `reconciledTicks`, and a `phase` (`idle` → `outage` → `reconciling` → `verified`).
 - **Data tab card** "Cloud Resilience & Edge Failover Drill" shows live badges: `Hot-Swap Latency`, `10Hz Telemetry Continuity: 100% (0 Dropped Frames)`, and `State Reconciliation: VERIFIED`.
 - **PipelineRibbon** carries an amber `EDGE DRILL` badge during the outage and flips to an emerald `DRILL OK` once reconciliation is verified.
+
+### Interactive Spatial "What-If" Counterfactual Sandbox
+- **The 3D stage is not an observer feed — it is a tactical sandbox.** Open the **Replay** popover on the bottom dock, arm the **What-If Sandbox**, then grab any avatar and drag it across the grass.
+- **Live Stage B recomputation:** the browser-native twin re-evaluates the *same* `xtValue` surface and the *same* 16×12 territory attribution used by the live pipeline, so the deltas are the pipeline's own numbers — not an approximation. Moving the NLA right-back 15 m inside shifts NLA territory −0.5 pts and hands MCS +3.2 pts, and the xT at that position drops 0.028 → 0.022.
+- **Broadcast-grade feedback:** a ghost anchor ring stays at the original telemetry position, a glowing tether measures the displacement, a pulsing target ring marks the drop point, and a glass HUD reports Δ Expected Threat, Δ Pitch Control and the opponent's territory in real time.
+- **60 FPS by construction:** the drag state lives in a mutable store (like the telemetry store) and the HUD subscribes to it directly, so neither the page nor the React tree re-renders during a drag — the avatar interpolates its position inside its own `useFrame`.
+- **Hand it to the agents:** **"Send to War-Room"** posts the relocation to `POST /api/tactical-war-room`, where the `SpatialArbiterAgent` receives it as a Stage B tool and adjudicates the structural consequence.
 
 ### Predictive Bio-Load Digital Twin
 - **Stage A** accumulates a rolling high-intensity metabolic load per player and publishes a `bio_load_profile` on every tick: `sprint_load_index` (0–100), `projected_stamina_10m`, `fatigue_pdr_penalty`, `high_intensity_seconds`, `stamina_now`, `relief_required`, and a role-specific `tactical_relief_directive` (e.g. *"Shift #7 to a compact mid-block; delegate the wide pressing trigger to the inverted fullback"*).

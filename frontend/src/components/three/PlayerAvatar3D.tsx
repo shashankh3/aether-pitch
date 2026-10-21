@@ -23,6 +23,9 @@ import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { Html, Text } from "@react-three/drei";
 import { telemetry } from "@/lib/telemetry";
+import {
+  activateSandbox, moveSandboxPlayer, sandbox, sandboxOverrideFor, setSandboxDragging,
+} from "@/lib/sandboxStore";
 import { clamp, lerpAngle } from "@/lib/utils";
 import type { Team } from "@/lib/types";
 
@@ -92,6 +95,9 @@ interface Props {
 
 function PlayerAvatar3D({ id, locked, showPill, alphaOnly, onLock }: Props) {
   const root = useRef<THREE.Group>(null);
+  const dragRef = useRef(false);
+  const groundPlaneRef = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
+  const dragPointRef = useRef(new THREE.Vector3());
   const body = useRef<THREE.Group>(null);
   const torsoGroup = useRef<THREE.Group>(null);
   const headGroup = useRef<THREE.Group>(null);
@@ -139,8 +145,11 @@ function PlayerAvatar3D({ id, locked, showPill, alphaOnly, onLock }: Props) {
     lastPose.current = s.pose_state;
 
     // ---- smooth 60fps position + heading (THREE.MathUtils.damp, λ=12) ----
-    const targetX = s.x - 52.5;
-    const targetZ = s.y - 34;
+    // The interactive sandbox can relocate this player; the override lives in
+    // a mutable store so a 60 fps drag never re-renders React.
+    const override = sandboxOverrideFor(id);
+    const targetX = override ? override.x - 52.5 : s.x - 52.5;
+    const targetZ = override ? override.y - 34 : s.y - 34;
     if (!initRef.current) {
       root.current.position.set(targetX, 0, targetZ);
       root.current.rotation.y = Math.PI / 2 - s.h;
@@ -301,7 +310,38 @@ function PlayerAvatar3D({ id, locked, showPill, alphaOnly, onLock }: Props) {
       ref={root}
       onPointerDown={(e) => {
         e.stopPropagation();
+        // In the interactive sandbox, grabbing an avatar selects it for
+        // relocation instead of locking the hologram.
+        if (sandbox.active) {
+          const meta = telemetry.players.get(id);
+          if (meta) {
+            activateSandbox(id, meta.x, meta.y);
+            setSandboxDragging(true);
+            dragRef.current = true;
+          }
+          return;
+        }
         onLock(id);
+      }}
+      onPointerMove={(e) => {
+        if (!sandbox.dragging || sandbox.playerId !== id) return;
+        e.stopPropagation();
+        const point = dragPointRef.current;
+        if (!e.ray.intersectPlane(groundPlaneRef.current, point)) return;
+        moveSandboxPlayer(
+          Math.max(1, Math.min(104, point.x + 52.5)),
+          Math.max(1, Math.min(67, point.z + 34)),
+        );
+      }}
+      onPointerUp={() => {
+        if (!dragRef.current && !sandbox.dragging) return;
+        dragRef.current = false;
+        setSandboxDragging(false);
+      }}
+      onPointerMissed={() => {
+        if (!dragRef.current && !sandbox.dragging) return;
+        dragRef.current = false;
+        setSandboxDragging(false);
       }}
     >
       {/* ======== biomechanical body (hidden in broadcast alpha mode) ======== */}

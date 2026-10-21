@@ -665,6 +665,20 @@ export interface WarRoomAgentCall {
   total_tokens?: number | null;
 }
 
+export interface WarRoomPrefill {
+  query: string;
+  counterfactual: {
+    player_id: string;
+    player_name: string;
+    team: Team;
+    from_xy: { x: number; y: number };
+    to_xy: { x: number; y: number };
+    displacement_m: number;
+    delta_xt: number;
+    delta_pitch_control_pct: number;
+  };
+}
+
 export interface WarRoomResponse {
   agent_debate_transcript: {
     manager_proposal: string;

@@ -664,8 +664,11 @@ async def _tactical_war_room_handler(body: dict) -> dict:
     raw_team = body.get("team")
     team = raw_team if raw_team in ("NLA", "MCS") else None
     language = body.get("language")
+    raw_query = body.get("query")
+    counterfactual = body.get("counterfactual") if isinstance(body.get("counterfactual"), dict) else None
     ctx = {
-        "query": body.get("query") or "Run a multi-agent bench war-room on the live match state.",
+        "query": raw_query.strip() if isinstance(raw_query, str) and raw_query.strip()
+        else "Run a multi-agent bench war-room on the live match state.",
         "language": language if isinstance(language, str) else "en",
         "persona": "analyst",
         "locked_player_id": body.get("locked_player_id") or None,
@@ -675,10 +678,10 @@ async def _tactical_war_room_handler(body: dict) -> dict:
         "top_inflections": top_inflections,
         "match_metadata": (last_state or {}).get("match_metadata"),
         "personalization": active_personalization,
+        "counterfactual": counterfactual,
     }
     result = await foundry.tactical_war_room(ctx)
-    shield = build_safety_shield(
-        ctx["query"], ctx["language"], None, str(result.get("recommended_adjustment", "")))
+    shield = build_safety_shield(ctx["query"], ctx["language"], None, str(result.get("recommended_adjustment", "")))
     result["foundry_safety_shield"] = shield
     return result
 

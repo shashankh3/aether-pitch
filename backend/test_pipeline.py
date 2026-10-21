@@ -712,6 +712,51 @@ def main() -> int:
           len({c["deployment"] for c in debate_calls}) == 2,
           ", ".join(sorted({c["deployment"] for c in debate_calls})))
 
+    # ---- the sandbox counterfactual must reach the arbiter's tools ------
+    counterfactual = {
+        "player_id": "NLA_2",
+        "player_name": "D. Keswick",
+        "team": "NLA",
+        "from_xy": {"x": 78.0, "y": 12.0},
+        "to_xy": {"x": 63.0, "y": 12.0},
+        "displacement_m": 15.0,
+        "delta_xt": -0.0412,
+        "delta_pitch_control_pct": 3.2,
+    }
+    cf_calls: list = []
+
+    def cf_chat(deployment, messages, **kwargs):
+        cf_calls.append(messages[1]["content"])
+        return json.dumps({
+            "statement": "The relocation vacates the channel; MCS gains 3.2 territory points.",
+            "recommended_adjustment": {
+                "title": "Cover the vacated wide channel",
+                "directive": "NLA_2 stays high; the pivot drops into the vacated wide channel.",
+            },
+            "projected_30s_xt_delta": 0.09,
+            "win_prob_shift_pct": 4.4,
+            "target_zones": [{"x": 63.0, "y": 12.0, "label": "VACATED CHANNEL"}],
+            "adjustment_vectors": [],
+        })
+
+    cf_router = FoundryRouter(settings)
+    cf_router._chat = cf_chat  # type: ignore[assignment]
+    cf_router.s = _AzureEnabledSettings(settings)  # type: ignore[assignment]
+    cf_result = asyncio.get_event_loop().run_until_complete(
+        cf_router.tactical_war_room({
+            "query": "Counterfactual: NLA_2 relocated 15 m into the half-space.",
+            "language": "en", "persona": "analyst", "locked_player_id": None,
+            "spatial": spatial, "metrics": math.snapshot(st),
+            "counterfactual": counterfactual,
+        }))
+    arbiter_payload = json.loads(cf_calls[-1])
+    check("Sandbox: counterfactual reaches the arbiter's tool bundle",
+          "counterfactual" in arbiter_payload.get("your_tools", {})
+          and arbiter_payload["your_tools"]["counterfactual"]["player_id"] == "NLA_2"
+          and arbiter_payload["your_tools"]["counterfactual"]["displacement_m"] == 15.0
+          and cf_result["recommended_adjustment"]["title"] == "Cover the vacated wide channel",
+          "arbiter adjudicates the relocation")
+
     # ---- the PRE-FLIGHT shield must stop the model call entirely -------
     blocked_calls: list = []
 

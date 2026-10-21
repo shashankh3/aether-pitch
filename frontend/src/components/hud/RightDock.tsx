@@ -26,7 +26,7 @@ import { SpatialPitchControlBar } from "@/components/PitchForgeDeck";
 import type {
   ClubBias, Insight, LangCode, MatchEvent, MatchTick, MetricFocus, Metrics,
   PersonalizationState, PersonaMode, Recap, StudioQueryResponse, StudioSuggestedAction,
-  TelestratorState, WarRoomVector, WarRoomZone,
+  TelestratorState, WarRoomPrefill, WarRoomVector, WarRoomZone,
 } from "@/lib/types";
 import type { OverlayToggles } from "@/components/three/HoloPitch3D";
 import type { CameraMode } from "@/lib/types";
@@ -61,6 +61,8 @@ interface Props {
   onStudioDirective: (d: StudioQueryResponse["scene_directive"]) => void;
   onStudioAction: (action: StudioSuggestedAction) => void;
   onProjectShift: (zones: WarRoomZone[], vectors: WarRoomVector[]) => void;
+  warRoomPrefill?: WarRoomPrefill | null;
+  warRoomRunToken?: number;
   // Fan tab
   personalization: PersonalizationState;
   applyPreferences: (next: PersonalizationState) => void;
@@ -105,7 +107,7 @@ export default function RightDock(props: Props) {
     camMode, pickCamera, toggles, toggleKey, aiDirected,
     insights, persona, onPersona, lang, onLang, metrics, tick, latestEvent, metricFocus, clubBias,
     latest, studioRecap, onCloseRecap, lockedId, onStudioDirective, onStudioAction,
-    onProjectShift,
+    onProjectShift, warRoomPrefill, warRoomRunToken,
     personalization, applyPreferences,
     telestrator, onLock, events, cvExpanded,
     toggleTelestrator, autoSpotlight,
@@ -349,6 +351,8 @@ export default function RightDock(props: Props) {
                 metrics={metrics}
                 lang={lang}
                 onProjectShift={onProjectShift}
+                prefill={warRoomPrefill}
+                runToken={warRoomRunToken}
               />
               <div className="border border-white/15 bg-slate-950/70 p-2">
                 <div className="mb-1.5 font-tech text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">

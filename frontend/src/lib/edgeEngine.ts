@@ -1108,8 +1108,20 @@ export class EdgeEngine {
 const XT_COLS = 16;
 const XT_ROWS = 12;
 
+/**
+ * Expected Threat at a pitch coordinate for a team. This is the public
+ * accessor for the same surface the tactical math uses, so the interactive
+ * sandbox and the live pipeline can never disagree.
+ */
+export function calculateXTAtCoord(team: Team, x: number, y: number): number {
+  return Number(xtValue(team, x, y).toFixed(4));
+}
+
 /** Browser-native mirror of the Stage B 16x12 territory attribution. */
-export function computePitchControlSplit(tick: MatchTick): PitchControlSplit {
+export function computePitchControlSplit(
+  tick: MatchTick,
+  override?: { playerId: string; x: number; y: number },
+): PitchControlSplit {
   const players = tick.players.filter((p) => p.role !== "GK");
   if (!players.length) {
     return { nla_territory_pct: 50, mcs_territory_pct: 50, neutral_pct: 0 };
@@ -1124,8 +1136,9 @@ export function computePitchControlSplit(tick: MatchTick): PitchControlSplit {
       let nlaInfluence = 0;
       let mcsInfluence = 0;
       for (const p of players) {
-        const px = p.x + p.vx * 0.45;
-        const py = p.y + p.vy * 0.45;
+        const moved = override && p.id === override.playerId;
+        const px = (moved ? override.x : p.x) + p.vx * 0.45;
+        const py = (moved ? override.y : p.y) + p.vy * 0.45;
         const d2 = (cx - px) ** 2 + (cy - py) ** 2;
         if (d2 > 400) continue;
         const weight = Math.exp(-d2 / 144) * (0.55 + Math.min(0.75, p.speed_kmh / 45));
@@ -1143,6 +1156,19 @@ export function computePitchControlSplit(tick: MatchTick): PitchControlSplit {
     mcs_territory_pct: Number(((mcs / total) * 100).toFixed(1)),
     neutral_pct: Number(((neutral / total) * 100).toFixed(1)),
   };
+}
+
+/**
+ * Pitch control with one player relocated — the counterfactual the
+ * interactive sandbox evaluates.
+ */
+export function evaluateSimulatedPitchControl(
+  tick: MatchTick,
+  playerId: string,
+  x: number,
+  y: number,
+): PitchControlSplit {
+  return computePitchControlSplit(tick, { playerId, x, y });
 }
 
 /** Browser-native mirror of the Stage A bio-mechanical fatigue projection. */

@@ -34,6 +34,8 @@ interface Props {
   lang: LangCode;
   insightLine: string | null;
   lowerThird: Insight | null;
+  sandboxActive: boolean;
+  onToggleSandbox: () => void;
 }
 
 const TOOLS: { id: Exclude<DockTool, null>; label: string; icon: typeof Crosshair }[] = [
@@ -46,7 +48,7 @@ export default function BottomDock(props: Props) {
   const {
     tick, busy, inject, isDvrPaused, dvrOffsetTicks, pausedClock, togglePause, scrub,
     telestrator, toggleTelestrator, autoSpotlight, lockedId, onLock, events, lang, insightLine,
-    lowerThird,
+    lowerThird, sandboxActive, onToggleSandbox,
   } = props;
   const { dockTool, setDockTool, openControlCenter } = useHud();
 
@@ -178,6 +180,22 @@ export default function BottomDock(props: Props) {
               onToggleTelestrator={toggleTelestrator}
               onToggleSpotlight={autoSpotlight}
             />
+
+            {/* ---------- interactive what-if sandbox ---------- */}
+            <button
+              onClick={onToggleSandbox}
+              aria-pressed={sandboxActive}
+              className={cn(
+                "clip-skew mt-1.5 flex w-full items-center justify-center gap-1.5 py-1.5 font-tech text-[9.5px] font-bold uppercase tracking-wider transition",
+                sandboxActive
+                  ? "bg-cyan-300/20 text-cyan-300"
+                  : "bg-white/[0.06] text-slate-300 hover:bg-cyan-300/15 hover:text-cyan-300",
+              )}
+              title="Arm the interactive spatial what-if sandbox: drag any avatar and watch ΔxT and pitch control recalculate live"
+            >
+              <Crosshair size={12} />
+              {sandboxActive ? "Sandbox armed — drag an avatar" : "What-If Sandbox · drag a player"}
+            </button>
           </div>
         </div>
       )}

@@ -17,6 +17,10 @@ import MatchRecapStudioModal from "@/components/MatchRecapStudioModal";
 import LiveCaptionStrip from "@/components/LiveCaptionStrip";
 import StudioErrorBoundary from "@/components/StudioErrorBoundary";
 import JudgeFirstRunCard from "@/components/JudgeFirstRunCard";
+import CounterfactualDeltaHUD from "@/components/hud/CounterfactualDeltaHUD";
+import {
+  clearSandbox, type SandboxDelta,
+} from "@/lib/sandboxStore";
 import JudgeAutopilotTour, {
   AUTOPILOT_STEPS, AUTOPILOT_TOTAL_SECONDS, type ProofJump,
 } from "@/components/JudgeAutopilotTour";
@@ -33,7 +37,8 @@ import { API_BASE } from "@/lib/api";
 import type {
   CameraDirective, CameraMode, HighlightZone, Insight, LangCode, MatchRecapStoryboard,
   MetricFocus, PersonaMode, PersonaModeV5, PersonalizationState, RecapAct, RecapPassArc,
-  StudioQueryResponse, StudioSuggestedAction, TelestratorState, WarRoomVector, WarRoomZone,
+  StudioQueryResponse, StudioSuggestedAction, TelestratorState, WarRoomPrefill,
+  WarRoomVector, WarRoomZone,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -616,6 +621,52 @@ function StudioOrchestrator() {
     openControlCenter(jump.tab);
   }, [openControlCenter]);
 
+  // ---- interactive what-if counterfactual sandbox ----------------------
+  const [sandboxActive, setSandboxActive] = useState(false);
+  const [warRoomPrefill, setWarRoomPrefill] = useState<WarRoomPrefill | null>(null);
+  const [warRoomRunToken, setWarRoomRunToken] = useState(0);
+
+  const toggleSandbox = useCallback(() => {
+    setSandboxActive((prev) => {
+      const next = !prev;
+      if (!next) clearSandbox();
+      return next;
+    });
+  }, []);
+
+  const closeSandbox = useCallback(() => {
+    setSandboxActive(false);
+    clearSandbox();
+  }, []);
+
+  const resetSandbox = useCallback(() => {
+    clearSandbox();
+  }, []);
+
+  const submitSandboxToWarRoom = useCallback((delta: SandboxDelta) => {
+    setWarRoomPrefill({
+      query:
+        `Counterfactual: ${delta.team} #${delta.shirtNumber} ${delta.playerName} is relocated ` +
+        `from (${delta.originX.toFixed(1)}, ${delta.originY.toFixed(1)}) to ` +
+        `(${delta.x.toFixed(1)}, ${delta.y.toFixed(1)}), a ${delta.displacementM.toFixed(1)} m ` +
+        `displacement. Stage B recomputes Expected Threat at that position and the ` +
+        `pitch-control split. Adjudicate the structural consequence.`,
+      counterfactual: {
+        player_id: delta.playerId,
+        player_name: delta.playerName,
+        team: delta.team,
+        from_xy: { x: delta.originX, y: delta.originY },
+        to_xy: { x: delta.x, y: delta.y },
+        displacement_m: delta.displacementM,
+        delta_xt: delta.deltaXT,
+        delta_pitch_control_pct: delta.deltaControlPct,
+      },
+    });
+    setWarRoomRunToken((n) => n + 1);
+    setCinemaMode(false);
+    openControlCenter("prod");
+  }, [openControlCenter]);
+
   const handleAutopilotStop = useCallback((keepRubric = false, keepVoiceSuppressed = false) => {
     tourFxTimers.current.forEach((t) => clearTimeout(t));
     tourFxTimers.current = [];
@@ -871,10 +922,11 @@ function StudioOrchestrator() {
           highlightZone={highlightZone}
           alphaMode={alphaMode}
           recapPass={recapPass}
-          warRoomShift={warRoomShift}
-          palette={palette}
-          onLock={handleLock}
-        />
+        warRoomShift={warRoomShift}
+        palette={palette}
+        sandboxActive={sandboxActive}
+        onLock={handleLock}
+      />
       </StudioErrorBoundary>
 
       {!alphaMode && (
@@ -1005,6 +1057,8 @@ function StudioOrchestrator() {
                 lang={lang}
                 insightLine={latest?.stage_e_personalization.player_lock_insight ?? null}
                 lowerThird={lowerThird}
+                sandboxActive={sandboxActive}
+                onToggleSandbox={toggleSandbox}
               />
             </div>
           </div>
@@ -1044,6 +1098,8 @@ function StudioOrchestrator() {
           onStudioDirective={handleStudioDirective}
           onStudioAction={handleStudioAction}
           onProjectShift={handleProjectShift}
+          warRoomPrefill={warRoomPrefill}
+          warRoomRunToken={warRoomRunToken}
           personalization={personalization}
           applyPreferences={applyPreferences}
           telestrator={telestrator}
@@ -1192,6 +1248,16 @@ function StudioOrchestrator() {
       )}
 
       {!alphaMode && !cinemaMode && <LiveCaptionStrip />}
+
+      {!alphaMode && !cinemaMode && (
+        <CounterfactualDeltaHUD
+          tick={tick}
+          active={sandboxActive}
+          onReset={resetSandbox}
+          onClose={closeSandbox}
+          onSubmit={submitSandboxToWarRoom}
+        />
+      )}
 
       <JudgeFirstRunCard onRunAutopilot={toggleAutopilot} />
 

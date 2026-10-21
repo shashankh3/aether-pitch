@@ -20,6 +20,7 @@ import Telestrator3DOverlays from "./Telestrator3DOverlays";
 import SpatialControlSurface3D from "./SpatialControlSurface3D";
 import RecapPassTubes from "./RecapPassTubes";
 import { WarRoomProjection, XTPassingNetwork } from "./SpatialLayers3D";
+import CounterfactualDragLayer from "./CounterfactualDragLayer";
 import { DefensiveLasers, XTGrid } from "./TacticalOverlays3D";
 import { telemetry, tickAlpha } from "@/lib/telemetry";
 import { STANDARD_PALETTE, type BroadcastPalette } from "@/lib/hudContext";
@@ -67,6 +68,7 @@ interface Props {
   recapPass: RecapPassArc | null;
   warRoomShift: { zones: WarRoomZone[]; vectors: WarRoomVector[] } | null;
   palette?: BroadcastPalette;
+  sandboxActive?: boolean;
   onLock: (id: string | null) => void;
 }
 
@@ -233,7 +235,7 @@ const PostFX = memo(function PostFX({ alphaMode }: { alphaMode: boolean }) {
 function Scene({
   camMode, override, toggles, lockedId, keyIds, metrics,
   telestrator, highlightZone, alphaMode, recapPass, warRoomShift, palette = STANDARD_PALETTE,
-  onLock,
+  sandboxActive = false, onLock,
 }: Props) {
   return (
     <>
@@ -275,6 +277,7 @@ function Scene({
         showControl={toggles.pitchControl}
         showNetwork={toggles.passingNetwork}
       />
+      <CounterfactualDragLayer active={sandboxActive} />
       {toggles.passingNetwork && (
         <XTPassingNetwork edges={metrics?.passing_network_edges ?? []} />
       )}

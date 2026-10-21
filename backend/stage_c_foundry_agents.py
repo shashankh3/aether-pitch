@@ -92,7 +92,7 @@ WAR_ROOM_AGENTS = (
         "max_tokens": 620,
         "timeout": 7.0,
         "tools": ("xt_top_zones", "xt_at_gap", "pitch_control", "chaos",
-                  "stamina_load", "defensive_line"),
+                  "stamina_load", "defensive_line", "counterfactual"),
         "system": (
             "You are the SpatialArbiterAgent. You are the neutral referee of an "
             "adversarial bench war-room. Weigh BOTH prior turns against the "
@@ -808,7 +808,7 @@ class FoundryRouter:
         network = metrics.get("passing_network_edges") or []
         chaos = metrics.get("chaos_index", sp.get("chaos_index", 0.5))
         bio = metrics.get("bio_load_summary") or {}
-        return {
+        tools = {
             "defensive_line": {
                 "NLA_m": def_lines.get("NLA"),
                 "MCS_m": def_lines.get("MCS"),
@@ -830,6 +830,12 @@ class FoundryRouter:
             "stamina_load": bio,
             "team_stats": metrics.get("team_stats") or {},
         }
+        counterfactual = ctx.get("counterfactual")
+        if counterfactual:
+            # The interactive sandbox hands its relocation here so the arbiter
+            # can adjudicate the structural consequence, not just re-state it.
+            tools["counterfactual"] = counterfactual
+        return tools
 
     def _run_war_room_debate(self, ctx: dict, tools: dict, fallback: dict) -> dict:
         """Sequential three-turn debate. Each turn is a separate model call."""

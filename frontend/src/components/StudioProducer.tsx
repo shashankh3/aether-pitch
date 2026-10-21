@@ -5,14 +5,14 @@
 // physically drives the 3D camera, spotlight beams, offside wall, compactness
 // mesh and ghost replay — plus localized answers and a 15s commentator cue.
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight, Clapperboard, Film, Mic, X, Zap, Camera, Send, Sparkles, Loader2, Quote,
   Swords, ShieldAlert, Gavel, Crosshair, Radar,
 } from "lucide-react";
 import type {
-  Insight, LangCode, Recap, StudioQueryResponse, StudioSuggestedAction, WarRoomResponse,
-  WarRoomVector, WarRoomZone, Metrics,
+  Insight, LangCode, Recap, StudioQueryResponse, StudioSuggestedAction, WarRoomPrefill,
+  WarRoomResponse, WarRoomVector, WarRoomZone, Metrics,
 } from "@/lib/types";
 import { useSpeechController } from "@/hooks/useSpeechController";
 import { useModalA11y } from "@/lib/useModalA11y";
@@ -490,20 +490,29 @@ interface WarRoomProps {
   metrics: Metrics | null;
   lang: LangCode;
   onProjectShift: (zones: WarRoomZone[], vectors: WarRoomVector[]) => void;
+  prefill?: WarRoomPrefill | null;
+  runToken?: number;
 }
 
-export function BenchWarRoomPanel({ metrics, lang, onProjectShift }: WarRoomProps) {
+export function BenchWarRoomPanel({
+  metrics, lang, onProjectShift, prefill, runToken = 0,
+}: WarRoomProps) {
   const [warRoom, setWarRoom] = useState<WarRoomResponse | null>(null);
   const [running, setRunning] = useState(false);
   const [offline, setOffline] = useState(false);
 
-  const runWarRoom = async () => {
+  const runWarRoom = useCallback(async (brief?: WarRoomPrefill) => {
     setRunning(true);
     try {
       const r = await fetch(`${API_BASE}/api/tactical-war-room`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ language: lang, team: telemetry.match.possession ?? "NLA" }),
+        body: JSON.stringify({
+          language: lang,
+          team: telemetry.match.possession ?? "NLA",
+          query: brief?.query,
+          counterfactual: brief?.counterfactual,
+        }),
       });
       if (!r.ok) throw new Error(`war-room HTTP ${r.status}`);
       const data = (await r.json()) as WarRoomResponse;
@@ -529,7 +538,12 @@ export function BenchWarRoomPanel({ metrics, lang, onProjectShift }: WarRoomProp
     } finally {
       setRunning(false);
     }
-  };
+  }, [lang, metrics]);
+
+  useEffect(() => {
+    if (!runToken || !prefill) return;
+    void runWarRoom(prefill);
+  }, [runToken, prefill, runWarRoom]);
 
   const transcript = warRoom?.agent_debate_transcript;
 
@@ -548,7 +562,7 @@ export function BenchWarRoomPanel({ metrics, lang, onProjectShift }: WarRoomProp
           </p>
         </div>
         <button
-          onClick={runWarRoom}
+          onClick={() => void runWarRoom()}
           disabled={running}
           className="clip-skew flex shrink-0 items-center gap-1 bg-crimson/20 px-2 py-1 font-tech text-[9.5px] font-bold uppercase tracking-wider text-crimson transition hover:bg-crimson/35 disabled:opacity-50"
           title="Run the NLATacticalManagerAgent / MCSOppositionScoutAgent / SpatialArbiterAgent debate"
