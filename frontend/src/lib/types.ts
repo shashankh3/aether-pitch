@@ -517,7 +517,7 @@ export interface StudioSuggestedAction {
     enabled?: boolean;
     player_id?: string;
     player_name?: string;
-    camera_mode?: CameraMode;
+    camera_mode?: DirectorMode;
     zone?: { x: number; y: number };
     focus?: string;
   };

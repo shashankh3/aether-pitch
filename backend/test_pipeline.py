@@ -289,7 +289,7 @@ def main() -> int:
     check("Audit: spatial context includes xt_at_gap",
           "xt_at_gap" in spatial_live
           and all(k in (spatial_live.get("ghost") or {}) for k in
-                  ("actual_delta_xt", "ghost_delta_xt", "net_xt_gain",
+                  ("delta_xt", "actual_delta_xt", "net_xt_gain",
                    "completion_probability", "target_id")))
     audit_packet = asyncio.get_event_loop().run_until_complete(app_main.pipeline_audit())
     stage_b_audit = audit_packet.get("stage_b_summary") or {}
