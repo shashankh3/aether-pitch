@@ -165,7 +165,7 @@ export default function RightDock(props: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="control-center-title"
-        className="clip-ea panel-lux animate-slide-up fixed inset-x-2 bottom-2 z-40 flex max-h-[82dvh] flex-col overflow-hidden outline-none sm:inset-x-auto sm:bottom-3 sm:right-3 sm:top-[68px] sm:max-h-none sm:w-[404px]"
+        className="clip-ea panel-lux animate-slide-up fixed inset-x-2 bottom-2 z-40 flex max-h-[82dvh] flex-col overflow-hidden outline-none sm:inset-x-auto sm:bottom-3 sm:right-2 sm:top-[64px] sm:max-h-none sm:w-[404px] lg:right-3 lg:top-[68px]"
       >
         {/* header */}
         <div className="flex shrink-0 items-start justify-between gap-2 border-b border-white/10 px-3 py-2.5">

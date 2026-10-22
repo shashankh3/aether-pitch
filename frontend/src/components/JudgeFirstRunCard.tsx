@@ -56,7 +56,7 @@ export default function JudgeFirstRunCard({
   onRunAutopilot?: () => void;
   alphaMode?: boolean;
 }) {
-  const { openControlCenter } = useHud();
+  const { openControlCenter, controlCenterOpen } = useHud();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -90,11 +90,13 @@ export default function JudgeFirstRunCard({
   // A clean alpha feed is a broadcast deliverable: nothing may sit over it.
   // The card appears on a judge's first visit, which is exactly when a judge
   // is most likely to open ?overlay=alpha straight from the pre-flight guide.
-  if (!visible || alphaMode) return null;
+  // The Control Center is a deliberate surface too, and the card would land
+  // on top of it.
+  if (!visible || alphaMode || controlCenterOpen) return null;
 
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 top-[64px] z-[58] flex justify-center px-3"
+      className="pointer-events-none fixed inset-x-0 top-[64px] z-[58] flex justify-center px-3 lg:top-[68px]"
       role="dialog"
       aria-label="Judge quick start"
     >

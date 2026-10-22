@@ -102,7 +102,7 @@ function StudioOrchestrator() {
 
   const {
     setHudMode, setControlCenterOpen, setDockTool, openControlCenter, setShortcutsOpen,
-    colorblindSafe, setColorblindSafe, palette,
+    colorblindSafe, setColorblindSafe, palette, controlCenterOpen,
   } = useHud();
 
   const [lockedId, setLockedId] = useState<string | null>(null);
@@ -992,7 +992,12 @@ function StudioOrchestrator() {
           </div>
 
           {/* ---------- live scenario / reasoning status ---------- */}
-          <div className="pointer-events-none absolute right-2 top-[62px] z-20 hidden max-w-[calc(100vw-350px)] flex-col items-end gap-1.5 md:flex md:right-3 lg:top-[71px]">
+          <div className={cn(
+            "pointer-events-none absolute right-2 top-[62px] z-20 hidden max-w-[calc(100vw-350px)] flex-col items-end gap-1.5 md:flex lg:right-3 lg:top-[71px]",
+            // The Control Center covers this column when it is open, so the
+            // chip is hidden rather than left poking out above the drawer.
+            controlCenterOpen && "md:hidden",
+          )}>
             {tick?.scenario && (
               <div
                 className="clip-skew flex max-w-full items-center gap-2 px-3 py-1"

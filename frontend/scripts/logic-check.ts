@@ -809,8 +809,8 @@ check(
   );
   check(
     "Alpha feed: the first-run card is suppressed on a clean feed",
-    /alphaMode\??:\s*boolean/.test(firstRun)
-    && /!visible\s*\|\|\s*alphaMode\)\s*return null/.test(firstRun),
+    /alphaMode[^)]*\)\s*return null/.test(firstRun),
+    "the card's render guard refuses to draw in alpha mode",
   );
   check(
     "Alpha feed: the goal slam and the cinema overlay are gated",
@@ -1578,6 +1578,96 @@ check(
         ? `${ANALYST_PANELS.length} panels untouched`
         : simplified.join(", "),
     );
+  }
+
+  // --- the right-hand column shares one gutter ---------------------------
+  // The Control Center is a drawer under the top bar. If its right edge
+  // uses a different gutter than the bar above it, the drawer visibly sits
+  // out from under the bar on some breakpoints. The right column is: the
+  // top bar container, the scenario chip and the drawer itself.
+  {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const SRC = path.resolve(process.cwd(), "src");
+
+    // Tailwind's breakpoint order. A value set at a breakpoint also applies
+    // to every larger one, so the comparison has to resolve the cascade
+    // rather than compare the raw tokens.
+    const BP_ORDER = ["base", "sm", "md", "lg", "xl"];
+
+    /** The right-edge gutter at each breakpoint, as declared. */
+    const rightGutters = (className: string): Map<string, string> => {
+      const out = new Map<string, string>();
+      for (const m of className.matchAll(
+        /(?:([a-z]{2}):)?\s*(?:inset-x-|right-)(\d+)/g,
+      )) {
+        out.set(m[1] ?? "base", `right-${m[2]}`);
+      }
+      return out;
+    };
+
+    /** The gutter actually in force at a breakpoint, cascade resolved. */
+    const effective = (entries: Map<string, string>, bp: string): string | undefined => {
+      const limit = BP_ORDER.indexOf(bp);
+      if (limit < 0) return undefined;
+      let value: string | undefined;
+      for (let i = 0; i <= limit; i += 1) {
+        const v = entries.get(BP_ORDER[i]);
+        if (v) value = v;
+      }
+      return value;
+    };
+
+    const pageSrc = fs.readFileSync(path.join(SRC, "app", "page.tsx"), "utf8");
+    const dockSrc = fs.readFileSync(path.join(SRC, "components", "hud", "RightDock.tsx"), "utf8");
+
+    // The top bar's container: the element the drawer hangs under.
+    const topBarContainer = /absolute inset-x-2 top-2[^"]*"/.exec(pageSrc);
+    // The drawer's own panel.
+    const drawerPanel = /clip-ea panel-lux animate-slide-up[^"]*"/.exec(dockSrc);
+    // The scenario chip, which shares the same column.
+    const scenarioChip = /absolute right-2 top-\[62px\][^"]*"/.exec(pageSrc);
+
+    if (!topBarContainer || !drawerPanel || !scenarioChip) {
+      check("Alignment: the right column shares one gutter", false,
+        "could not find the top bar, the drawer or the scenario chip");
+    } else {
+      const bar = rightGutters(topBarContainer[0]);
+      const drawer = rightGutters(drawerPanel[0]);
+      const chip = rightGutters(scenarioChip[0]);
+
+      const misaligned: string[] = [];
+      for (const bp of BP_ORDER) {
+        if (bp === "base") continue; // the base is the mobile bottom sheet
+        const barValue = effective(bar, bp);
+        const drawerValue = effective(drawer, bp);
+        if (barValue && drawerValue && barValue !== drawerValue) {
+          misaligned.push(`drawer ${bp}: ${drawerValue} vs top bar ${barValue}`);
+        }
+        const chipValue = effective(chip, bp);
+        if (chipValue && drawerValue && chipValue !== drawerValue) {
+          misaligned.push(`scenario chip ${bp}: ${chipValue} vs drawer ${drawerValue}`);
+        }
+      }
+      check(
+        "Alignment: the right column shares one gutter",
+        misaligned.length === 0,
+        misaligned.length === 0
+          ? `top bar ${[...bar.values()].join("/")}, drawer ${[...drawer.values()].join("/")}`
+          : misaligned.join("; "),
+      );
+
+      // The drawer must start below the top bar, not over it, and not at a
+      // magic number that drifts from the bar's height.
+      const barHeight = 52; // the top bar panel is h-[52px]
+      const barTop = bar.size && /\btop-2\b/.test(topBarContainer[0]) ? 8 : 12;
+      const drawerTop = Number(/sm:top-\[(\d+)px\]/.exec(drawerPanel[0])?.[1] ?? 0);
+      check(
+        "Alignment: the drawer starts just below the top bar",
+        drawerTop > barTop + barHeight && drawerTop <= barTop + barHeight + 8,
+        `bar ends at ${barTop + barHeight}px, drawer starts at ${drawerTop}px`,
+      );
+    }
   }
 }
 

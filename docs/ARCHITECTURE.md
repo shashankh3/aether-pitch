@@ -55,7 +55,7 @@ frontend/src/
   lib/useModalA11y.ts            72 LOC  focus trap + escape handling
   lib/utils.ts                   14 LOC  shared class-name helper
   lib/api.ts                      6 LOC  the REST client
-  app/page.tsx                1,285 LOC  the orchestrator
+  app/page.tsx                1,290 LOC  the orchestrator
   app/layout.tsx                108 LOC  runtime config injection + error boundary
   hooks/useResilientMatchEngine.ts  336 LOC  WS + edge failover + drill
   hooks/useSpeechController.ts      129 LOC  zero-overlap speech
@@ -176,7 +176,7 @@ The 3D stage is not an observer feed — it is a sandbox.
 | Types | `cd frontend && npx tsc --noEmit` | The whole contract surface |
 | Build | `npm run build` | Production compile |
 | SSR | `npm run smoke` | In-process server render, runtime config injection, no SSR error |
-| Logic | `npm run check:logic` | 87 headless assertions over the browser twin, the sandbox, the ledger, the dossier and the DVR buffer |
+| Logic | `npm run check:logic` | 89 headless assertions over the browser twin, the sandbox, the ledger, the dossier and the DVR buffer |
 | UI render | `npm run smoke:ui` | 30 assertions — every judge-facing surface renders without throwing |
 
 The backend suite also runs the **Official Rules compliance audit** — synthetic
