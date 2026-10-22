@@ -260,6 +260,21 @@ function CompactnessPolygon() {
 }
 
 /* ---------------------------------------------- ghost-ball replay + zone */
+
+// Scratch objects for the ghost trail. This callback runs every animation
+// frame, and building the curve from scratch allocated ~29 objects per
+// frame (two Vector3s, a clone, a Bezier curve, and 25 getPoint() calls
+// each returning a fresh Vector3) - roughly 1,700 allocations a second
+// while a ghost pass was on screen, which showed up as GC hitches in the
+// measured frame time.
+const GHOST_START = new THREE.Vector3();
+const GHOST_END = new THREE.Vector3();
+const GHOST_MID = new THREE.Vector3();
+const GHOST_POINT = new THREE.Vector3();
+const GHOST_CURVE = new THREE.QuadraticBezierCurve3(
+  new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(),
+);
+
 function GhostReplayBall() {
   const mesh = useRef<THREE.Mesh>(null);
   const light = useRef<THREE.PointLight>(null);
@@ -289,12 +304,16 @@ function GhostReplayBall() {
       if (ringB.current) ringB.current.visible = false;
       return;
     }
-    const start = new THREE.Vector3((b.pass_start?.[0] ?? b.x) - 52.5, 0.2, (b.pass_start?.[1] ?? b.y) - 34);
-    const end = new THREE.Vector3(ghost!.x - 52.5, 0.2, ghost!.y - 34);
-    const mid = start.clone().add(end).multiplyScalar(0.5).setY(1.4);
-    const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
+    const start = GHOST_START.set(
+      (b.pass_start?.[0] ?? b.x) - 52.5, 0.2, (b.pass_start?.[1] ?? b.y) - 34);
+    const end = GHOST_END.set(ghost!.x - 52.5, 0.2, ghost!.y - 34);
+    const mid = GHOST_MID.copy(start).add(end).multiplyScalar(0.5).setY(1.4);
+    const curve = GHOST_CURVE;
+    curve.v0.copy(start);
+    curve.v1.copy(mid);
+    curve.v2.copy(end);
     const u = (state.clock.elapsedTime * 0.45) % 1;
-    const p = curve.getPoint(u);
+    const p = curve.getPoint(u, GHOST_POINT);
     m.visible = true;
     m.position.copy(p);
     if (light.current) light.current.position.copy(p);
@@ -313,8 +332,8 @@ function GhostReplayBall() {
     }
     const attr = trail.geometry.getAttribute("position") as THREE.BufferAttribute;
     for (let i = 0; i < 24; i++) {
-      const pt = curve.getPoint(clamp01(u - i * 0.012));
-      attr.setXYZ(i, pt.x, pt.y, pt.z);
+      curve.getPoint(clamp01(u - i * 0.012), GHOST_POINT);
+      attr.setXYZ(i, GHOST_POINT.x, GHOST_POINT.y, GHOST_POINT.z);
     }
     attr.needsUpdate = true;
     trail.visible = true;
