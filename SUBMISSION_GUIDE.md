@@ -518,7 +518,7 @@ Run through this immediately before you submit the repo and record the video.
 | # | Step | Command / action | Pass condition |
 |---|------|------------------|----------------|
 | 1 | Confirm doc hygiene | `grep -rniE "sandbox\|not implemented\|todo\|fixme\|unverified" README.md SUBMISSION_GUIDE.md` | No internal engineering notes in the judge-facing docs |
-| 2 | Backend suite | `python backend/test_pipeline.py` | `RESULT: ALL 225 PIPELINE TESTS PASSED` |
+| 2 | Backend suite | `python backend/test_pipeline.py` | `RESULT: ALL 233 PIPELINE TESTS PASSED` |
 | 3 | ARM template | `python infra/validate_template.py` | `RESULT: ARM TEMPLATE VALIDATION PASSED` |
 | 3b | Documentation lint | `python tools/doc_lint.py` | `RESULT: DOC LINT PASSED` |
 | 4 | Frontend types | `cd frontend && npx tsc --noEmit` | No output |
@@ -551,10 +551,29 @@ Run through this immediately before you submit the repo and record the video.
 | **Reliability** | Pipeline status pill + backend-off demo | Edge fallback and hot-swap |
 | **Compliance** | README + guide | 100% synthetic data, no real clubs/logos/tracking |
 | **Best Use of Microsoft Foundry** | Controls → **Data** tab → *Foundry Eval & RAI Scorecard* + *Foundry Route* card | 4 live metrics (groundedness, tactical coherence, prompt shield, P95 frame SLA), a 1-click grounding audit receipt, the live triage/narrative deployments, API version, request id, token usage, and the active RAI layer (deterministic Prompt Shield, optionally Azure AI Content Safety) |
-| **Best Multi-Agent System** | Controls → **Studio** tab → *Bench War-Room* | A genuine **sequential three-call debate** — manager proposes, scout counters (reads turn 1), arbiter adjudicates (reads turns 1–2) — each with its own model deployment, Stage B tool bundle, latency and token count, ending in one tactical prescription projected onto the 3D pitch |
+| **Best Multi-Agent System** | Controls → **Studio** tab → *Bench War-Room* | A genuine **sequential three-call debate** — manager proposes, scout counters (reads turn 1), arbiter adjudicates (reads turns 1–2) — each with its own Stage B tool bundle, latency and token count, ending in one tactical prescription projected onto the 3D pitch. Each card names the deployment that call actually ran on, so a judge can see the route: the triage and narrative Azure deployments with credentials, or `deterministic-stage-b` without them |
 | **Best Azure Cloud Native** | Controls → **Ask AI** tab + *Data** tab | Distributed Foundry trace, dual-engine (cloud + edge) failover inspector, the 6-second cloud-outage drill, `stage_modes`, Azure posture, and `infra/main.json` (AI Foundry, Translator, Key Vault + managed identity, Container Apps, App Insights, Monitor alerts) |
 | **Responsible AI** | Any studio query + `foundry_safety_shield` | Prompt Shield blocks injection/off-topic/third-party queries, `numeric_grounding_pass`, `club_neutrality_pass` |
 | **Spatial analytics** | Controls → **Stats** (pitch control bar) + **CV** tab | Live NLA % vs MCS % territory split, 105×68 m homography lock, 14-joint pose distribution, xT-weighted 3D passing tubes |
+
+### 9b. One command per prize
+
+Each prize claim is backed by a single command that a judge can run and a
+number they can check. Nothing here needs Azure credentials: every figure
+below is produced by the offline deterministic path, and the same commands
+report the cloud route when credentials are present.
+
+| Prize | Run this | What it proves | Measured |
+|---|---|---|---|
+| **Best Use of Microsoft Foundry** | `python backend/test_pipeline.py` | The Foundry Eval & Responsible AI scorecard is computed from live measurements, and the Prompt Shield really blocks before any model call | `mathematical_groundedness_pct` from the numeric critic's cross-check; `tactical_coherence_pct` = the share of published insights that critic confirmed (with the raw `published / passed` basis in the payload); `prompt_shield_status`; `p95_frame_sla_pct` against the 100 ms budget |
+| | `GET /api/health/pipeline-audit` | The live Azure posture: which route each stage actually took | `stage_modes` (one token per stage), `azure.last_attempted / last_used / last_error / request_id / usage`, `translator.*` |
+| **Best Multi-Agent System** | `POST /api/tactical-war-room` | A genuine sequential three-call debate, not one model role-playing three roles | `agent_calls[]` — three entries, each with its own `deployment`, `tools`, `latency_ms` and token counts; `orchestration.rounds = 3`; the scout reads turn 1 and the arbiter reads turns 1–2 |
+| **Best Azure Cloud Native** | `python infra/validate_template.py` | The Azure estate is real, complete and self-consistent | 16 ARM resources: AI Services + Translator + opt-in Content Safety (3 Cognitive Services accounts), 2 model deployments, Key Vault, a user-assigned managed identity + 2 role assignments, Container Apps ×2 on a managed environment, App Insights, a Log Analytics workspace and 2 metric alerts |
+| | `GET /api/health` | Zero-downtime edge resilience is real, not a claim | the live WebSocket client count, the per-stage route, and the cloud→edge hot-swap state |
+
+The **Pre-Flight Execution Checklist** (§8b) turns the same evidence into a
+15-minute rehearsal, and §8b's last step is the 6-second cloud-outage drill
+that shows the pitch surviving the backend disappearing.
 
 ---
 
@@ -585,7 +604,7 @@ page renders with the runtime configuration injected and no SSR error, then
 shuts down — it leaves no background process behind. `npm run check:logic` and
 `npm run smoke:ui` are pure Node: no server, no browser, no network.
 
-Together the four suites make **303 automated assertions** with zero dependencies
+Together the four suites make **311 automated assertions** with zero dependencies
 beyond what the project already ships. `python tools/doc_lint.py` re-runs the
 three headless suites and proves that every assertion count, `/api` path,
 `npm run` script and module size quoted in this guide, the README and

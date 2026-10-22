@@ -2328,6 +2328,90 @@ def main() -> int:
         check("Live loop: the match loop survives a real run", False,
               f"{type(exc).__name__}: {exc}")
 
+    # ---- the judge's prize claims must be true ---------------------------
+    # SUBMISSION_GUIDE 9b promises one command per prize and a number to
+    # check. These assertions are that promise, kept honest: each claim is
+    # checked against the live code, so the guide cannot drift into a
+    # flattering description of the system.
+    async def prize_claims():
+        loop = asyncio.get_event_loop()
+        task = loop.create_task(app_main.match_loop())
+        await asyncio.sleep(12)
+        live_audit = await app_main.pipeline_audit()
+        live_wr = await app_main._tactical_war_room_handler({})
+        live_health = await app_main.health()
+        live_stats = dict(app_main.gate_stats)
+        task.cancel()
+        try:
+            await task
+        except BaseException:
+            pass
+        return live_audit, live_wr, live_health, live_stats
+
+    try:
+        live_audit, live_wr, live_health, live_stats = (
+            asyncio.get_event_loop().run_until_complete(prize_claims()))
+
+        fe = live_audit.get("foundry_eval") or {}
+        basis = fe.get("tactical_coherence_basis") or {}
+        published_insights = int(basis.get("published_insights") or 0)
+        critic_passed = int(basis.get("numeric_critic_passed") or 0)
+        check("Prize claim: the Foundry scorecard is measured, with its basis",
+              published_insights > 0 and critic_passed <= published_insights
+              and fe.get("tactical_coherence_pct")
+              == round(critic_passed / published_insights * 100.0, 1),
+              f"{critic_passed}/{published_insights} -> {fe.get('tactical_coherence_pct')}%")
+        check("Prize claim: the audit reports a route for every stage",
+              set(live_audit.get("stage_modes") or {}) == {"a", "b", "c", "d", "e"},
+              str(live_audit.get("stage_modes")))
+        check("Prize claim: the audit reports the Azure and translator posture",
+              all(k in (live_audit.get("azure") or {})
+                  for k in ("last_attempted", "last_used", "last_error",
+                            "request_id", "usage"))
+              and all(k in (live_audit.get("translator") or {})
+                      for k in ("configured", "last_attempted", "last_used",
+                                "last_error")))
+
+        calls = live_wr.get("agent_calls") or []
+        check("Prize claim: the war room is three separate calls",
+              len(calls) == 3
+              and len({tuple(c.get("tools") or []) for c in calls}) == 3
+              and (live_wr.get("orchestration") or {}).get("rounds") == 3,
+              f"{len(calls)} calls, "
+              f"{len({tuple(c.get('tools') or []) for c in calls})} tool bundles")
+        check("Prize claim: every agent call names its deployment and latency",
+              all(c.get("deployment") and c.get("latency_ms") is not None
+                  and "total_tokens" in c for c in calls),
+              ", ".join(sorted({str(c.get("deployment")) for c in calls})))
+
+        arm = json.loads((Path(__file__).resolve().parent.parent
+                          / "infra" / "main.json").read_text(encoding="utf-8"))
+        arm_types = [r["type"] for r in arm["resources"]]
+        check("Prize claim: the ARM template has the 16 resources the guide lists",
+              len(arm_types) == 16
+              and arm_types.count("Microsoft.CognitiveServices/accounts") == 3
+              and arm_types.count("Microsoft.CognitiveServices/accounts/deployments") == 2
+              and arm_types.count("Microsoft.App/containerApps") == 2
+              and arm_types.count("Microsoft.Insights/metricAlerts") == 2
+              and arm_types.count("Microsoft.Authorization/roleAssignments") == 2
+              and arm_types.count("Microsoft.KeyVault/vaults") == 1
+              and arm_types.count("Microsoft.ManagedIdentity/userAssignedIdentities") == 1
+              and arm_types.count("Microsoft.App/managedEnvironments") == 1
+              and arm_types.count("Microsoft.Insights/components") == 1
+              and arm_types.count("Microsoft.OperationalInsights/workspaces") == 1,
+              f"{len(arm_types)} resources")
+
+        check("Prize claim: the health endpoint reports the live client count",
+              isinstance(live_health.get("clients"), int),
+              f"clients={live_health.get('clients')}")
+        check("Prize claim: every published insight passed the numeric critic",
+              live_stats.get("insights", 0) == 0
+              or live_stats.get("grounding_pass") == live_stats.get("insights"),
+              f"{live_stats.get('grounding_pass')}/{live_stats.get('insights')}")
+    except Exception as exc:
+        check("Prize claim: the judge's claims could be verified", False,
+              f"{type(exc).__name__}: {exc}")
+
     print()
     if failures:
         print(f"RESULT: {len(failures)} FAILED -> {failures}")

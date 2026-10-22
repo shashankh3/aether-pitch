@@ -37,7 +37,7 @@ backend/
   counterfactual.py             358 LOC  what-if contract + evaluation (no globals)
   config.py                      98 LOC  environment + runtime configuration
   main.py                     1,318 LOC  HTTP/WS surface + match loop
-  test_pipeline.py            2,340 LOC  225 assertions
+  test_pipeline.py            2,424 LOC  233 assertions
 
 frontend/src/
   lib/edgeEngine.ts           1,707 LOC  the browser-native twin
@@ -157,7 +157,7 @@ The 3D stage is not an observer feed â€” it is a sandbox.
 
 | Suite | Command | Covers |
 |---|---|---|
-| Backend | `python backend/test_pipeline.py` | 225 assertions: all five stages, the gate, the trace, the war-room, the counterfactual arbiter, the line shift, the RAI shield, the hub, the retry policy, the xT/pitch-control invariants, the i18n atlas, the REST contract, the compliance audit |
+| Backend | `python backend/test_pipeline.py` | 233 assertions: all five stages, the gate, the trace, the war-room, the counterfactual arbiter, the line shift, the RAI shield, the hub, the retry policy, the xT/pitch-control invariants, the i18n atlas, the REST contract, the compliance audit |
 | ARM | `python infra/validate_template.py` | JSON validity, ARM symbol resolution, dependency integrity, secret handling |
 | Docs | `python tools/doc_lint.py` | Every assertion count, `/api` path, `npm run` script, quoted file path and module size in the judge-facing docs still matches the code |
 | Types | `cd frontend && npx tsc --noEmit` | The whole contract surface |

@@ -14,7 +14,7 @@
 [![Synthetic Data](https://img.shields.io/badge/data-100%25%20synthetic-6f42c1)](#synthetic-data)
 
 **Repository:** `github.com/shashankh3/aether-pitch` · **Branch:** `main`
-**Scale:** 114 tracked files · ~27,200 LOC of Python + TypeScript (79 source files) · **303 automated assertions** (225 backend · 48 headless logic · 30 headless UI render) · 16-resource Azure ARM template
+**Scale:** 114 tracked files · ~27,284 LOC of Python + TypeScript (79 source files) · **311 automated assertions** (233 backend · 48 headless logic · 30 headless UI render) · 16-resource Azure ARM template
 
 > **The hook:** *AETHER PITCH is a live 3D football broadcast where every number on screen is computed by transparent football mathematics, every AI claim is graded by a deterministic numeric critic, and the cloud can die mid-match without the picture ever dropping a frame.*
 
@@ -54,7 +54,7 @@ Open the app and a dismissible card routes you straight to the evidence for each
 | Prize track | One click opens | What you see |
 |---|---|---|
 | **Best Use of Microsoft Foundry** | Control Center → **Data** | Foundry Eval & Responsible AI scorecard (groundedness, tactical coherence, Prompt Shield status, P95 frame SLA), the **Microsoft Foundry Route** card showing the real triage/narrative deployments, API version, request id, token usage and the active RAI layer, plus the 4-node grounded handoff DAG. |
-| **Best Multi-Agent System** | Control Center → **Studio** | The **Bench War-Room**: a genuine **sequential three-call debate** — `NLATacticalManagerAgent` proposes, `MCSOppositionScoutAgent` counters (reading turn 1), `SpatialArbiterAgent` adjudicates (reading turns 1–2). Each card shows its own model deployment, latency, token count and Stage B tool bundle. The verdict lands as a 3D tactical prescription. |
+| **Best Multi-Agent System** | Control Center → **Studio** | The **Bench War-Room**: a genuine **sequential three-call debate** — `NLATacticalManagerAgent` proposes, `MCSOppositionScoutAgent` counters (reading turn 1), `SpatialArbiterAgent` adjudicates (reading turns 1–2). Each card shows the deployment that call actually ran on, its latency, token count and Stage B tool bundle, so the route is always visible. The verdict lands as a 3D tactical prescription. |
 | **Best Azure Cloud Native** | Control Center → **Ask AI** | The distributed pipeline trace and the **Cloud Resilience & Edge Failover Drill** — one click simulates a 6-second cloud outage and measures the hot-swap latency, 10 Hz continuity and state reconciliation. |
 
 **And if you only have 30 seconds:** open the bottom dock → **Replay** → **What-If Sandbox**, grab a player and drag him. The pitch-control surface and Expected Threat recalculate live under your cursor — the 3D stage is a tactical sandbox, not a video.
