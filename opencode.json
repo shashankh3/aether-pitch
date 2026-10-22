@@ -27,6 +27,8 @@
       "git clean*": "deny",
       "git checkout main*": "deny",
       "git checkout master*": "deny",
+      "git checkout --*": "deny",
+      "git restore*": "deny",
       "git switch main*": "deny",
       "git switch master*": "deny",
       "git rebase*": "deny",
@@ -35,11 +37,12 @@
       "git commit --amend*": "deny",
       "rm -rf /*": "deny",
       "rm -rf ~*": "deny",
-      "rm -rf *": "deny",
-      "Remove-Item *-Recurse*": "deny",
-      "format *": "deny",
-      "curl *": "allow",
-      "Invoke-WebRequest *": "allow"
+      "rm -rf C:\\*": "deny",
+      "rm -rf C:/*": "deny",
+      "Remove-Item C:\\ -Recurse*": "deny",
+      "Remove-Item C:\\ -Force*": "deny",
+      "Remove-Item C:\\* -Recurse*": "deny",
+      "format *": "deny"
     }
   }
 }

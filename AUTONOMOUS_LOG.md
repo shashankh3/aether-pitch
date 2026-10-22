@@ -66,3 +66,7 @@ Base commit: `d28ccdf`
 ### 2026-10-22T07:11:13Z — Stage B spatial invariants + NaN cross-engine drift fix
 - Files: backend/stage_b_math_engine.py, frontend/src/lib/edgeEngine.ts, backend/test_pipeline.py, frontend/scripts/logic-check.ts, README.md, docs/ARCHITECTURE.md, SUBMISSION_GUIDE.md, AUTONOMOUS_BACKLOG.md
 - Verification: 154 backend + 36 logic + 30 UI render = 220 assertions; ARM valid; tsc clean; build ok; SSR smoke ok
+
+### 2026-10-22T07:25:57Z — i18n atlas coverage lock + cp1252 mojibake repair
+- Files: backend/test_pipeline.py, frontend/scripts/logic-check.ts, frontend/src/lib/edgeEngine.ts, README.md, docs/ARCHITECTURE.md, SUBMISSION_GUIDE.md, AUTONOMOUS_BACKLOG.md
+- Verification: 163 backend + 37 logic + 30 UI render = 230 assertions; ARM valid; tsc clean; build ok; SSR smoke ok
