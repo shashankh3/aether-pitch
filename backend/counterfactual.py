@@ -13,11 +13,20 @@ request cannot inflate the result; the client baseline is only a cross-check.
 from __future__ import annotations
 
 import hashlib
-from typing import Any, Dict, List, Optional, Tuple
+import math
+from typing import Annotated, Any, Dict, List, Optional, Tuple
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 PITCH_L = 105.0
+PITCH_W = 68.0
+
+#: A coordinate is a position on the pitch. The client drag layer already
+#: clamps to the pitch, so anything outside it is corrupt input, not a
+#: creative placement - and an out-of-pitch coordinate would otherwise read
+#: as a plausible corner-of-the-grid xT.
+PitchX = Annotated[float, Field(ge=-1.0, le=PITCH_L + 1.0, allow_inf_nan=False)]
+PitchY = Annotated[float, Field(ge=-1.0, le=PITCH_W + 1.0, allow_inf_nan=False)]
 
 
 class CounterfactualDisplacement(BaseModel):
@@ -33,12 +42,12 @@ class CounterfactualDisplacement(BaseModel):
     )
     team: str = Field(description="NLA or MCS.")
     role: str = Field(description="GK | DEF | MID | FWD.")
-    original_coords: Tuple[float, float] = Field(
+    original_coords: Tuple[PitchX, PitchY] = Field(
         description="Where the player stood, in absolute pitch metres (x, y).")
-    displaced_coords: Tuple[float, float] = Field(
+    displaced_coords: Tuple[PitchX, PitchY] = Field(
         description="Where the judge dragged them to, in absolute pitch metres (x, y).")
     delta_distance_m: float = Field(
-        description="Euclidean displacement in metres.", ge=0.0)
+        description="Euclidean displacement in metres.", ge=0.0, allow_inf_nan=False)
 
 
 class DefensiveLineOverride(BaseModel):
@@ -47,28 +56,39 @@ class DefensiveLineOverride(BaseModel):
     team: str = Field(description="NLA or MCS.")
     original_height_m: float = Field(
         description="The line height before the shift, in metres from the team's own goal line.",
-        ge=0.0, le=80.0)
+        ge=0.0, le=80.0, allow_inf_nan=False)
     target_height_m: float = Field(
         description="The requested line height, clamped to [18.0, 52.0] metres.",
-        ge=0.0, le=80.0)
+        ge=0.0, le=80.0, allow_inf_nan=False)
 
 
 class CounterfactualRequest(BaseModel):
     """A full sandbox scenario submitted for arbitration."""
 
     match_id: str = Field(description="Synthetic match id.")
-    minute: float = Field(description="Match minute of the scenario.")
+    minute: float = Field(description="Match minute of the scenario.", allow_inf_nan=False)
     displacements: List[CounterfactualDisplacement] = Field(
-        description="Every player relocated in this scenario.")
+        description="Every player relocated in this scenario.", max_length=22)
     baseline_xt: float = Field(
-        description="Client-side xT at the original position.")
+        description="Client-side xT at the original position.", allow_inf_nan=False)
     baseline_pitch_control: Dict[str, float] = Field(
         description="Client-side baseline territory split.")
     current_chaos_index: float = Field(
-        description="Chaos Index at the moment of the scenario.", ge=0.0, le=1.0)
+        description="Chaos Index at the moment of the scenario.", ge=0.0, le=1.0,
+        allow_inf_nan=False)
     defensive_line_override: Optional[DefensiveLineOverride] = Field(
         default=None,
         description="Optional collective defensive line shift for one team.")
+
+    @field_validator("baseline_pitch_control")
+    @classmethod
+    def _finite_baseline(cls, v: Dict[str, float]) -> Dict[str, float]:
+        """The client baseline is only a cross-check, but a NaN in it would
+        still poison that cross-check, so it must be finite too."""
+        for key, value in v.items():
+            if not math.isfinite(float(value)):
+                raise ValueError(f"baseline_pitch_control[{key!r}] must be a finite number")
+        return v
 
 
 class CounterfactualEvaluation(BaseModel):

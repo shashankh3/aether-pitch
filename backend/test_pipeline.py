@@ -1329,6 +1329,58 @@ def main() -> int:
         unknown_rejected = True
     check("Sandbox: an unresolvable player is rejected, not scored",
           unknown_rejected)
+
+    # ---- the API must reject corrupt (non-finite / off-pitch) input ------
+    # Python's json.loads accepts bare NaN and Infinity tokens, so a client
+    # really can post them. Before the fix they reached xt_value, where the
+    # engine silently clamped them to the far corner of the grid.
+    def _cf_payload(**over):
+        base = dict(
+            match_id="SYN-PL-2026-1019-NLA-MCS", minute=62.5,
+            displacements=[app_main.CounterfactualDisplacement(
+                player_id=rb["shirt_number"],
+                canonical_player_id=rb["id"],
+                team=rb["team"], role=rb["role"],
+                original_coords=(60.0, 34.0), displaced_coords=(70.0, 34.0),
+                delta_distance_m=10.0)],
+            baseline_xt=0.05,
+            baseline_pitch_control={"nla_territory_pct": 52.0},
+            current_chaos_index=0.5,
+        )
+        base.update(over)
+        return base
+
+    def _cf_rejected(**over) -> bool:
+        try:
+            app_main.CounterfactualRequest(**_cf_payload(**over))
+            return False
+        except Exception:
+            return True
+
+    def _raw_displacement(dx, dy):
+        # A raw dict, so Pydantic really validates it (model_construct would
+        # skip validation and prove nothing).
+        return [dict(
+            player_id=3, canonical_player_id="NLA_3", team="NLA", role="DEF",
+            original_coords=[60.0, 34.0], displaced_coords=[dx, dy],
+            delta_distance_m=10.0)]
+
+    check("Sandbox: a NaN coordinate is rejected at the API boundary",
+          _cf_rejected(displacements=_raw_displacement(float("nan"), float("nan"))))
+    check("Sandbox: an infinite coordinate is rejected at the API boundary",
+          _cf_rejected(displacements=_raw_displacement(float("inf"), 34.0)))
+    check("Sandbox: an off-pitch coordinate is rejected",
+          _cf_rejected(displacements=_raw_displacement(9999.0, 34.0)))
+    check("Sandbox: a NaN in the client baseline is rejected",
+          _cf_rejected(baseline_pitch_control={"nla_territory_pct": float("nan")}))
+    check("Sandbox: an in-bounds coordinate is still accepted",
+          not _cf_rejected())
+
+    # The engine itself must also stay honest if a non-finite value ever
+    # reaches it from another path.
+    check("Sandbox: the engine reads a non-finite coordinate as out of play",
+          math.xt_value("NLA", float("nan"), 34.0) == XT_MIN
+          and math.xt_value("MCS", 50.0, float("inf")) == XT_MIN)
     # The Azure path: the arbiter must be a real model call.
     arbiter_calls: list = []
 

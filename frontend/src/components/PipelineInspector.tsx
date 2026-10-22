@@ -253,13 +253,15 @@ interface ScorecardProps {
   onRunAudit: () => void;
   azure?: PipelineAudit["azure"];
   contentSafety?: ContentSafetyVerdict;
+  translator?: PipelineAudit["translator"];
 }
 
 /* ------------------------------------------- v6.2 Foundry connection panel */
 
-function FoundryConnectionCard({ azure, contentSafety }: {
+function FoundryConnectionCard({ azure, contentSafety, translator }: {
   azure?: PipelineAudit["azure"];
   contentSafety?: ContentSafetyVerdict;
+  translator?: PipelineAudit["translator"];
 }) {
   if (!azure) return null;
   const configured = !!azure.configured;
@@ -397,7 +399,7 @@ function ScoreMetric({
 }
 
 function FoundryEvalScorecardPanel({
-  scorecard, trace, auditing, receipt, onRunAudit, azure, contentSafety,
+  scorecard, trace, auditing, receipt, onRunAudit, azure, contentSafety, translator,
 }: ScorecardProps) {
   const groundingPct = scorecard?.mathematical_groundedness_pct
     ?? (trace ? Math.round(trace.grounding.score * 100) : 100);
@@ -473,7 +475,7 @@ function FoundryEvalScorecardPanel({
         {scorecard?.evaluated_at ?? "on demand"} · deterministic offline fallback
       </p>
 
-      <FoundryConnectionCard azure={azure} contentSafety={contentSafety} />
+      <FoundryConnectionCard azure={azure} contentSafety={contentSafety} translator={translator} />
     </div>
   );
 }
@@ -627,6 +629,8 @@ export function PipelinePanel({
   const [auditing, setAuditing] = useState(false);
   const [azureBlock, setAzureBlock] = useState<PipelineAudit["azure"] | undefined>(undefined);
   const [contentSafety, setContentSafety] = useState<ContentSafetyVerdict | undefined>(undefined);
+  const [translatorBlock, setTranslatorBlock] = useState<PipelineAudit["translator"] | undefined>(undefined);
+  const [auditUnreachable, setAuditUnreachable] = useState(false);
 
   const runGroundingAudit = useCallback(async () => {
     setAuditing(true);
@@ -636,12 +640,15 @@ export function PipelinePanel({
       const data = (await r.json()) as PipelineAudit;
       if (data.foundry_eval) setEvalCard(data.foundry_eval);
       if (data.azure) setAzureBlock(data.azure);
+      if (data.translator) setTranslatorBlock(data.translator);
       if (data.foundry_eval?.content_safety) setContentSafety(data.foundry_eval.content_safety);
+      setAuditUnreachable(false);
       setAuditReceipt({
         at: new Date().toISOString(),
         source: data.foundry_eval?.eval_suite ?? "aether-foundry-eval-v1",
       });
     } catch {
+      setAuditUnreachable(true);
       setAuditReceipt({ at: new Date().toISOString(), source: "unreachable" });
     } finally {
       setAuditing(false);
@@ -661,12 +668,21 @@ export function PipelinePanel({
     fetch(`${API_BASE}/api/health/pipeline-audit`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data: PipelineAudit | null) => {
-        if (cancelled || !data) return;
+        if (cancelled) return;
+        if (!data) {
+          // An empty panel reads as "not implemented". Say so explicitly.
+          setAuditUnreachable(true);
+          return;
+        }
         if (data.foundry_eval) setEvalCard(data.foundry_eval);
         if (data.azure) setAzureBlock(data.azure);
+        if (data.translator) setTranslatorBlock(data.translator);
         if (data.foundry_eval?.content_safety) setContentSafety(data.foundry_eval.content_safety);
+        setAuditUnreachable(false);
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (!cancelled) setAuditUnreachable(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -692,6 +708,19 @@ export function PipelinePanel({
         </div>
       )}
 
+      {auditUnreachable && (
+        <div className="clip-ea mb-2 border border-gold/40 bg-gold/[0.07] px-2 py-1.5">
+          <div className="font-tech text-[9.5px] font-bold uppercase tracking-wider text-gold">
+            Live audit unreachable
+          </div>
+          <div className="mt-0.5 font-tech text-[9px] leading-relaxed text-slate-400">
+            The backend self-test could not be reached, so the Foundry route, the eval
+            scorecard and the RAI shield readouts below are unavailable right now. The
+            deterministic pipeline is still running live.
+          </div>
+        </div>
+      )}
+
       <FoundryEvalScorecardPanel
         scorecard={evalCard}
         trace={trace}
@@ -700,6 +729,7 @@ export function PipelinePanel({
         onRunAudit={runGroundingAudit}
         azure={azureBlock}
         contentSafety={contentSafety}
+        translator={translatorBlock}
       />
 
       {onTriggerDrill && (
