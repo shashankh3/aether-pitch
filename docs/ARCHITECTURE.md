@@ -1,4 +1,4 @@
-# AETHER PITCH â€” Architecture Reference
+# AETHER PITCH — Architecture Reference
 
 > A real-time 3D football broadcast studio running on 100% self-generated
 > synthetic telemetry, with a deterministic five-stage AI pipeline and a
@@ -27,39 +27,40 @@ network.
 
 ```text
 backend/
-  stage_a_synthetic_engine.py 1,075 LOC  Stage A â€” the simulation
-  stage_b_math_engine.py        870 LOC  Stage B â€” the mathematics
-  stage_c_foundry_agents.py   1,549 LOC  Stage C â€” Foundry routing + agents
-  stage_d_e_personalizer.py     498 LOC  Stage D/E â€” render + personalise
+  stage_a_synthetic_engine.py 1,075 LOC  Stage A — the simulation
+  stage_b_math_engine.py        870 LOC  Stage B — the mathematics
+  stage_c_foundry_agents.py   1,549 LOC  Stage C — Foundry routing + agents
+  stage_d_e_personalizer.py     498 LOC  Stage D/E — render + personalise
   agent_trace.py                231 LOC  grounded handoff trace
   rai_shield.py                 311 LOC  prompt shield + neutrality + grounding
   content_safety.py             147 LOC  Azure AI Content Safety (optional)
   counterfactual.py             358 LOC  what-if contract + evaluation (no globals)
   config.py                      98 LOC  environment + runtime configuration
   main.py                     1,318 LOC  HTTP/WS surface + match loop
-  test_pipeline.py            2,489 LOC  237 assertions
+  test_pipeline.py            2,517 LOC  237 assertions
 
 frontend/src/
   lib/edgeEngine.ts           1,749 LOC  the browser-native twin
-  lib/telemetry.ts              284 LOC  10 Hz store â†’ 60 fps render
+  lib/telemetry.ts              284 LOC  10 Hz store → 60 fps render
   lib/types.ts                  907 LOC  the shared contract surface
   lib/dossier.ts                359 LOC  audit dossier serialization
   lib/sandboxStore.ts           247 LOC  what-if sandbox state
   lib/ledgerStore.ts             88 LOC  counterfactual experiment ledger
   lib/runtimeConfig.ts           53 LOC  runtime backend coordinates
+  lib/terminology.ts         380 LOC  the terminology module
   lib/narrativeAtlas.ts       92 LOC  the narrativeAtlas module
   parity_fixture.py          237 LOC  the parity_fixture module
   lib/failoverDrill.ts       199 LOC  the failoverDrill module
-  lib/hudContext.tsx            137 LOC  control-center + palette state
+  lib/hudContext.tsx            169 LOC  control-center + palette state
   lib/useModalA11y.ts            72 LOC  focus trap + escape handling
   lib/utils.ts                   14 LOC  shared class-name helper
   lib/api.ts                      6 LOC  the REST client
-  app/page.tsx                1,281 LOC  the orchestrator
+  app/page.tsx                1,285 LOC  the orchestrator
   app/layout.tsx                108 LOC  runtime config injection + error boundary
   hooks/useResilientMatchEngine.ts  336 LOC  WS + edge failover + drill
   hooks/useSpeechController.ts      129 LOC  zero-overlap speech
   hooks/useRenderTelemetry.ts       55 LOC  measured frame rate
-  components/                            HUD, drawers, modals (30 files)
+  components/                            HUD, drawers, modals (32 files)
   components/three/                      the 3D scene (12 files)
 
 infra/main.json                 491 LOC  ARM template (16 resources)
@@ -70,20 +71,20 @@ infra/main.json                 491 LOC  ARM template (16 resources)
 ## 3. Data flow
 
 ```text
-             â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ 10 Hz â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-             â”‚                                                      â”‚
-  [Stage A] seed=42 simulation â”€â”€â–º state{players,ball,clock}      â”‚
-             â”‚                              â”‚                     â”‚
-  [Stage B] deterministic math â—„â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜                     â”‚
-             â”‚  xT grid Â· PDR Â· Chaos Â· PPDA                      â”‚
-             â”‚  pitch control Â· ghost pass Â· bio-load             â”‚
-             â–¼                                                    â”‚
-  [Stage C] Foundry router (optional) â”€â”€â–º narrative + scene directive
-             â”‚                                                    â”‚
-  [Stage D/E] render packet + personalisation                    â”‚
-             â”‚                                                    â”‚
-             â–¼                                                    â”‚
-        FastAPI hub â”€â”€WebSocket /wsâ”€â”€â–º telemetry store â”€â”€â–º 3D + HUD
+             ┌──────────────────────── 10 Hz â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+             │                                                      │
+  [Stage A] seed=42 simulation ──► state{players,ball,clock}      │
+             │                              │                     │
+  [Stage B] deterministic math ◄───────────┘                     │
+             │  xT grid · PDR · Chaos · PPDA                      │
+             │  pitch control · ghost pass · bio-load             │
+             ▼                                                    │
+  [Stage C] Foundry router (optional) ──► narrative + scene directive
+             │                                                    │
+  [Stage D/E] render packet + personalisation                    │
+             │                                                    │
+             ▼                                                    │
+        FastAPI hub ──WebSocket /ws──► telemetry store ──► 3D + HUD
 ```
 
 ### The four resilience layers
@@ -108,35 +109,35 @@ refusal of a second trigger, the socket-reopen cross-check and timer disposal.
 
 ## 4. The five stages
 
-### Stage A â€” Synthetic ingest (`stage_a_synthetic_engine.py`)
+### Stage A — Synthetic ingest (`stage_a_synthetic_engine.py`)
 A seeded, frame-for-frame reproducible football simulation: 22 players with
 per-role kinematics, ball physics, pass completion, tackles, auto-evented
 sprint/distance thresholds, milestone detection, match metadata, and the
 **bio-load twin** (rolling metabolic load, +10-minute stamina projection,
 fatigue-adjusted PDR penalty, role-specific relief directive).
 
-### Stage B â€” Deterministic mathematics (`stage_b_math_engine.py`)
+### Stage B — Deterministic mathematics (`stage_b_math_engine.py`)
 Pure NumPy, zero heuristics, 100% auditable:
 
 | Output | Meaning |
 |---|---|
-| `xt_value` / 16Ã—12 grid | Expected Threat, normalised to [0.004, 0.350] |
+| `xt_value` / 16×12 grid | Expected Threat, normalised to [0.004, 0.350] |
 | `pass_difficulty` | Logistic PDR from distance, speed, defenders, nearest man |
 | `chaos_index` | EMA of turnovers, ball-speed variance, line stretch, press |
 | `ppda` | Passes allowed per defensive action, rolling 60 s window |
-| `ghost_pass` | The better lane nobody took, with net Î”xT and completion % |
+| `ghost_pass` | The better lane nobody took, with net ΔxT and completion % |
 | `pitch_control_split` | Territory share per cell, proximity + velocity weighted |
 | `passing_network_edges` | Top-5 high-value lanes with xT weights |
-| `evaluate_defensive_line_shift` | Collective line shift â†’ exposure, trap %, press gain |
+| `evaluate_defensive_line_shift` | Collective line shift → exposure, trap %, press gain |
 | `bio_load_summary` | Mean load, mean +10 m projection, worst penalty, at-risk list |
 
-### Stage C â€” Foundry routing and agents (`stage_c_foundry_agents.py`)
-- **4-node insight pipeline** â€” `Spatial Sentinel` â†’ `Tactical Triage` â†’ `Causal Analyst + Critic` â†’ `Broadcast Director`.
-- **3-turn adversarial war-room** â€” manager proposes, scout counters, arbiter adjudicates. Each turn is a *separate* model call with its own Stage B tool bundle, and each reads the turns before it.
-- **Counterfactual arbiter** â€” `POST /api/counterfactual-query` returns a `structural_vulnerability_index`, a compensation move, and a numeric-critic verdict.
-- **RAI** â€” a pre-flight prompt shield, a post-flight numeric critic and a club-neutrality gate, plus optional Azure AI Content Safety.
+### Stage C — Foundry routing and agents (`stage_c_foundry_agents.py`)
+- **4-node insight pipeline** — `Spatial Sentinel` → `Tactical Triage` → `Causal Analyst + Critic` → `Broadcast Director`.
+- **3-turn adversarial war-room** — manager proposes, scout counters, arbiter adjudicates. Each turn is a *separate* model call with its own Stage B tool bundle, and each reads the turns before it.
+- **Counterfactual arbiter** — `POST /api/counterfactual-query` returns a `structural_vulnerability_index`, a compensation move, and a numeric-critic verdict.
+- **RAI** — a pre-flight prompt shield, a post-flight numeric critic and a club-neutrality gate, plus optional Azure AI Content Safety.
 
-### Stage D/E â€” Render and personalise (`stage_d_e_personalizer.py`)
+### Stage D/E — Render and personalise (`stage_d_e_personalizer.py`)
 Overlay packets, camera directives, highlight zones; persona, metric lock, club
 bias, locked player, cognitive density, colourblind palette, market language.
 
@@ -144,7 +145,7 @@ bias, locked player, cognitive density, colourblind palette, market language.
 
 ## 5. The interactive counterfactual sandbox
 
-The 3D stage is not an observer feed â€” it is a sandbox.
+The 3D stage is not an observer feed — it is a sandbox.
 
 1. **Pause and grab.** The judge drags any avatar. `sandboxStore` holds the
    relocation in a mutable module store, so the 60 fps render loop is
@@ -176,10 +177,10 @@ The 3D stage is not an observer feed â€” it is a sandbox.
 | Build | `npm run build` | Production compile |
 | SSR | `npm run smoke` | In-process server render, runtime config injection, no SSR error |
 | Logic | `npm run check:logic` | 83 headless assertions over the browser twin, the sandbox, the ledger, the dossier and the DVR buffer |
-| UI render | `npm run smoke:ui` | 30 assertions â€” every judge-facing surface renders without throwing |
+| UI render | `npm run smoke:ui` | 30 assertions — every judge-facing surface renders without throwing |
 
-The backend suite also runs the **Official Rules compliance audit** â€” synthetic
-metadata, deterministic replay, Stage Aâ€“E payload keys, zero third-party brand
+The backend suite also runs the **Official Rules compliance audit** — synthetic
+metadata, deterministic replay, Stage A–E payload keys, zero third-party brand
 strings, zero external media references, encoding hygiene and ARM validity.
 
 The logic suite also enforces the **accessibility gate**: every slate token the
@@ -233,6 +234,6 @@ chip in the corner. Four things keep that inside the frame budget:
 The render-affecting work is also throttled to the rate the data actually
 arrives: the defensive-line overlays recompute on the 10 Hz stream tick, not
 on the 60 Hz animation frame. The one place that used to rebuild a Bezier
-curve from scratch every frame â€” the ghost-pass trail â€” now reuses a
+curve from scratch every frame — the ghost-pass trail — now reuses a
 module-level curve and scratch vectors, so a frame allocates nothing while a
 ghost pass is on screen.

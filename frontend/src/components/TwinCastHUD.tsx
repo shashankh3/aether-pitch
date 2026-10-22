@@ -12,6 +12,8 @@ import type {
 import { COGNITIVE_DENSITY_META, LANG_LABELS } from "@/lib/types";
 import { useSpeechController } from "@/hooks/useSpeechController";
 import { cn } from "@/lib/utils";
+import { useHud } from "@/lib/hudContext";
+import { MetricLabel } from "@/components/hud/MetricLabel";
 
 interface Props {
   insights: Insight[];
@@ -36,6 +38,7 @@ const METRIC_LABELS: Record<MetricFocus, string> = {
 
 function AnalystCard({
   metrics, tick, latestEvent, focus, showRawNumbers = true, jargon = true,
+  plainLanguage = true,
 }: {
   metrics: Metrics | null;
   tick: MatchTick | null;
@@ -43,6 +46,7 @@ function AnalystCard({
   focus: MetricFocus;
   showRawNumbers?: boolean;
   jargon?: boolean;
+  plainLanguage?: boolean;
 }) {
   const fastest = tick?.players.reduce((best, p) => p.speed_kmh > best ? p.speed_kmh : best, 0) ?? 0;
   const sprinters = tick?.players.filter((p) => p.speed_kmh >= 30).length ?? 0;
@@ -113,7 +117,9 @@ function AnalystCard({
       <div className="grid grid-cols-2 gap-1.5">
         {visibleRows.map(([k, v, c]) => (
           <div key={k} className="clip-chamfer border border-white/10 bg-white/[0.03] px-2 py-1.5">
-            <div className="font-display text-[9px] font-semibold uppercase tracking-[0.2em] text-slate-500">{k}</div>
+            <div className="font-display text-[9px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+              <MetricLabel label={k} plain={plainLanguage} />
+            </div>
             <div className={`font-tech text-[14px] font-bold ${c}`}>{v}</div>
           </div>
         ))}
@@ -175,7 +181,8 @@ export default function TwinCastHUD({
   insights, persona, onPersona, lang, metrics, tick, latestEvent, metricFocus, clubBias,
   cognitiveDensity = "PRO_TACTICAL_DIRECTOR",
 }: Props) {
-  const { isSpeaking, isVoiceMuted, speakAuto, toggleMute } = useSpeechController();
+    const { isSpeaking, isVoiceMuted, speakAuto, toggleMute } = useSpeechController();
+    const { plainLanguage } = useHud();
   const spokenRef = useRef<string>("");
   const latest = insights[0];
   const densityMeta = COGNITIVE_DENSITY_META[cognitiveDensity];
@@ -294,6 +301,7 @@ export default function TwinCastHUD({
                 focus={metricFocus}
                 showRawNumbers={showRawNumbers}
                 jargon={densityMeta.jargon}
+                plainLanguage={plainLanguage}
               />
             </div>
             <div className="clip-chamfer mt-2.5 border border-white/10 bg-white/[0.03] px-2.5 py-2">

@@ -13,6 +13,8 @@ import { SPEECH_LOCALES } from "@/lib/types";
 import { CRESTS } from "@/components/Crests";
 import { useSpeechController } from "@/hooks/useSpeechController";
 import { clamp } from "@/lib/utils";
+import { useHud } from "@/lib/hudContext";
+import { MetricLabel } from "@/components/hud/MetricLabel";
 
 const SPRINT_KMH = 30;
 const DIAL_MAX = 36;
@@ -113,6 +115,7 @@ interface Props {
 /* ------------------------------------------- v6.2 bio-load / fatigue twin */
 
 function BioLoadMeter({ player }: { player: PlayerTick }) {
+  const { plainLanguage } = useHud();
   const profile = player.bio_load_profile;
   if (!profile) return null;
 
@@ -141,7 +144,8 @@ function BioLoadMeter({ player }: { player: PlayerTick }) {
     <div className="clip-chamfer mt-2 border border-white/10 bg-black/30 p-2">
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <span className="flex items-center gap-1 font-display text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400">
-          <HeartPulse size={11} className="text-crimson" /> Bio-Load &amp; +10m Stamina
+          <HeartPulse size={11} className="text-crimson" />{" "}
+          <MetricLabel label="BIO-LOAD & +10m STAMINA" plain={plainLanguage} />
         </span>
         <span
           className="clip-skew px-1.5 py-0.5 font-tech text-[8px] font-bold uppercase tracking-wider"
@@ -182,7 +186,9 @@ function BioLoadMeter({ player }: { player: PlayerTick }) {
             />
           </div>
           <div className="mt-0.5 flex items-center justify-between font-tech text-[8px] uppercase tracking-wider text-slate-500">
-            <span>PDR penalty</span>
+            <span>
+              <MetricLabel label="PDR penalty" plain={plainLanguage} />
+            </span>
             <span className="font-bold text-amber-300">−{penalty.toFixed(1)}%</span>
           </div>
         </div>
@@ -209,6 +215,7 @@ export default function PlayerLock360({ tick, lockedId, onLock, events, lang, in
   const sprinting = (player?.speed_kmh ?? 0) > SPRINT_KMH;
   const Crest = player ? CRESTS[player.team as Team] : null;
   const { speakInsight } = useSpeechController();
+  const { plainLanguage } = useHud();
 
   const roster = useMemo(() => tick?.players ?? [], [tick?.players]);
 

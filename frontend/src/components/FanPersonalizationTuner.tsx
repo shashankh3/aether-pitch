@@ -10,6 +10,8 @@ import type {
 } from "@/lib/types";
 import { COGNITIVE_DENSITY_META } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useHud } from "@/lib/hudContext";
+import { MetricLabel } from "@/components/hud/MetricLabel";
 
 export const FAN_PERSONAS: { id: PersonaModeV5; label: string }[] = [
   { id: "ANALYST_HUD", label: "Analyst" },
@@ -45,8 +47,9 @@ interface Props {
 }
 
 export default function FanPersonalizationPanel({
-  state, onChange, colorblindSafe = false, onToggleColorblind,
-}: Props) {
+    state, onChange, colorblindSafe = false, onToggleColorblind,
+  }: Props) {
+    const { plainLanguage } = useHud();
   const update = <K extends keyof PersonalizationState>(key: K, value: PersonalizationState[K]) => {
     onChange({ ...state, [key]: value });
   };
@@ -115,9 +118,9 @@ export default function FanPersonalizationPanel({
         </div>
       </div>
 
-      <div className="mb-2" role="group" aria-label="Cognitive telemetry density">
+      <div className="mb-2" role="group" aria-label="How much detail you see">
         <div className="mb-1 flex items-center gap-1 font-display text-[9px] font-bold uppercase tracking-[0.22em] text-slate-500">
-          <Brain size={10} /> Cognitive Telemetry Density
+          <Brain size={10} /> <MetricLabel label="Cognitive Telemetry Density" plain={plainLanguage} />
         </div>
         <div className="space-y-1">
           {FAN_DENSITIES.map((id) => {

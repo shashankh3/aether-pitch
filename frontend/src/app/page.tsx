@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import HoloPitch3D, { type OverlayToggles } from "@/components/three/HoloPitch3D";
 import TacticalPulseBar from "@/components/TacticalPulseBar";
 import BroadcastAlphaModal, { SMPTEChip } from "@/components/BroadcastAlphaModal";
+import PlainLanguageSheet from "@/components/hud/PlainLanguageSheet";
 import RubricVerifierModal from "@/components/RubricVerifierModal";
 import MatchRecapStudioModal from "@/components/MatchRecapStudioModal";
 import LiveCaptionStrip from "@/components/LiveCaptionStrip";
@@ -140,6 +141,7 @@ function StudioOrchestrator() {
   const [alphaMode, setAlphaMode] = useState(false);
   const [alphaBackdrop, setAlphaBackdrop] = useState<"checker" | "green">("checker");
   const [showAlphaModal, setShowAlphaModal] = useState(false);
+  const [showGlossary, setShowGlossary] = useState(false);
   const [showRubric, setShowRubric] = useState(false);
 
   // ---- presentation / clean-feed controls ----
@@ -972,9 +974,10 @@ function StudioOrchestrator() {
               autopilotElapsed={autopilotElapsed}
               autopilotStep={autopilotStep}
               onToggleAutopilot={toggleAutopilot}
-              isSpeaking={isSpeaking}
-              isVoiceMuted={isVoiceMuted}
-              onToggleMute={toggleMute}
+                isSpeaking={isSpeaking}
+                isVoiceMuted={isVoiceMuted}
+                onToggleMute={toggleMute}
+                onOpenGlossary={() => setShowGlossary(true)}
             />
           </div>
 
@@ -1266,6 +1269,7 @@ function StudioOrchestrator() {
 
       {/* ---------- modals (outside the pointer-events-none HUD wrapper) ---------- */}
       <BroadcastAlphaModal open={showAlphaModal} onClose={() => setShowAlphaModal(false)} insight={latest} />
+      <PlainLanguageSheet open={showGlossary} onClose={() => setShowGlossary(false)} />
       <RubricVerifierModal open={showRubric} onClose={() => setShowRubric(false)} />
       <MatchRecapStudioModal
         open={showRecap}

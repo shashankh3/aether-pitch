@@ -4,6 +4,8 @@
 // countdown badge that arms when chaos crosses the 0.68 threshold.
 
 import type { Metrics } from "@/lib/types";
+import { useHud } from "@/lib/hudContext";
+import { MetricLabel } from "@/components/hud/MetricLabel";
 
 interface Props {
   metrics: Metrics | null;
@@ -38,6 +40,7 @@ function Sparkline({ history }: { history: number[] }) {
 }
 
 export default function TacticalPulseBar({ metrics, compact = false }: Props) {
+  const { plainLanguage } = useHud();
   const chaos = metrics?.chaos_index ?? 0;
   const state = metrics?.chaos_state ?? "BALANCED RHYTHM";
   const critical = chaos > 0.68;
@@ -53,10 +56,10 @@ export default function TacticalPulseBar({ metrics, compact = false }: Props) {
         className={`clip-skew panel-lux panel-enter pointer-events-auto flex items-center gap-2 border px-2.5 py-1 backdrop-blur-xl ${
           critical ? "animate-pulse-crimson border-crimson/60" : "border-white/15"
         }`}
-        title="Tactical Pulse · Control vs Chaos"
+        title="Match tempo"
       >
         <span className="font-display text-[9px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-          Pulse
+          <MetricLabel label="Pulse" plain={plainLanguage} />
         </span>
         <span
           className={`font-tech text-[16px] font-bold leading-none ${
@@ -70,7 +73,9 @@ export default function TacticalPulseBar({ metrics, compact = false }: Props) {
             ⚡ Counter-Attack · {runway}s
           </span>
         ) : (
-          <span className="font-tech text-[9.5px] uppercase tracking-[0.16em] text-slate-500">{state}</span>
+          <span className="font-tech text-[9.5px] uppercase tracking-[0.16em] text-slate-500">
+            <MetricLabel label={state} plain={plainLanguage} />
+          </span>
         )}
       </div>
     );
@@ -85,7 +90,7 @@ export default function TacticalPulseBar({ metrics, compact = false }: Props) {
       <div className="hairline absolute inset-x-0 top-0 h-px opacity-60" />
       <div className="mb-1 flex items-center justify-between">
         <span className="font-display text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">
-          Tactical Pulse · Control vs Chaos
+          <MetricLabel label="Tactical Pulse · Control vs Chaos" plain={plainLanguage} />
         </span>
         {critical ? (
           <span className="clip-skew animate-breathe bg-crimson/25 px-2 py-0.5 font-tech text-[10px] font-bold uppercase tracking-[0.14em] text-crimson">
@@ -93,7 +98,8 @@ export default function TacticalPulseBar({ metrics, compact = false }: Props) {
           </span>
         ) : (
           <span className="font-tech text-[10px] uppercase tracking-[0.2em] text-slate-600">
-            Δ10s {((metrics?.delta_chaos ?? 0) >= 0 ? "+" : "") + (metrics?.delta_chaos ?? 0).toFixed(2)}
+            <MetricLabel label="Δ10s" plain={plainLanguage} />{" "}
+            {((metrics?.delta_chaos ?? 0) >= 0 ? "+" : "") + (metrics?.delta_chaos ?? 0).toFixed(2)}
           </span>
         )}
       </div>

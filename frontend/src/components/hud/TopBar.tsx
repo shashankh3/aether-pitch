@@ -4,7 +4,7 @@
 // the Control Center so the default broadcast view stays uncluttered.
 
 import {
-  Eye, EyeOff, Languages, Maximize2, Minimize2, Play, Radio, SlidersHorizontal,
+  BookOpen, Eye, EyeOff, Languages, Maximize2, Minimize2, Play, Radio, SlidersHorizontal,
   Square, Trophy, Volume2, VolumeX,
 } from "lucide-react";
 import type { LangCode } from "@/lib/types";
@@ -29,14 +29,16 @@ interface Props {
   isSpeaking: boolean;
   isVoiceMuted: boolean;
   onToggleMute: () => void;
+  /** Open the plain-English glossary. */
+  onOpenGlossary: () => void;
 }
 
 export default function TopBar({
   connected, lang, alphaMode, cinemaMode, onToggleCinema,
   isFullscreen, onToggleFullscreen, autopilotActive, autopilotElapsed, autopilotStep, onToggleAutopilot,
-  isSpeaking, isVoiceMuted, onToggleMute,
+    isSpeaking, isVoiceMuted, onToggleMute, onOpenGlossary,
 }: Props) {
-  const { controlCenterOpen, openControlCenter, palette } = useHud();
+  const { controlCenterOpen, openControlCenter, palette, plainLanguage, setPlainLanguage } = useHud();
   const { fps, frameMs } = useRenderTelemetry();
 
   return (
@@ -75,6 +77,26 @@ export default function TopBar({
       {/* right control cluster */}
       <div className="ml-auto flex shrink-0 items-center gap-1">
         <button
+          onClick={() => setPlainLanguage(!plainLanguage)}
+          aria-pressed={plainLanguage}
+          className={cn(
+            "clip-skew flex h-8 items-center gap-1.5 border px-2 font-tech text-[10px] font-bold uppercase tracking-wider transition",
+            plainLanguage
+              ? "border-pitch/40 bg-pitch/10 text-pitch"
+              : "border-white/10 bg-slate-950/75 text-slate-400 hover:border-tactical/40 hover:text-white",
+          )}
+          title={plainLanguage
+            ? "Showing plain-English labels — tap for the analyst terms (xT, PPDA, Chaos Index)"
+            : "Showing analyst terms — tap for plain-English labels"}
+          aria-label={plainLanguage
+            ? "Plain English labels on. Switch to analyst terms."
+            : "Analyst terms on. Switch to plain English labels."}
+        >
+          {plainLanguage ? <Eye size={12} /> : <EyeOff size={12} />}
+          {plainLanguage ? "Plain" : "Analyst"}
+        </button>
+
+        <button
           onClick={onToggleMute}
           aria-pressed={isVoiceMuted}
           className={cn(
@@ -105,6 +127,16 @@ export default function TopBar({
         >
           <Languages size={12} className="text-tactical" />
           {LANG_LABELS[lang]}
+        </button>
+
+        <button
+          onClick={onOpenGlossary}
+          className="clip-skew flex h-8 items-center gap-1.5 border border-white/10 bg-slate-950/75 px-2 font-tech text-[10px] font-bold uppercase tracking-wider text-slate-400 transition hover:border-tactical/40 hover:text-white"
+          title="What am I looking at? Every metric in plain English"
+          aria-label="Open the plain-English glossary"
+        >
+          <BookOpen size={12} className="text-gold" />
+          <span className="hidden lg:inline">Explain</span>
         </button>
 
         <button

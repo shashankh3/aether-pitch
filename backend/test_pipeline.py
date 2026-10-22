@@ -167,7 +167,12 @@ def _repo_root() -> Path:
 
 
 def _iter_source_files() -> list:
-    """Every UI-rendering source file we ship, discovered with pure pathlib."""
+    """Every UI-rendering source file we ship, discovered with pure pathlib.
+
+    The brand, media and competition-name rules are about what a *viewer*
+    sees on screen, so the documentation is deliberately not in scope: the
+    guide has to name the competition it was entered into.
+    """
     root = _repo_root()
     patterns = (
         "frontend/src/**/*.tsx",
@@ -178,6 +183,29 @@ def _iter_source_files() -> list:
     for pattern in patterns:
         found.extend(sorted(root.glob(pattern)))
     return found
+
+
+def _iter_text_files() -> list:
+    """Every shipped file whose bytes a reader can see, docs included.
+
+    A double-encoded em dash in `docs/ARCHITECTURE.md` is as visible to a
+    judge as one in a component, so the encoding rules use this wider set.
+    """
+    root = _repo_root()
+    patterns = (
+        "frontend/src/**/*.tsx",
+        "frontend/src/**/*.ts",
+        "frontend/scripts/*.ts",
+        "backend/*.py",
+        "docs/*.md",
+        "*.md",
+        "infra/*.md",
+    )
+    found: list = []
+    for pattern in patterns:
+        found.extend(sorted(root.glob(pattern)))
+    # The mojibake detector itself contains the sequences it looks for.
+    return [p for p in found if p.name != "logic-check.ts"]
 
 
 def test_rules_and_trademark_compliance(
@@ -314,7 +342,7 @@ def test_rules_and_trademark_compliance(
 
     # -- clean UTF-8: no cp1252 double-encoding reaches the fan -----------
     mojibake: list = []
-    for path in _iter_source_files():
+    for path in _iter_text_files():
         rel = str(path.relative_to(_repo_root())).replace("\\", "/")
         try:
             raw = path.read_bytes()
@@ -348,7 +376,7 @@ def test_rules_and_trademark_compliance(
 
     # -- encoding hygiene: no stray UTF-8 BOM in shipped source ---------
     bom_files: list = []
-    for path in _iter_source_files():
+    for path in _iter_text_files():
         try:
             if path.read_bytes()[:3] == b"\xef\xbb\xbf":
                 bom_files.append(str(path.relative_to(_repo_root())))

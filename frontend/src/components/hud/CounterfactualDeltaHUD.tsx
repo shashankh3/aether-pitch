@@ -23,6 +23,8 @@ import { logExperiment, annotateWithEvaluation } from "@/lib/ledgerStore";
 import { API_BASE } from "@/lib/api";
 import type { CounterfactualEvaluation, MatchTick } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useHud } from "@/lib/hudContext";
+import { MetricLabel } from "@/components/hud/MetricLabel";
 
 interface Props {
   tick: MatchTick | null;
@@ -37,6 +39,7 @@ export default function CounterfactualDeltaHUD({
   tick, metrics, active, onReset, onClose, onSubmit,
 }: Props) {
   const [delta, setDelta] = useState<SandboxDelta | null>(null);
+  const { plainLanguage } = useHud();
   const [evaluation, setEvaluation] = useState<CounterfactualEvaluation | null>(null);
   const [adjudicating, setAdjudicating] = useState(false);
   const [adjudicationError, setAdjudicationError] = useState<string | null>(null);
@@ -216,7 +219,7 @@ export default function CounterfactualDeltaHUD({
               <div className="border border-white/10 bg-black/35 px-2 py-1.5">
                 <div className="flex items-center justify-between gap-1">
                   <span className="font-tech text-[8px] font-bold uppercase tracking-[0.14em] text-slate-500">
-                    Δ Expected Threat
+                    <MetricLabel label="Δ Expected Threat" plain={plainLanguage} />
                   </span>
                   {up ? (
                     <TrendingUp size={10} className="text-pitch" />
@@ -238,7 +241,7 @@ export default function CounterfactualDeltaHUD({
               <div className="border border-white/10 bg-black/35 px-2 py-1.5">
                 <div className="flex items-center justify-between gap-1">
                   <span className="font-tech text-[8px] font-bold uppercase tracking-[0.14em] text-slate-500">
-                    Δ {delta.team} Pitch Control
+                    <MetricLabel label="Δ Pitch Control" plain={plainLanguage} />
                   </span>
                   {ctrlUp ? (
                     <TrendingUp size={10} className="text-cyan-300" />
@@ -264,8 +267,7 @@ export default function CounterfactualDeltaHUD({
                 <div className="flex items-center justify-between gap-1">
                   <span className="font-tech text-[8px] font-bold uppercase tracking-[0.14em] text-slate-500">
                     Opponent Control
-                  </span>
-                  <GitCompareArrows size={10} className="text-slate-500" />
+                  </span>                  <GitCompareArrows size={10} className="text-slate-500" />
                 </div>
                 <div className="font-display text-[16px] font-bold tabular-nums text-slate-300">
                   {delta.opponentControlPct.toFixed(1)}%

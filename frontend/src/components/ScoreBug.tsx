@@ -5,6 +5,8 @@
 
 import type { MatchTick, Metrics } from "@/lib/types";
 import { NLACrest, MCSCrest } from "@/components/Crests";
+import { useHud } from "@/lib/hudContext";
+import { MetricLabel } from "@/components/hud/MetricLabel";
 
 interface Props {
   tick: MatchTick | null;
@@ -12,6 +14,7 @@ interface Props {
 }
 
 export default function ScoreBug({ tick, metrics }: Props) {
+  const { plainLanguage } = useHud();
   const nla = tick?.score.NLA ?? 0;
   const mcs = tick?.score.MCS ?? 0;
   const chaos = metrics?.chaos_index ?? 0.5;
@@ -78,7 +81,9 @@ export default function ScoreBug({ tick, metrics }: Props) {
       <div className="border-x border-b border-white/15 bg-slate-950/70 px-2 py-1.5 backdrop-blur-xl">
         <div className="mb-1 flex items-center justify-between font-tech text-[9px] font-bold uppercase tracking-[0.18em]">
           <span className="text-crimson">NLA {wpPct}%</span>
-          <span className="text-slate-500">Win Probability</span>
+          <span className="text-slate-500">
+            <MetricLabel label="WIN PROBABILITY" plain={plainLanguage} />
+          </span>
           <span className="text-tactical">{100 - wpPct}% MCS</span>
         </div>
         <div className="flex h-[7px] overflow-hidden">

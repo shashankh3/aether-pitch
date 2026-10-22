@@ -396,12 +396,13 @@ render("TopBar (brand + engine status)", () =>
       autopilotElapsed: 0,
       autopilotStep: -1,
       onToggleAutopilot: noop,
-      isSpeaking: false,
-      isVoiceMuted: false,
-      onToggleMute: noop,
-    }),
-  ),
-);
+        isSpeaking: false,
+        isVoiceMuted: false,
+        onToggleMute: noop,
+        onOpenGlossary: noop,
+      }),
+    ),
+  );
 
 render("JudgeAutopilotTour (80 s tour banner)", () =>
   createElement(JudgeAutopilotTour, {
