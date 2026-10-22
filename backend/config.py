@@ -63,6 +63,21 @@ class Settings:
     # ---- Broadcast pacing ---------------------------------------------------
     min_seconds_between_insights: float = 10.0      # studio co-pilot rate limit
 
+    # ---- API surface --------------------------------------------------------
+    # Comma-separated list of origins allowed to call the API. The default is
+    # "*" so a judge can open the studio from any machine during the demo, but
+    # it is explicit and overridable, and credentials are never allowed, so a
+    # wildcard origin cannot be used to ride an authenticated session.
+    cors_origins: str = _env("AETHER_CORS_ORIGINS", "*")
+    #: Largest request body the studio will read, in bytes. The heaviest
+    #: legitimate payload is a what-if scenario with 22 displacements.
+    max_request_body_bytes: int = int(_env("AETHER_MAX_BODY_BYTES", str(256 * 1024)))
+
+    @property
+    def cors_origin_list(self) -> list:
+        raw = [o.strip() for o in (self.cors_origins or "").split(",")]
+        return [o for o in raw if o] or ["*"]
+
     @property
     def azure_enabled(self) -> bool:
         return bool(self.azure_openai_endpoint and self.azure_openai_key)

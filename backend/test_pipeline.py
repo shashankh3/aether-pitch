@@ -106,7 +106,8 @@ _ASGI_UNSET = object()
 
 
 async def asgi_request(app, method: str, path: str,
-                       json_body=_ASGI_UNSET, raw_body: bytes = b"") -> tuple:
+                       json_body=_ASGI_UNSET, raw_body: bytes = b"",
+                       extra_headers: Optional[list] = None) -> tuple:
     """One HTTP call against the ASGI app, in-process.
 
     Returns ``(status, parsed_json_or_none, raw_bytes)``. ``status`` is None
@@ -117,6 +118,7 @@ async def asgi_request(app, method: str, path: str,
     headers = []
     if json_body is not _ASGI_UNSET or raw_body:
         headers.append((b"content-type", b"application/json"))
+    headers.extend(extra_headers or [])
     scope = {
         "type": "http",
         "asgi": {"version": "3.0"},
@@ -1992,8 +1994,9 @@ def main() -> int:
         error_payloads = []
 
         async def hit(method: str, path: str, json_body=_ASGI_UNSET,
-                      raw_body: bytes = b"") -> tuple:
-            s, b, raw = await asgi_request(app, method, path, json_body, raw_body)
+                      raw_body: bytes = b"", extra_headers: Optional[list] = None) -> tuple:
+            s, b, raw = await asgi_request(app, method, path, json_body, raw_body,
+                                           extra_headers)
             if s is None or s >= 400:
                 error_payloads.append((f"{method} {path}", s, raw))
             return s, b, raw
@@ -2136,6 +2139,29 @@ def main() -> int:
             s, b, _ = await hit("GET", "/api/health/pipeline-audit")
             check("REST: GET /api/health/pipeline-audit returns the audit",
                   s == 200 and isinstance(b, dict) and "event_gate" in b,
+                  f"status={s}")
+
+            # -- API surface posture -----------------------------------------
+            limit = app_main.settings.max_request_body_bytes
+            s, b, _ = await hit("POST", "/api/studio-query", raw_body=b"{}",
+                                extra_headers=[(b"content-length", str(limit + 1).encode())])
+            check("REST: an oversized body is refused with a 413",
+                  s == 413 and isinstance(b, dict) and "detail" in b,
+                  f"status={s}")
+            s, b, _ = await hit("POST", "/api/studio-query", raw_body=b"{}",
+                                extra_headers=[(b"content-length", b"not-a-number")])
+            check("REST: a malformed Content-Length is a 400, not a 500",
+                  s == 400 and isinstance(b, dict) and "detail" in b,
+                  f"status={s}")
+            s, b, _ = await hit("POST", "/api/studio-query",
+                                raw_body=json.dumps({"query": "x" * (limit + 64)}).encode())
+            check("REST: a large body with no Content-Length is still bounded",
+                  s == 413,
+                  f"status={s}")
+            s, b, _ = await hit("POST", "/api/studio-query", raw_body=b"{}",
+                                extra_headers=[(b"content-length", b"2")])
+            check("REST: a legitimate small body is not blocked by the limit",
+                  s != 413,
                   f"status={s}")
         finally:
             app_main.active_personalization = saved_prefs

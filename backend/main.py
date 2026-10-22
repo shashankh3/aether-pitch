@@ -27,8 +27,9 @@ from collections import deque
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from agent_trace import build_agent_trace, gate_snapshot, p95, verify_grounding
 from config import settings
@@ -55,10 +56,97 @@ app = FastAPI(title="AETHER PITCH — Studio Engine", version="3.0.0")
 log = logging.getLogger("aether.studio")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],           # hackathon demo: studio frontend on any origin
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # Explicit and overridable (AETHER_CORS_ORIGINS). Credentials are never
+    # allowed, so a wildcard origin cannot be used to ride an authenticated
+    # session - the studio uses no cookies and no auth.
+    allow_origins=settings.cors_origin_list,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "Accept"],
+    max_age=600,
 )
+
+
+class _BodyTooLarge(Exception):
+    """Raised inside the ASGI receive channel when a body exceeds the cap."""
+
+
+class BodySizeLimitMiddleware:
+    """Cap the request body the studio is willing to read.
+
+    Starlette has no default body limit, so a single large POST could pin the
+    backend's memory. The heaviest legitimate payload is a what-if scenario
+    with 22 displacements, which is a few kilobytes.
+
+    The declared Content-Length is checked first (the cheap case, and the one
+    every normal client sends), then the bytes are counted as they arrive so
+    a chunked body with no length header is bounded too.
+    """
+
+    def __init__(self, app, limit: int):
+        self.app = app
+        self.limit = limit
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        for key, value in scope.get("headers", []):
+            if key == b"content-length":
+                try:
+                    declared = int(value)
+                except ValueError:
+                    await self._respond(send, 400, "Invalid Content-Length header.")
+                    return
+                if declared > self.limit:
+                    await self._respond(
+                        send, 413, f"Request body exceeds {self.limit} bytes.")
+                    return
+                break
+
+        seen = 0
+        response_started = False
+
+        async def counting_receive():
+            nonlocal seen
+            message = await receive()
+            if message.get("type") == "http.request":
+                seen += len(message.get("body", b""))
+                if seen > self.limit:
+                    # An HTTPException is used so the framework's own error
+                    # handling renders the 413 - a bare exception here would
+                    # be reported as a 400 body-parse failure.
+                    raise HTTPException(
+                        413, f"Request body exceeds {self.limit} bytes.")
+            return message
+
+        async def guarded_send(message):
+            nonlocal response_started
+            if message["type"] == "http.response.start":
+                response_started = True
+            await send(message)
+
+        try:
+            await self.app(scope, counting_receive, guarded_send)
+        except _BodyTooLarge:
+            if not response_started:
+                await self._respond(
+                    send, 413, f"Request body exceeds {self.limit} bytes.")
+
+    @staticmethod
+    async def _respond(send, status: int, detail: str) -> None:
+        body = json.dumps({"detail": detail}).encode("utf-8")
+        await send({
+            "type": "http.response.start",
+            "status": status,
+            "headers": [(b"content-type", b"application/json"),
+                        (b"content-length", str(len(body)).encode("ascii"))],
+        })
+        await send({"type": "http.response.body", "body": body})
+
+
+app.add_middleware(BodySizeLimitMiddleware, limit=settings.max_request_body_bytes)
 
 engine = PitchForgeEngine(seed=settings.seed, start_minute=settings.match_start_minute)
 math = TacticalMathEngine(window_s=settings.chaos_window_s)
