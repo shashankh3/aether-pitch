@@ -2,11 +2,14 @@
 
 ## The verification gate
 
-Every change must leave all eight checks green. They run in about a minute:
+Every change must leave all nine checks green. They run in about a minute:
 
 ```bash
 # 1. Backend pipeline, multi-agent, counterfactual and compliance assertions
 python backend/test_pipeline.py
+
+# 1b. Async transport, retry, timeout and circuit-breaker assertions
+python backend/test_resilience.py
 
 # 2. Azure ARM template validity (no subscription needed)
 python infra/validate_template.py

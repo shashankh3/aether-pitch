@@ -464,11 +464,11 @@ No credentials? Everything still runs through deterministic fallbacks. Add `AZUR
 
 ### Cloud-native deployment topology
 
-The repo ships application containers and an `azure.yaml` service manifest, not a turnkey infrastructure template. The target Azure deployment is:
+The repo ships application containers, an `azure.yaml` service manifest and a statically validated 16-resource ARM template (`infra/main.json`). The target Azure deployment is:
 
 | Layer | Azure target | Shipped artifact | Production note |
 |---|---|---|---|
-| Frontend | Azure Static Web Apps or Azure Container Apps | `frontend/Dockerfile`, `azure.yaml` | Set `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` to the backend ingress. |
+| Frontend | Azure Static Web Apps or Azure Container Apps | `frontend/Dockerfile`, `azure.yaml` | The ARM template sets `AETHER_API_URL` and `AETHER_WS_URL`; for external hosting, point them at the backend ingress. |
 | Backend + WebSocket | Azure Container Apps | `backend/Dockerfile`, `azure.yaml` | Port 8000, `/api/health` probe, one warm replica for the demo. |
 | Reasoning | Azure AI Foundry / Azure OpenAI | `AZURE_OPENAI_*` contract | Triage and narrative deployments; deterministic fallback when unset. |
 | Localization | Azure AI Translator | `AZURE_TRANSLATOR_*` contract | Optional; local EN/ES/AR/HI atlas remains available. |
@@ -478,11 +478,18 @@ The repo ships application containers and an `azure.yaml` service manifest, not 
 | Realtime scale | Azure Web PubSub or Redis backplane | Not wired | Add a backplane before scaling the FastAPI hub past one replica. |
 
 ```bash
+# Option A: azd service manifest (first deploy needs AETHER_WS_URL set after the engine FQDN exists)
 azd auth login
 azd up
+
+# Option B: the statically validated ARM template used by the verification gate
+az deployment group create \
+  --resource-group rg-aether-pitch \
+  --template-file infra/main.json \
+  --parameters prefix=aether openAiApiKey=<foundry-key> translatorKey=<translator-key>
 ```
 
-Use Docker Compose for the zero-setup local demo. For a hosted judging URL, restrict CORS to the frontend origin and keep the deterministic fallbacks enabled so a model outage cannot take the demo down.
+Use Docker Compose for the zero-setup local demo. For a hosted judging URL, set `AETHER_CORS_ORIGINS` to the studio origin instead of the default `*`, and keep the deterministic fallbacks enabled so a model outage cannot take the demo down.
 
 ---
 
@@ -519,13 +526,14 @@ Run through this immediately before you submit the repo and record the video.
 |---|------|------------------|----------------|
 | 1 | Confirm doc hygiene | `grep -rniE "sandbox\|not implemented\|todo\|fixme\|unverified" README.md SUBMISSION_GUIDE.md` | No internal engineering notes in the judge-facing docs |
 | 2 | Backend suite | `python backend/test_pipeline.py` | `RESULT: ALL 237 PIPELINE TESTS PASSED` |
+| 2b | Resilience suite | `python backend/test_resilience.py` | `ALL 9 RESILIENCE & ASYNC TRANSPORT TESTS PASSED` |
 | 3 | ARM template | `python infra/validate_template.py` | `RESULT: ARM TEMPLATE VALIDATION PASSED` |
 | 3b | Documentation lint | `python tools/doc_lint.py` | `RESULT: DOC LINT PASSED` |
 | 4 | Frontend types | `cd frontend && npx tsc --noEmit` | No output |
 | 5 | Production build | `npm run build` | `✓ Compiled successfully` |
 | 6 | SSR smoke | `npm run smoke` | `RESULT: SSR SMOKE PASSED` |
 | 6b | Headless logic | `npm run check:logic` | `RESULT: ALL 89 FRONTEND LOGIC CHECKS PASSED` |
-| 6c | Headless UI render | `npm run smoke:ui` | `RESULT: ALL 30 COMPONENT RENDER CHECKS PASSED` |
+| 6c | Headless UI render | `npm run smoke:ui` | `RESULT: ALL 33 COMPONENT RENDER CHECKS PASSED` |
 | 7 | **Live visual boot** | Terminal 1: `cd backend && python -m uvicorn main:app --reload --port 8000`<br>Terminal 2: `cd frontend && npm run dev` | 3D canvas renders at 60 FPS; no console errors |
 | 8 | Colourblind palette | Controls → **Fan** → toggle the palette | 3D defensive lasers and HUD pills shift to cyan/amber |
 | 9 | Bio-load meter | Controls → **Stats** → lock a player | Load bar, +10 m projection and relief directive all populate |
@@ -586,13 +594,14 @@ cd backend
 python -m py_compile main.py stage_a_synthetic_engine.py stage_b_math_engine.py \
   stage_c_foundry_agents.py stage_d_e_personalizer.py rai_shield.py
 python test_pipeline.py
+python test_resilience.py   # async transport, retry, timeout and circuit-breaker checks
 
 cd ../frontend
 npx tsc --noEmit
 npm run build
 npm run smoke          # server-rendered smoke test: 200, runtime config, no SSR errors
 npm run check:logic    # 89 headless assertions: browser twin, sandbox, ledger, dossier, DVR
-npm run smoke:ui       # 30 assertions: every judge-facing HUD surface renders
+npm run smoke:ui       # 33 assertions: every judge-facing HUD surface renders
 
 cd ..
 python infra/validate_template.py   # ARM template validity, no subscription needed
@@ -606,8 +615,10 @@ page renders with the runtime configuration injected and no SSR error, then
 shuts down — it leaves no background process behind. `npm run check:logic` and
 `npm run smoke:ui` are pure Node: no server, no browser, no network.
 
-Together the four suites make **356 automated assertions** with zero dependencies
-beyond what the project already ships. `python tools/doc_lint.py` re-runs the
+Together the four suites make **359 automated assertions** with zero dependencies
+beyond what the project already ships. A separate **9-test resilience suite**
+covers async transport, retries, timeouts and the circuit breaker; non-retryable
+4xx responses deliberately do not trip it. `python tools/doc_lint.py` re-runs the
 three headless suites and proves that every assertion count, `/api` path,
 `npm run` script and module size quoted in this guide, the README and
 `docs/ARCHITECTURE.md` still matches the code — judge-facing documentation
@@ -791,7 +802,9 @@ backend/
   rai_shield.py                    # Prompt Shield + club-neutrality + numeric grounding
   main.py                          # v5 REST + studio/war-room/audit + match loop
   runtime.py                       # WebSocket fan-out hub + request body guard
+  circuit_breaker.py               # retry policy + circuit breaker for Azure transport
   test_pipeline.py                 # pipeline + multi-agent + bio-load + compliance audit
+  test_resilience.py               # async transport, timeout, retry and breaker checks
 
 infra/
   main.json                        # ARM template: AI Foundry, Translator, KV, Container Apps
@@ -932,7 +945,7 @@ Everything below is paste-ready. Keep it under any character limit the portal en
 >
 > - **The simulation.** `PitchForgeEngine` is a seeded, deterministic 10 Hz football simulation (default `seed=42`, reproducible frame-for-frame) that generates 22 articulated players with kinematics, ball physics, pass completion, tackles, auto-evented sprint and distance thresholds, milestone detection, and match metadata. The 16×12 Expected Threat surface, Pass Difficulty Rating, Chaos Index, PPDA, defensive-line geometry, pitch-control territory split, and passing network are all computed from that simulation in the included Stage B math — no external feed, no scraped dataset, no licensed API.
 > - **The entities are fictional.** Only two clubs exist: North Larchmont Athletic (NLA) and Meridian City SC (MCS), playing in the AETHER Synthetic League at the AETHER 3D DIGITAL TWIN. All 22 players, all crests, all kits, the stadium, the advertising boards, and the crowd are procedurally generated in code. The stadium, crests, and overlays are drawn with Three.js geometry and CSS — there are **no external image, video, or audio assets** and no third-party logos.
-> - **Automated compliance gate.** `python backend/test_pipeline.py` runs an Official Rules audit that verifies the synthetic metadata is strictly NLA vs MCS in the AETHER Synthetic League, confirms deterministic replay at `seed=42`, asserts `bio_load_profile` and all Stage A–E payload keys are present, and then scans every shipped `frontend/src` and `backend` source file with pure Python `pathlib` to prove that **zero** prohibited third-party sponsor, league, kit-brand, broadcaster, or social-platform strings appear in UI rendering code and that **zero** external media assets are referenced. The audit currently scans 91 files with 0 offenders.
+> - **Automated compliance gate.** `python backend/test_pipeline.py` runs an Official Rules audit that verifies the synthetic metadata is strictly NLA vs MCS in the AETHER Synthetic League, confirms deterministic replay at `seed=42`, asserts `bio_load_profile` and all Stage A–E payload keys are present, and then scans every shipped `frontend/src` and `backend` source file with pure Python `pathlib` to prove that **zero** prohibited third-party sponsor, league, kit-brand, broadcaster, or social-platform strings appear in UI rendering code and that **zero** external media assets are referenced. The audit currently scans 97 files with 0 offenders.
 > - **No external video, ever.** The live broadcast feed is `HoloPitch3D.tsx` — a fully synthetic, spatially calibrated 3D stadium rendered in real time from the simulation. The transparent `?overlay=alpha` mode strips every opaque surface and leaves only the AR layer, ready for a real television compositor, but even that layer is drawn from our own synthetic geometry.
 > - **Responsible AI is part of the build, not a claim.** The Foundry Prompt Shield blocks prompt injection, off-topic queries, and third-party entity references before any model is called, and a club-neutrality check rejects biased or non-objective narrative. The Foundry Eval scorecard publishes groundedness, coherence, safety, and frame-SLA telemetry a reviewer can verify in one click.
 > - **Originality.** All source code is original work owned by the entrant. Third-party dependencies are used under their respective open-source licences, and no third-party assets are bundled. No Sponsor financial support was received, and the project is not a prior winner.

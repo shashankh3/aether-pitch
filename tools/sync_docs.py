@@ -161,6 +161,10 @@ def main() -> int:
                               mm.group(1), f"{a:,}"),
                           f"README size for {rel or 'the RAI layer'}", changes)
 
+    readme = sub_once(readme, r"RESULT: ALL \d+ PIPELINE TESTS PASSED",
+                      f"RESULT: ALL {suites['backend']} PIPELINE TESTS PASSED",
+                      "README expected backend result", changes)
+
     # --- SUBMISSION_GUIDE: the totals -------------------------------------
     guide = sub_once(guide, r"the four suites make \*\*\d+ automated assertions\*\*",
                      f"the four suites make **{total} automated assertions**",
@@ -168,6 +172,9 @@ def main() -> int:
     guide = sub_once(guide, r"npm run check:logic\s+# \d+ headless assertions",
                      f"npm run check:logic    # {suites['logic']} headless assertions",
                      "SUBMISSION_GUIDE logic count", changes)
+    guide = sub_once(guide, r"npm run smoke:ui\s+# \d+ assertions",
+                     f"npm run smoke:ui       # {suites['ui']} assertions",
+                     "SUBMISSION_GUIDE UI comment count", changes)
     guide = sub_once(guide, r"RESULT: ALL \d+ FRONTEND LOGIC CHECKS PASSED",
                      f"RESULT: ALL {suites['logic']} FRONTEND LOGIC CHECKS PASSED",
                      "SUBMISSION_GUIDE expected logic result", changes)
@@ -214,6 +221,12 @@ def main() -> int:
                     rf"\g<1>{suites['logic']}\2", "ARCHITECTURE logic count", changes)
     arch = sub_once(arch, r"(\| UI render \| `npm run smoke:ui` \| )\d+( assertions)",
                     rf"\g<1>{suites['ui']}\2", "ARCHITECTURE ui count", changes)
+    component_count = len([p for p in (ROOT / "frontend" / "src" / "components").rglob("*")
+                           if p.is_file() and "three" not in p.relative_to(
+                               ROOT / "frontend" / "src" / "components").parts])
+    arch = sub_once(arch, r"(components/\s+HUD, drawers, modals \()\d+( files\))",
+                    lambda mm: f"{mm.group(1)}{component_count}{mm.group(2)}",
+                    "ARCHITECTURE component count", changes)
     arch = sub_once(arch, r"(test_pipeline\.py\s+)([\d,]+)( LOC\s+)\d+( assertions)",
                     lambda mm: (f"{mm.group(1)}{count_lines('backend/test_pipeline.py'):,}"
                                 f"{mm.group(3)}{suites['backend']} assertions"),
@@ -269,8 +282,10 @@ def main() -> int:
         short = rel.replace("frontend/src/", "").replace("backend/", "")
         actual = count_lines(rel)
         lines = arch.splitlines(keepends=True)
+        anchor_pattern = (r"\s*test_pipeline\.py\s" if base == "backend"
+                          else r"\s*lib/runtimeConfig\.ts\s")
         anchor = next((i for i, l in enumerate(lines)
-                       if re.match(r"\s*lib/runtimeConfig\.ts\s", l)), None)
+                       if re.match(anchor_pattern, l)), None)
         if anchor is None:
             continue
         # The map right-aligns the LOC figure at column 32; match it.

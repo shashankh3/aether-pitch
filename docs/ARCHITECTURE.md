@@ -30,16 +30,19 @@ backend/
   stage_a_synthetic_engine.py 1,075 LOC  Stage A — the simulation
   stage_b_math_engine.py        870 LOC  Stage B — the mathematics
   stage_c_foundry_agents.py       36 LOC  stable re-export barrel
-  agents/                     1,627 LOC  Foundry router package (8 modules)
-  stage_d_e_personalizer.py     498 LOC  Stage D/E — render + personalise
+  agents/                     1,843 LOC  Foundry router package (8 modules)
+  stage_d_e_personalizer.py     555 LOC  Stage D/E — render + personalise
   agent_trace.py                231 LOC  grounded handoff trace
   rai_shield.py                 311 LOC  prompt shield + neutrality + grounding
-  content_safety.py             147 LOC  Azure AI Content Safety (optional)
+  content_safety.py             206 LOC  Azure AI Content Safety (optional)
   counterfactual.py             358 LOC  what-if contract + evaluation (no globals)
+  parity_fixture.py             237 LOC  cross-engine parity fixture
   config.py                      98 LOC  environment + runtime configuration
   main.py                     1,157 LOC  HTTP/WS surface + match loop
   runtime.py                    169 LOC  WebSocket hub + request body guard
+  circuit_breaker.py            147 LOC  transport retry + circuit breaker
   test_pipeline.py            2,518 LOC  237 assertions
+  test_resilience.py            234 LOC  resilience + async transport tests
 
 frontend/src/
   lib/edgeEngine.ts               1 LOC  stable re-export barrel
@@ -53,18 +56,17 @@ frontend/src/
   lib/runtimeConfig.ts           53 LOC  runtime backend coordinates
   lib/terminology.ts         380 LOC  the terminology module
   lib/narrativeAtlas.ts       92 LOC  the narrativeAtlas module
-  parity_fixture.py          237 LOC  the parity_fixture module
   lib/failoverDrill.ts       199 LOC  the failoverDrill module
   lib/hudContext.tsx            169 LOC  control-center + palette state
   lib/useModalA11y.ts            72 LOC  focus trap + escape handling
   lib/utils.ts                   14 LOC  shared class-name helper
   lib/api.ts                      6 LOC  the REST client
-  app/page.tsx                1,290 LOC  the orchestrator
-  app/layout.tsx                108 LOC  runtime config injection + error boundary
+  app/page.tsx                1,349 LOC  the orchestrator
+  app/layout.tsx                121 LOC  runtime config injection + error boundary
   hooks/useResilientMatchEngine.ts  336 LOC  WS + edge failover + drill
   hooks/useSpeechController.ts      129 LOC  zero-overlap speech
   hooks/useRenderTelemetry.ts       55 LOC  measured frame rate
-  components/                            HUD, drawers, modals (32 files)
+  components/                            HUD, drawers, modals (36 files)
   components/three/                      the 3D scene (12 files)
 
 infra/main.json                 491 LOC  ARM template (16 resources)
@@ -175,13 +177,14 @@ The 3D stage is not an observer feed — it is a sandbox.
 | Suite | Command | Covers |
 |---|---|---|
 | Backend | `python backend/test_pipeline.py` | 237 assertions: all five stages, the gate, the trace, the war-room, the counterfactual arbiter, the line shift, the RAI shield, the hub, the retry policy, the xT/pitch-control invariants, the i18n atlas, the REST contract, the compliance audit |
+| Resilience | `python backend/test_resilience.py` | 9 async-transport, retry, timeout and circuit-breaker checks; non-retryable 4xx errors do not trip the breaker |
 | ARM | `python infra/validate_template.py` | JSON validity, ARM symbol resolution, dependency integrity, secret handling |
 | Docs | `python tools/doc_lint.py` | Every assertion count, `/api` path, `npm run` script, quoted file path and module size in the judge-facing docs still matches the code |
 | Types | `cd frontend && npx tsc --noEmit` | The whole contract surface |
 | Build | `npm run build` | Production compile |
 | SSR | `npm run smoke` | In-process server render, runtime config injection, no SSR error |
 | Logic | `npm run check:logic` | 89 headless assertions over the browser twin, the sandbox, the ledger, the dossier and the DVR buffer |
-| UI render | `npm run smoke:ui` | 30 assertions — every judge-facing surface renders without throwing |
+| UI render | `npm run smoke:ui` | 33 assertions — every judge-facing surface renders without throwing |
 
 The backend suite also runs the **Official Rules compliance audit** — synthetic
 metadata, deterministic replay, Stage A–E payload keys, zero third-party brand

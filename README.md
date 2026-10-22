@@ -14,7 +14,7 @@
 [![Synthetic Data](https://img.shields.io/badge/data-100%25%20synthetic-6f42c1)](#synthetic-data)
 
 **Repository:** `github.com/shashankh3/aether-pitch` · **Branch:** `main`
-**Scale:** 136 tracked files · ~29,562 LOC of Python + TypeScript (106 source files) · **356 automated assertions** (237 backend · 89 headless logic · 30 headless UI render) · 16-resource Azure ARM template
+**Scale:** 136 tracked files · ~30,161 LOC of Python + TypeScript (106 source files) · **359 automated assertions** (237 backend · 89 headless logic · 33 headless UI render) · 16-resource Azure ARM template
 
 > **The hook:** *AETHER PITCH is a live 3D football broadcast where every number on screen is computed by transparent football mathematics, every AI claim is graded by a deterministic numeric critic, and the cloud can die mid-match without the picture ever dropping a frame.*
 
@@ -272,7 +272,7 @@ CounterfactualEvaluation
   - Synthetic metadata is strictly NLA vs MCS in the `AETHER Synthetic League`.
   - `seed=42` replays frame-for-frame identically.
   - `bio_load_profile` and every Stage A–E payload key are present.
-  - **0** third-party sponsor / league / kit-brand / broadcaster / social strings across all shipped `frontend/src` + `backend` sources (91 files scanned).
+  - **0** third-party sponsor / league / kit-brand / broadcaster / social strings across all shipped `frontend/src` + `backend` sources (97 files scanned).
   - **0** external media asset references.
 - **`SUBMISSION_GUIDE.md` §14** ships paste-ready answers for the submission portal: project summary & tagline, Foundry + multi-agent orchestration, cloud-native architecture & edge resilience, the synthetic-data compliance attestation, and prize-track one-liners.
 
@@ -290,9 +290,9 @@ BROWSER CLIENT (Next.js 14 / React 18 / React Three Fiber)
 FASTAPI BACKEND ENGINE (10 Hz deterministic loop)
   ├─ Stage A  Synthetic ingest (1,075 LOC) ──► kinematics, ball physics, auto-eventing, bio-load twin
   ├─ Stage B  Deterministic math (858 LOC) ──► xT grid, PDR, PPDA, Chaos, pitch control, ghost pass
-  ├─ Stage C  Foundry agent router (1,627 LOC) ──► 4-node insight pipeline + 3-turn war-room
-  ├─ RAI & numeric critic (689 LOC) ──► prompt shield + grounding verifier + club-neutrality gate
-  └─ Stage D & E  Personalizer (498 LOC) ──► camera directives, overlays, persona & i18n
+  ├─ Stage C  Foundry agent router (1,843 LOC) ──► 4-node insight pipeline + 3-turn war-room
+  ├─ RAI & numeric critic (748 LOC) ──► prompt shield + grounding verifier + club-neutrality gate
+  └─ Stage D & E  Personalizer (555 LOC) ──► camera directives, overlays, persona & i18n
         │
         ├──► Azure AI Foundry (Azure OpenAI: gpt-4o narrative / gpt-4o-mini triage)
         ├──► Azure AI Translator (real-time EN / ES / AR / HI broadcast localization)
@@ -647,7 +647,9 @@ The frontend interpolates the 10 Hz stream to 60 FPS through a mutable telemetry
 │   ├── agents/                        # Foundry core, explain, studio, war-room, roster
 │   ├── stage_d_e_personalizer.py      # Render packets and fan personalization
 │   ├── agent_trace.py                  # Grounded handoff trace + numeric cross-check
+│   ├── circuit_breaker.py             # Retry policy + circuit breaker for Azure transport
 │   ├── test_pipeline.py               # Offline five-stage pipeline self-test
+│   ├── test_resilience.py             # Async transport, retry, timeout and breaker tests
 │   ├── requirements.txt
 │   ├── .env.example
 │   └── Dockerfile
@@ -675,11 +677,21 @@ Run the backend pipeline self-test:
 python backend/test_pipeline.py
 ```
 
-Expected result: `RESULT: ALL 191 PIPELINE TESTS PASSED`. The suite also runs the
+Expected result: `RESULT: ALL 237 PIPELINE TESTS PASSED`. The suite also runs the
 **Official Rules & trademark compliance audit** (synthetic metadata, deterministic
 `seed=42` replay, Stage A–E payload keys, zero third-party brand strings, zero
 external media references, encoding hygiene) and validates the Azure ARM
 template.
+
+Run the resilience suite:
+
+```bash
+python backend/test_resilience.py
+```
+
+Expected result: `ALL 9 RESILIENCE & ASYNC TRANSPORT TESTS PASSED` — async
+transport, retries, timeouts and the circuit breaker, including the rule that
+non-retryable 4xx responses do not trip it.
 
 Build the frontend and run the server-rendered smoke test:
 
@@ -738,11 +750,11 @@ This starts the FastAPI engine on port 8000 and the Next.js studio on port 3000.
 
 ### Cloud-native Azure topology
 
-The repository ships the application containers and a `azure.yaml` service manifest. It does **not** ship a full infrastructure template or a hosted URL; treat this as the target production topology and supply your own `azd` infrastructure.
+The repository ships the application containers, a `azure.yaml` service manifest and a statically validated 16-resource ARM template (`infra/main.json`). It does **not** ship a hosted URL; deploy with either path below.
 
 | Layer | Azure target | Shipped artifact | Production note |
 |---|---|---|---|
-| Frontend | Azure Static Web Apps (Next.js) or Azure Container Apps | `frontend/Dockerfile`, `azure.yaml` | Set `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` to public backend endpoints. |
+| Frontend | Azure Static Web Apps (Next.js) or Azure Container Apps | `frontend/Dockerfile`, `azure.yaml` | The ARM template sets `AETHER_API_URL` and `AETHER_WS_URL`; for external hosting, point them at the backend ingress. |
 | Backend + WebSocket | Azure Container Apps | `backend/Dockerfile`, `azure.yaml` | External ingress on port 8000; health probe `GET /api/health`; keep one warm replica for the demo. |
 | Reasoning | Azure AI Foundry / Azure OpenAI deployments | `AZURE_OPENAI_*` settings | Triage and narrative deployments are independent; missing credentials fall back locally. |
 | Localization | Azure AI Translator | `AZURE_TRANSLATOR_*` settings | Optional; the deterministic phrase atlas covers EN/ES/AR/HI offline. |
@@ -752,11 +764,18 @@ The repository ships the application containers and a `azure.yaml` service manif
 | Realtime scale | Azure Web PubSub or a Redis backplane | Not wired | The current FastAPI hub is single-process; add a backplane before scaling beyond one replica. |
 
 ```bash
+# Option A: azd service manifest (first deploy needs AETHER_WS_URL set after the engine FQDN exists)
 azd auth login
 azd up
+
+# Option B: the statically validated ARM template used by the verification gate
+az deployment group create \
+  --resource-group rg-aether-pitch \
+  --template-file infra/main.json \
+  --parameters prefix=aether openAiApiKey=<foundry-key> translatorKey=<translator-key>
 ```
 
-For a single-host demo, Docker Compose is the supported zero-setup path. For a public judging URL, deploy the two containers, restrict CORS to the frontend origin, and keep the backend's deterministic fallbacks enabled so a model outage cannot take the demo down.
+For a single-host demo, Docker Compose is the supported zero-setup path. For a public judging URL, set `AETHER_CORS_ORIGINS` to the studio origin instead of the default `*`, and keep the backend's deterministic fallbacks enabled so a model outage cannot take the demo down.
 
 ## Synthetic Data
 
