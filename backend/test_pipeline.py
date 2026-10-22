@@ -2423,7 +2423,7 @@ def main() -> int:
           fixture_path.exists(),
           str(fixture_path.name))
     if fixture_path.exists():
-        live_fixture = parity_fixture.build_fixture()
+        live_fixture = parity_fixture._encode_non_finite(parity_fixture.build_fixture())
         stored = json.loads(fixture_path.read_text(encoding="utf-8"))
         check("Parity: the fixture still matches the live Python engine",
               stored == live_fixture,

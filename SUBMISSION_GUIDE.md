@@ -524,7 +524,7 @@ Run through this immediately before you submit the repo and record the video.
 | 4 | Frontend types | `cd frontend && npx tsc --noEmit` | No output |
 | 5 | Production build | `npm run build` | `✓ Compiled successfully` |
 | 6 | SSR smoke | `npm run smoke` | `RESULT: SSR SMOKE PASSED` |
-| 6b | Headless logic | `npm run check:logic` | `RESULT: ALL 82 FRONTEND LOGIC CHECKS PASSED` |
+| 6b | Headless logic | `npm run check:logic` | `RESULT: ALL 83 FRONTEND LOGIC CHECKS PASSED` |
 | 6c | Headless UI render | `npm run smoke:ui` | `RESULT: ALL 30 COMPONENT RENDER CHECKS PASSED` |
 | 7 | **Live visual boot** | Terminal 1: `cd backend && python -m uvicorn main:app --reload --port 8000`<br>Terminal 2: `cd frontend && npm run dev` | 3D canvas renders at 60 FPS; no console errors |
 | 8 | Colourblind palette | Controls → **Fan** → toggle the palette | 3D defensive lasers and HUD pills shift to cyan/amber |
@@ -591,7 +591,7 @@ cd ../frontend
 npx tsc --noEmit
 npm run build
 npm run smoke          # server-rendered smoke test: 200, runtime config, no SSR errors
-npm run check:logic    # 82 headless assertions: browser twin, sandbox, ledger, dossier, DVR
+npm run check:logic    # 83 headless assertions: browser twin, sandbox, ledger, dossier, DVR
 npm run smoke:ui       # 30 assertions: every judge-facing HUD surface renders
 
 cd ..
@@ -606,7 +606,7 @@ page renders with the runtime configuration injected and no SSR error, then
 shuts down — it leaves no background process behind. `npm run check:logic` and
 `npm run smoke:ui` are pure Node: no server, no browser, no network.
 
-Together the four suites make **349 automated assertions** with zero dependencies
+Together the four suites make **350 automated assertions** with zero dependencies
 beyond what the project already ships. `python tools/doc_lint.py` re-runs the
 three headless suites and proves that every assertion count, `/api` path,
 `npm run` script and module size quoted in this guide, the README and

@@ -16,6 +16,7 @@ fails the build.
 """
 from __future__ import annotations
 
+import copy
 import json
 import math
 import pathlib
@@ -118,6 +119,51 @@ def build_fixture() -> dict:
 
     from stage_d_e_personalizer import STORIES, TRANSLATIONS
 
+    # --- the boundary matrix ---------------------------------------------
+    # The happy path is not enough. A twin that agrees on a full 22-player
+    # state can still disagree on a degenerate one - and degenerate states
+    # are exactly what a judge triggers by dragging a player off the pitch.
+    edge_cases = []
+    for name, mutate in (
+        ("empty_squad", lambda s: s.update({"players": []})),
+        ("one_player", lambda s: s.update({"players": s["players"][:1]})),
+        ("all_on_one_spot",
+         lambda s: s.update({"players": [dict(p, x=50.0, y=34.0, vx=0.0, vy=0.0)
+                                         for p in s["players"]]})),
+        ("nan_coordinate",
+         lambda s: s.update({"players": [dict(p, x=float("nan"))
+                                         if i == 0 else p
+                                         for i, p in enumerate(s["players"])]})),
+        ("infinite_velocity",
+         lambda s: s.update({"players": [dict(p, vx=float("inf"))
+                                         if i == 0 else p
+                                         for i, p in enumerate(s["players"])]})),
+        ("off_the_pitch",
+         lambda s: s.update({"players": [dict(p, x=400.0, y=-50.0)
+                                         if i == 0 else p
+                                         for i, p in enumerate(s["players"])]})),
+    ):
+        s = copy.deepcopy(st)
+        mutate(s)
+        edge_cases.append({
+            "name": name,
+            "state": s,
+            "expected": {
+                "pitch_control": math.pitch_control_split(s),
+                "passing_network": [
+                    {"from_id": e["from_id"], "to_id": e["to_id"], "team": e["team"],
+                     "xt_weight": e["xt_weight"], "distance_m": e["distance_m"],
+                     "from_xy": e["from_xy"], "to_xy": e["to_xy"]}
+                    for e in math.passing_network_edges(s)
+                ],
+                "bio_load_summary": math.bio_load_summary(s),
+                "line_shift": {
+                    k: v for k, v in math.evaluate_defensive_line_shift(s, "NLA", 40.0).items()
+                    if isinstance(v, (int, float)) and not isinstance(v, bool)
+                },
+            },
+        })
+
     return {
         "scenario": {
             "seed": SEED, "start_minute": START_MINUTE, "ticks": TICKS,
@@ -128,6 +174,7 @@ def build_fixture() -> dict:
             "stories": dict(STORIES),
             "translations": {k: dict(v) for k, v in TRANSLATIONS.items()},
         },
+        "edge_cases": edge_cases,
         "expected": {
             "xt_samples": xt_samples,
             "pitch_control": math.pitch_control_split(st),
@@ -140,9 +187,31 @@ def build_fixture() -> dict:
     }
 
 
+def _encode_non_finite(value):
+    """Make a structure safe to write as strict JSON.
+
+    Python's json module writes a bare NaN, which JSON.parse rejects, and a
+    NaN coordinate is one of the boundary cases the harness exists to
+    compare. Non-finite numbers are therefore written as a tagged marker and
+    revived on the TypeScript side.
+    """
+    if isinstance(value, float):
+        if math.isnan(value):
+            return {"__nonfinite__": "NaN"}
+        if math.isinf(value):
+            return {"__nonfinite__": "Infinity" if value > 0 else "-Infinity"}
+        return value
+    if isinstance(value, dict):
+        return {k: _encode_non_finite(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_encode_non_finite(v) for v in value]
+    return value
+
+
 def main() -> int:
-    fixture = build_fixture()
-    text = json.dumps(fixture, indent=1, sort_keys=True, ensure_ascii=False) + "\n"
+    fixture = _encode_non_finite(build_fixture())
+    text = json.dumps(fixture, indent=1, sort_keys=True, ensure_ascii=False,
+                      allow_nan=False) + "\n"
     if "--check" in sys.argv:
         if not FIXTURE.exists():
             print("parity fixture is missing - run python backend/parity_fixture.py")

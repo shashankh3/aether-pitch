@@ -1004,9 +1004,66 @@ check(
   const path = await import("node:path");
 
   const fixturePath = path.resolve(process.cwd(), "scripts", "parity-fixture.json");
-  const fixture = JSON.parse(fs.readFileSync(fixturePath, "utf8"));
-  const tick = fixture.state as MatchTick;
-  const expected = fixture.expected;
+  const parsedFixture = JSON.parse(fs.readFileSync(fixturePath, "utf8"));
+  // The fixture writes non-finite numbers as tagged markers, because JSON has
+  // no NaN and a NaN coordinate is one of the boundary cases.
+  const reviveNonFinite = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(reviveNonFinite);
+    if (value && typeof value === "object") {
+      const obj = value as Record<string, unknown>;
+      const tag = obj.__nonfinite__;
+      if (typeof tag === "string") {
+        if (tag === "NaN") return Number.NaN;
+        if (tag === "Infinity") return Number.POSITIVE_INFINITY;
+        return Number.NEGATIVE_INFINITY;
+      }
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(obj)) out[k] = reviveNonFinite(v);
+      return out;
+    }
+    return value;
+  };
+  const fixture = reviveNonFinite(parsedFixture) as {
+    state: MatchTick;
+    expected: Record<string, unknown>;
+    atlas?: { stories: Record<string, string>; translations: Record<string, Record<string, string>> };
+    edge_cases?: {
+      name: string;
+      state: MatchTick;
+      expected: {
+        pitch_control: { nla_territory_pct: number; mcs_territory_pct: number; neutral_pct?: number };
+        passing_network: { from_id: string; to_id: string; team: string; xt_weight: number }[];
+        bio_load_summary: { mean_sprint_load_index: number; at_risk_count: number };
+        line_shift: Record<string, number>;
+      };
+    }[];
+  };
+
+  const tick = fixture.state;
+  const expected = fixture.expected as {
+    xt_samples: number[][];
+    pitch_control: { nla_territory_pct: number; mcs_territory_pct: number; neutral_pct?: number };
+    passing_network: {
+      from_id: string; to_id: string; team: string;
+      xt_weight: number; distance_m: number;
+      from_xy: { x: number; y: number }; to_xy: { x: number; y: number };
+    }[];
+    bio_load: {
+      id: string;
+      profile: {
+        sprint_load_index: number; projected_stamina_10m: number;
+        fatigue_pdr_penalty: number; high_intensity_seconds: number;
+        press_seconds: number; stamina_now: number; relief_required: boolean;
+        tactical_relief_directive: string;
+      };
+    }[];
+    bio_load_summary: { mean_sprint_load_index: number; at_risk_count: number };
+    line_shift: Record<string, Record<string, number>>;
+    simulated_pitch_control: {
+      player_id: string; x: number; y: number;
+      split: { nla_territory_pct: number; mcs_territory_pct: number };
+    }[];
+  };
 
   // --- xT at 192 grid points, both attacking directions ------------------
   let xtMismatches: string[] = [];
@@ -1312,6 +1369,83 @@ check(
         : atlasProblems.slice(0, 4).join("; "),
     );
   }
+
+  // --- the boundary matrix -----------------------------------------------
+  // The happy path is not enough. A twin that agrees on a full 22-player
+  // state can still disagree on a degenerate one - and degenerate states are
+  // exactly what a judge triggers by dragging a player off the pitch.
+  const edgeCases = (fixture as {
+    edge_cases?: {
+      name: string;
+      state: MatchTick;
+      expected: {
+        pitch_control: { nla_territory_pct: number; mcs_territory_pct: number; neutral_pct?: number };
+        passing_network: { from_id: string; to_id: string; team: string; xt_weight: number }[];
+        bio_load_summary: { mean_sprint_load_index: number; at_risk_count: number };
+        line_shift: Record<string, number>;
+      };
+    }[];
+  }).edge_cases ?? [];
+
+  const edgeProblems: string[] = [];
+  for (const edge of edgeCases) {
+    const eTick = edge.state;
+    const eExpected = edge.expected;
+
+    const ePc = computePitchControlSplit(eTick);
+    if (Math.abs(ePc.nla_territory_pct - eExpected.pitch_control.nla_territory_pct) > 1e-6
+      || Math.abs(ePc.mcs_territory_pct - eExpected.pitch_control.mcs_territory_pct) > 1e-6) {
+      edgeProblems.push(
+        `${edge.name}: pitch control twin=${ePc.nla_territory_pct}/`
+        + `${ePc.mcs_territory_pct} py=${eExpected.pitch_control.nla_territory_pct}/`
+        + `${eExpected.pitch_control.mcs_territory_pct}`,
+      );
+    }
+
+    const eNet = computePassingNetworkEdges(eTick);
+    if (eNet.length !== eExpected.passing_network.length) {
+      edgeProblems.push(
+        `${edge.name}: network count twin=${eNet.length} py=${eExpected.passing_network.length}`,
+      );
+    } else {
+      for (let i = 0; i < eNet.length; i += 1) {
+        if (eNet[i].from_id !== eExpected.passing_network[i].from_id
+          || eNet[i].to_id !== eExpected.passing_network[i].to_id
+          || Math.abs(eNet[i].xt_weight - eExpected.passing_network[i].xt_weight) > 1e-6) {
+          edgeProblems.push(
+            `${edge.name}: network #${i} twin=${eNet[i].from_id}->${eNet[i].to_id} `
+            + `py=${eExpected.passing_network[i].from_id}->${eExpected.passing_network[i].to_id}`,
+          );
+          break;
+        }
+      }
+    }
+
+    const eBio = computeBioLoadSummary(eTick);
+    if (Math.abs(eBio.mean_sprint_load_index - eExpected.bio_load_summary.mean_sprint_load_index) > 1e-6
+      || eBio.at_risk_count !== eExpected.bio_load_summary.at_risk_count) {
+      edgeProblems.push(
+        `${edge.name}: bio-load twin=${eBio.mean_sprint_load_index}/`
+        + `${eBio.at_risk_count} py=${eExpected.bio_load_summary.mean_sprint_load_index}/`
+        + `${eExpected.bio_load_summary.at_risk_count}`,
+      );
+    }
+
+    const eShift = evaluateDefensiveLineShift(eTick, "NLA", 40);
+    for (const [field, pyValue] of Object.entries(eExpected.line_shift)) {
+      const twinValue = (eShift as unknown as Record<string, number>)[field];
+      if (typeof twinValue !== "number" || Math.abs(twinValue - pyValue) > 1e-6) {
+        edgeProblems.push(`${edge.name}: line shift ${field} twin=${twinValue} py=${pyValue}`);
+      }
+    }
+  }
+  check(
+    "Parity: the twin matches the engine on the degenerate states too",
+    edgeCases.length > 0 && edgeProblems.length === 0,
+    edgeProblems.length === 0
+      ? `${edgeCases.length} boundary cases: ${edgeCases.map((e) => e.name).join(", ")}`
+      : edgeProblems.slice(0, 4).join("; "),
+  );
 }
 
 // --- cleanup ----------------------------------------------------------------
