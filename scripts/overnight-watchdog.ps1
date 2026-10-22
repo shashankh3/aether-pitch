@@ -42,7 +42,7 @@ param(
     [string]$PromptFile = 'overnight_prompt.md',
     [string]$LogDir = 'logs\overnight',
     [string]$StopFile = 'STOP_OVERNIGHT',
-    [string]$Models = 'fireworks-ai/accounts/fireworks/models/kimi-k3,fireworks-ai/accounts/fireworks/models/glm-5p3,openrouter/minimax/minimax-m3.1-flash:free',
+    [string]$Models = 'opencode/minimax-m3.1-flash-free,opencode/glm-5.3-flash-free,opencode/deepseek-v4.1-flash-free,opencode/nemotron-3-ultra-free,openrouter/minimax/minimax-m3.1-flash:free',
     [int]$MaxConsecutiveFailures = 5,
     [switch]$DryRun
 )
@@ -51,6 +51,25 @@ $ErrorActionPreference = 'Continue'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 
+# ---- FREE-MODEL ALLOWLIST ---------------------------------------------------
+# Hard rule: the unattended loop may only spend FREE-TIER quota. Any provider
+# that bills (Fireworks, paid OpenRouter, etc.) is refused before a request is
+# made, so an unattended run can never burn the user's credit without them
+# explicitly changing this list.
+$AllowedModelPrefixes = @(
+    'opencode/',                       # opencode zen free tier
+    'openrouter/minimax/minimax-m3.1-flash:free',   # explicit free variant
+    'openrouter/deepseek/deepseek-r1:free',
+    'openrouter/google/gemini-2.0-flash-exp:free',
+    'openrouter/qwen/qwen3-235b-a22b:free'
+)
+function Test-ModelAllowed([string]$m) {
+    foreach ($p in $AllowedModelPrefixes) {
+        if ($m -like "$p*") { return $true }
+    }
+    return $false
+}
+
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 if (-not (Test-Path $LogDir)) { New-Item -ItemType Directory -Path $LogDir -Force | Out-Null }
 $log = Join-Path $LogDir "watchdog-$stamp.log"
@@ -58,6 +77,13 @@ $status = Join-Path $LogDir 'overnight_status.json'
 $iterations = Join-Path $LogDir 'overnight_iterations.jsonl'
 $lockFile = Join-Path $LogDir 'watchdog.lock'
 $modelList = $Models -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+$rejected = @($modelList | Where-Object { -not (Test-ModelAllowed $_) })
+if ($rejected.Count -gt 0) {
+    Say "FATAL: refusing to run - these models are not on the FREE-TIER allowlist: $($rejected -join ', ')"
+    Say "Edit `$Models and `$AllowedModelPrefixes if you intend to use a paid provider."
+    Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
+    exit 2
+}
 
 function Say([string]$m) {
     $line = "[{0}] {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $m

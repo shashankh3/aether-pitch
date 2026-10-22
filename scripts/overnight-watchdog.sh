@@ -26,9 +26,29 @@ BRANCH="overnight-auto-improve"
 PROMPT_FILE="overnight_prompt.md"
 LOG_DIR="logs/overnight"
 STOP_FILE="STOP_OVERNIGHT"
-MODELS="${MODELS:-fireworks-ai/accounts/fireworks/models/kimi-k3,fireworks-ai/accounts/fireworks/models/glm-5p3,openrouter/minimax/minimax-m3.1-flash:free}"
+MODELS="${MODELS:-opencode/minimax-m3.1-flash-free,opencode/glm-5.3-flash-free,opencode/deepseek-v4.1-flash-free,opencode/nemotron-3-ultra-free,openrouter/minimax/minimax-m3.1-flash:free}"
 MAX_FAIL="${MAX_FAIL:-5}"
 IFS=',' read -r -a MODEL_LIST <<<"$MODELS"
+
+# ---- FREE-MODEL ALLOWLIST ---------------------------------------------------
+# Hard rule: the unattended loop may only spend FREE-TIER quota. Any provider
+# that bills (Fireworks, paid OpenRouter, etc.) is refused before a request is
+# made, so an unattended run can never burn the user's credit without them
+# explicitly changing this list.
+ALLOWED_PREFIXES=(
+  "opencode/"
+  "openrouter/minimax/minimax-m3.1-flash:free"
+  "openrouter/deepseek/deepseek-r1:free"
+  "openrouter/google/gemini-2.0-flash-exp:free"
+  "openrouter/qwen/qwen3-235b-a22b:free"
+)
+model_allowed() {
+  local m="$1" p
+  for p in "${ALLOWED_PREFIXES[@]}"; do
+    case "$m" in "$p"*) return 0 ;; esac
+  done
+  return 1
+}
 
 cd "$(dirname "$0")/.." || exit 1
 mkdir -p "$LOG_DIR"
@@ -55,6 +75,19 @@ trap 'rm -f "$LOCK"' EXIT
 command -v opencode >/dev/null 2>&1 || { say "FATAL: opencode not on PATH."; exit 1; }
 [ -f "$PROMPT_FILE" ] || { say "FATAL: ${PROMPT_FILE} not found."; exit 1; }
 [ -f "$STOP_FILE" ] && { say "FATAL: stop file present at startup."; exit 1; }
+
+# Refuse to spend money: only free-tier models may run unattended.
+REJECTED=""
+for M in "${MODEL_LIST[@]}"; do
+  M="$(echo "$M" | tr -d '[:space:]')"
+  [ -z "$M" ] && continue
+  if ! model_allowed "$M"; then REJECTED="${REJECTED} ${M}"; fi
+done
+if [ -n "$REJECTED" ]; then
+  say "FATAL: refusing to run - not on the FREE-TIER allowlist:${REJECTED}"
+  say "Edit \$MODELS and ALLOWED_PREFIXES if you intend to use a paid provider."
+  exit 2
+fi
 
 CURRENT="$(git branch --show-current 2>/dev/null || echo '')"
 if [ "$CURRENT" != "$BRANCH" ]; then
