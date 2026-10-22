@@ -125,3 +125,26 @@ by review:
 Include the failing check's output, the command you ran, and whether the
 backend, the browser twin or both are affected. If the two engines disagree,
 that is always a bug — please report it as such.
+
+## Unattended runs (the overnight loop)
+
+`scripts/overnight-watchdog.ps1` (Windows) and `scripts/overnight-watchdog.sh`
+(macOS/Linux) re-launch `opencode run` against `overnight_prompt.md` until a
+wall-clock window closes.
+
+**Cost rule: unattended runs may only use free-tier models.** Both scripts
+enforce this with a hard allowlist (`$AllowedModelPrefixes` /
+`ALLOWED_PREFIXES`). Any provider that bills - Fireworks, paid OpenRouter,
+Azure OpenAI - is *refused before a request is made*, and the loop exits with
+code 2. An unattended run can never spend the owner's credit by accident.
+To use a paid provider you must edit the allowlist deliberately.
+
+Operational notes:
+
+- The brief is inlined into the **user message**, not attached with `--file`.
+  An attached file arrives as file/tool-output content, which a model correctly
+  treats as untrusted and then refuses to act on.
+- The loop aborts after 5 consecutive failed iterations rather than spinning.
+- Drop a `STOP_OVERNIGHT` file in the repo root to stop it cleanly.
+- Progress: `logs/overnight/overnight_status.json`, `overnight_iterations.jsonl`,
+  and one `iter-*.log` per iteration.

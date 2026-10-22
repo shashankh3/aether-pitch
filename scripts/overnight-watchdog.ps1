@@ -77,17 +77,20 @@ $status = Join-Path $LogDir 'overnight_status.json'
 $iterations = Join-Path $LogDir 'overnight_iterations.jsonl'
 $lockFile = Join-Path $LogDir 'watchdog.lock'
 $modelList = $Models -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-$rejected = @($modelList | Where-Object { -not (Test-ModelAllowed $_) })
-if ($rejected.Count -gt 0) {
-    Say "FATAL: refusing to run - these models are not on the FREE-TIER allowlist: $($rejected -join ', ')"
-    Say "Edit `$Models and `$AllowedModelPrefixes if you intend to use a paid provider."
-    Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
-    exit 2
-}
 
 function Say([string]$m) {
     $line = "[{0}] {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $m
     Add-Content -LiteralPath $log -Value $line -Encoding UTF8
+}
+
+# ---- FREE-TIER GUARD --------------------------------------------------------
+# Refuse to spend money: only models on the free allowlist may run unattended.
+$rejected = @($modelList | Where-Object { -not (Test-ModelAllowed $_) })
+if ($rejected.Count -gt 0) {
+    Say "FATAL: refusing to run - these models are not on the FREE-TIER allowlist: $($rejected -join ', ')"
+    Say "Edit `$Models and `$AllowedModelPrefixes if you intend to use a paid provider."
+    Write-Output "REFUSED: $($rejected -join ', ') is not on the free-tier allowlist."
+    exit 2
 }
 
 # ---- single-instance guard -------------------------------------------------
