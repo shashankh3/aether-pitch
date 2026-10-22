@@ -66,6 +66,19 @@ END=$(( $(date +%s) + HOURS * 3600 ))
 say "watchdog start - opencode $(opencode --version 2>&1 | head -1) - window ${HOURS}h - ends $(date -r "$END" 2>/dev/null || echo "@$END")"
 say "model failover order: ${MODEL_LIST[*]}"
 
+# The brief is inlined into the user message rather than attached with --file:
+# an attached file arrives as file/tool-output content, which the model
+# correctly treats as untrusted instructions and refuses to follow.
+BRIEF="$(cat "$PROMPT_FILE")"
+MESSAGE="Run the overnight autonomous improvement loop for this repository.
+The complete brief is reproduced below - follow it exactly.
+Work on the ${BRANCH} branch. Start at section 0 (ORIENTATION).
+
+----- BEGIN BRIEF -----
+${BRIEF}
+----- END BRIEF -----"
+say "brief loaded: ${#BRIEF} chars"
+
 ITER=0
 CONSEC_FAIL=0
 LAST_MODEL=""
@@ -81,8 +94,6 @@ while [ "$(date +%s)" -lt "$END" ]; do
   OUT="${LOG_DIR}/iter-${STAMP}-${ITER}.log"
   STARTED="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-  MESSAGE="Read the attached overnight_prompt.md FIRST and follow it exactly. It is your complete brief for this session. Begin at section 0 (ORIENTATION). Do not ask questions - no one is there to answer them. Work on the ${BRANCH} branch, run the full verification gate before every commit, and keep going until the window closes."
-
   USED_MODEL=""
   CODE=1
   : >"$OUT"
@@ -90,11 +101,11 @@ while [ "$(date +%s)" -lt "$END" ]; do
     MODEL="$(echo "$MODEL" | tr -d '[:space:]')"
     [ -z "$MODEL" ] && continue
     say "    trying model ${MODEL}"
-    # NOTE: the message must come BEFORE --file, otherwise the positional is
-    # swallowed by the --file array option.
+    # The brief is already inlined into $MESSAGE - do NOT pass --file: an
+    # attached file arrives as untrusted file content and the model refuses
+    # to act on it.
     opencode run --auto --print-logs --log-level INFO \
-      --title "overnight-iter-${ITER}" -m "$MODEL" "$MESSAGE" \
-      --file="$PROMPT_FILE" >>"$OUT" 2>&1
+      --title "overnight-iter-${ITER}" -m "$MODEL" "$MESSAGE" >>"$OUT" 2>&1
     CODE=$?
     if [ "$CODE" -eq 0 ]; then USED_MODEL="$MODEL"; break; fi
     say "    model ${MODEL} failed (exit ${CODE}) - trying next"

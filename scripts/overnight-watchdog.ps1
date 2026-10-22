@@ -106,6 +106,18 @@ Say "watchdog start - opencode $($opencodeVer.Trim()) - window $Hours h - ends $
 Say "repo $repoRoot | branch $Branch | log $log"
 Say "model failover order: $($modelList -join ' -> ')"
 
+# The brief is inlined into the user message rather than attached with --file:
+# an attached file arrives as file/tool-output content, which the model
+# correctly treats as untrusted instructions and refuses to follow.
+$brief = Get-Content -LiteralPath $PromptFile -Raw -Encoding UTF8
+$message = "Run the overnight autonomous improvement loop for this repository." +
+    "`nThe complete brief is reproduced below - follow it exactly." +
+    "`nWork on the $Branch branch. Start at section 0 (ORIENTATION)." +
+    "`n`n----- BEGIN BRIEF -----" +
+    "`n" + $brief +
+    "`n----- END BRIEF -----"
+Say "brief loaded: $($brief.Length) chars; message: $($message.Length) chars"
+
 $iteration = 0
 $consecutiveFailures = 0
 $lastModel = ''
@@ -123,14 +135,6 @@ while ((Get-Date) -lt $endTime) {
 
     Say "--- iteration $iteration starting (${remaining}s remaining) ---"
 
-    $message = @"
-Read the attached `overnight_prompt.md` FIRST and follow it exactly.
-It is your complete brief for this session. Begin at section 0 (ORIENTATION).
-Do not ask questions - no one is there to answer them.
-Work on the `$Branch` branch, run the full verification gate before every commit,
-and keep going until the window closes.
-"@
-
     $headBefore = (git rev-parse --short HEAD 2>$null)
     $outFile = Join-Path $LogDir "iter-$stamp-$iteration.log"
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -145,11 +149,14 @@ and keep going until the window closes.
                 $out = "DRY RUN - model $model not launched."
                 $code = 0
             } else {
-                # NOTE: the message must come BEFORE --file, otherwise the
-                # positional is swallowed by the --file array option.
+                # The brief is inlined into the USER MESSAGE. Passing it via
+                # --file makes it arrive as attached-file content, which the
+                # model correctly treats as untrusted (prompt-injection
+                # defence) and then refuses to act on. It must be the message.
+                # NOTE: the message must be the last positional or be a single
+                # argument - do not reorder around --file.
                 $out = & opencode run --auto --print-logs --log-level INFO `
-                    --title "overnight-iter-$iteration" -m $model $message `
-                    "--file=$PromptFile" 2>&1
+                    --title "overnight-iter-$iteration" -m $model $message 2>&1
                 $code = $LASTEXITCODE
             }
         } catch {
