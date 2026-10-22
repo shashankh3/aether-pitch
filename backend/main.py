@@ -25,7 +25,7 @@ import logging
 import time
 from collections import deque
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, NamedTuple, Optional, Set, Tuple
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -236,7 +236,29 @@ hub = Hub()
 #: The live (state, metrics) pair, published together so a reader can
 #: never pair a state from tick N with metrics from tick N-1.
 LIVE: Tuple[dict, dict] = ({}, {})
-last_ghost: Optional[tuple] = None    # expire, target xy, ghost ΔxT, actual ΔxT, target id, completion %, net gain
+
+
+class GhostOverlayState(NamedTuple):
+    """The live ghost-pass overlay state.
+
+    This is a named tuple on purpose. The shape used to be a bare tuple
+    written in two places and read in two more, and a writer that produced a
+    shorter tuple made a reader raise IndexError inside the match loop - which
+    killed the live pitch mid-demo. With named fields, a writer cannot
+    silently produce a different shape, and a reader that destructures it
+    fails loudly at the point of the mistake.
+    """
+
+    expires_at: float          # match time at which the ghost lane expires
+    target_xy: Tuple[float, float]
+    ghost_delta_xt: float
+    actual_delta_xt: float
+    target_id: Optional[str]
+    completion_probability: float
+    net_xt_gain: float
+
+
+last_ghost: Optional[GhostOverlayState] = None
 latest_ghost_counterfactual: Optional[dict] = None
 insights: deque = deque(maxlen=40)
 top_inflections: List[dict] = []
@@ -530,14 +552,14 @@ async def make_insight(ev: dict, metrics: dict, state: dict) -> None:
         # shorter tuple raised IndexError and killed the match loop mid-demo.
         ghost_delta = float(ghost.get("delta_xt") or 0.0)
         actual_delta = float(ev.get("delta_xt") or 0.0)
-        last_ghost = (
-            state["t_match"] + 4.0,
-            [ghost["x"], ghost["y"]],
-            ghost_delta,
-            actual_delta,
-            ghost.get("target_id"),
-            float(ghost.get("completion_probability") or 0.0),
-            float(ghost.get("net_xt_gain") or (ghost_delta - actual_delta)),
+        last_ghost = GhostOverlayState(
+            expires_at=state["t_match"] + 4.0,
+            target_xy=(float(ghost["x"]), float(ghost["y"])),
+            ghost_delta_xt=ghost_delta,
+            actual_delta_xt=actual_delta,
+            target_id=ghost.get("target_id"),
+            completion_probability=float(ghost.get("completion_probability") or 0.0),
+            net_xt_gain=float(ghost.get("net_xt_gain") or (ghost_delta - actual_delta)),
         )
     _stamp_pipeline("c", stage_c.get("latency_ms", 0.0), {
         **(stage_c.get("stage_c_explainability") or {}),
@@ -648,14 +670,16 @@ async def match_loop() -> None:
                 if ghost:
                     ghost_delta = float(ghost.get("delta_xt") or 0.0)
                     actual_delta = float(ev.get("delta_xt") or 0.0)
-                    last_ghost = (
-                        state["t_match"] + 4.0,
-                        [ghost["x"], ghost["y"]],
-                        ghost_delta,
-                        actual_delta,
-                        ghost.get("target_id"),
-                        float(ghost.get("completion_probability") or 0.0),
-                        float(ghost.get("net_xt_gain") or (ghost_delta - actual_delta)),
+                    last_ghost = GhostOverlayState(
+                        expires_at=state["t_match"] + 4.0,
+                        target_xy=(float(ghost["x"]), float(ghost["y"])),
+                        ghost_delta_xt=ghost_delta,
+                        actual_delta_xt=actual_delta,
+                        target_id=ghost.get("target_id"),
+                        completion_probability=float(
+                            ghost.get("completion_probability") or 0.0),
+                        net_xt_gain=float(
+                            ghost.get("net_xt_gain") or (ghost_delta - actual_delta)),
                     )
                     latest_ghost_counterfactual = {
                         "clock": ev.get("clock"),
@@ -671,13 +695,13 @@ async def match_loop() -> None:
                     }
             elif ev.get("type") == "PRESSURE_TRAP" and ev.get("players"):
                 engine.set_badge(list(ev["players"])[:3], "INTERCEPT", 4.0)
-        if last_ghost and len(last_ghost) >= 7 and state["t_match"] < last_ghost[0]:
-            state["ball"]["ghost_end"] = last_ghost[1]
-            state["ball"]["ghost_delta_xt"] = round(last_ghost[2], 3)
-            state["ball"]["ghost_actual_delta_xt"] = round(last_ghost[3], 3)
-            state["ball"]["ghost_target_id"] = last_ghost[4]
-            state["ball"]["ghost_completion_probability"] = last_ghost[5]
-            state["ball"]["ghost_net_xt_gain"] = round(last_ghost[6], 3)
+        if last_ghost and state["t_match"] < last_ghost.expires_at:
+            state["ball"]["ghost_end"] = list(last_ghost.target_xy)
+            state["ball"]["ghost_delta_xt"] = round(last_ghost.ghost_delta_xt, 3)
+            state["ball"]["ghost_actual_delta_xt"] = round(last_ghost.actual_delta_xt, 3)
+            state["ball"]["ghost_target_id"] = last_ghost.target_id
+            state["ball"]["ghost_completion_probability"] = last_ghost.completion_probability
+            state["ball"]["ghost_net_xt_gain"] = round(last_ghost.net_xt_gain, 3)
         elif state.get("ball"):
             state["ball"]["ghost_end"] = None
             state["ball"]["ghost_delta_xt"] = None
@@ -782,11 +806,14 @@ def _spatial_context(team: Optional[str] = None) -> dict:
         "fastest_sprinter": dict(fastest) if fastest else {},
         "xt_at_gap": round(math.xt_value(team, gap_center["x"], gap_center["y"]), 3),
         "xt_top_zones": math.top_xt_zones(3),
-        "ghost": ({"x": last_ghost[1][0], "y": last_ghost[1][1],
-                   "delta_xt": last_ghost[2], "actual_delta_xt": last_ghost[3],
-                   "target_id": last_ghost[4], "completion_probability": last_ghost[5],
-                   "net_xt_gain": last_ghost[6]}
-                  if last_ghost and st.get("t_match", 0) < last_ghost[0] else None),
+        "ghost": ({"x": last_ghost.target_xy[0], "y": last_ghost.target_xy[1],
+                   "delta_xt": last_ghost.ghost_delta_xt,
+                   "actual_delta_xt": last_ghost.actual_delta_xt,
+                   "target_id": last_ghost.target_id,
+                   "completion_probability": last_ghost.completion_probability,
+                   "net_xt_gain": last_ghost.net_xt_gain}
+                  if last_ghost and st.get("t_match", 0) < last_ghost.expires_at
+                  else None),
         "def_lines": LIVE[1].get("def_lines", {}) if LIVE[1] else {},
         "ppda": LIVE[1].get("ppda", {}) if LIVE[1] else {},
     }

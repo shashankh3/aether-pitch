@@ -518,7 +518,7 @@ Run through this immediately before you submit the repo and record the video.
 | # | Step | Command / action | Pass condition |
 |---|------|------------------|----------------|
 | 1 | Confirm doc hygiene | `grep -rniE "sandbox\|not implemented\|todo\|fixme\|unverified" README.md SUBMISSION_GUIDE.md` | No internal engineering notes in the judge-facing docs |
-| 2 | Backend suite | `python backend/test_pipeline.py` | `RESULT: ALL 221 PIPELINE TESTS PASSED` |
+| 2 | Backend suite | `python backend/test_pipeline.py` | `RESULT: ALL 225 PIPELINE TESTS PASSED` |
 | 3 | ARM template | `python infra/validate_template.py` | `RESULT: ARM TEMPLATE VALIDATION PASSED` |
 | 3b | Documentation lint | `python tools/doc_lint.py` | `RESULT: DOC LINT PASSED` |
 | 4 | Frontend types | `cd frontend && npx tsc --noEmit` | No output |
@@ -585,7 +585,7 @@ page renders with the runtime configuration injected and no SSR error, then
 shuts down — it leaves no background process behind. `npm run check:logic` and
 `npm run smoke:ui` are pure Node: no server, no browser, no network.
 
-Together the four suites make **299 automated assertions** with zero dependencies
+Together the four suites make **303 automated assertions** with zero dependencies
 beyond what the project already ships. `python tools/doc_lint.py` re-runs the
 three headless suites and proves that every assertion count, `/api` path,
 `npm run` script and module size quoted in this guide, the README and

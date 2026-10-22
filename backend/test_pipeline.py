@@ -752,10 +752,14 @@ def main() -> int:
     # ---- runtime audit + all God Mode scenarios -------------------------
     app_main.LIVE = (copy.deepcopy(st), copy.deepcopy(bs))
     app_main.math = math
-    app_main.last_ghost = (
-        st["t_match"] + 4.0, [ghost["x"], ghost["y"]], ghost["delta_xt"],
-        ghost["actual_delta_xt"], ghost["target_id"],
-        ghost["completion_probability"], ghost["net_xt_gain"],
+    app_main.last_ghost = app_main.GhostOverlayState(
+        expires_at=st["t_match"] + 4.0,
+        target_xy=(float(ghost["x"]), float(ghost["y"])),
+        ghost_delta_xt=ghost["delta_xt"],
+        actual_delta_xt=ghost["actual_delta_xt"],
+        target_id=ghost["target_id"],
+        completion_probability=ghost["completion_probability"],
+        net_xt_gain=ghost["net_xt_gain"],
     )
     app_main.latest_ghost_counterfactual = {
         "clock": st["clock"], "team": carrier["team"],
@@ -797,14 +801,17 @@ def main() -> int:
         insight_error = f"{type(exc).__name__}: {exc}"
     if insight_ran:
         lg = app_main.last_ghost
-        check("Ghost overlay: the insight path writes the full 7-tuple",
-              isinstance(lg, tuple) and len(lg) == 7,
-              f"len={len(lg) if isinstance(lg, tuple) else lg}")
-        check("Ghost overlay: the tuple carries the fields the loop reads back",
-              isinstance(lg, tuple) and len(lg) == 7
-              and isinstance(lg[3], (int, float))
-              and isinstance(lg[6], (int, float)),
-              f"actual_delta={lg[3] if isinstance(lg, tuple) and len(lg) > 3 else None}")
+        check("Ghost overlay: the insight path writes the full state",
+              isinstance(lg, app_main.GhostOverlayState),
+              f"type={type(lg).__name__}")
+        check("Ghost overlay: the state carries the fields the loop reads back",
+              isinstance(lg, app_main.GhostOverlayState)
+              and isinstance(lg.actual_delta_xt, (int, float))
+              and isinstance(lg.net_xt_gain, (int, float)),
+              f"actual_delta={lg.actual_delta_xt if lg else None}")
+        check("Ghost overlay: the state shape cannot drift silently",
+              len(app_main.GhostOverlayState._fields) == 7,
+              f"{app_main.GhostOverlayState._fields}")
     else:
         check("Ghost overlay: the insight path writes the full 7-tuple", False,
               f"the insight path could not be exercised: {insight_error}")
@@ -2274,6 +2281,52 @@ def main() -> int:
           and not any(name in war_room_text
                       for name in ("premier league", "real madrid", "fifa", "uefa",
                                    "barcelona", "liverpool", "arsenal")))
+
+    # ---- the live match loop must not die --------------------------------
+    # 221 assertions missed a crash that killed the loop mid-demo: the insight
+    # path wrote the ghost overlay state in a different tuple shape than the
+    # loop read it back. Unit tests set that state by hand and never saw it.
+    # This runs the REAL loop for a few seconds and asserts it survives.
+    async def live_loop_smoke():
+        loop = asyncio.get_event_loop()
+        task = loop.create_task(app_main.match_loop())
+        await asyncio.sleep(12)
+        alive = not task.done()
+        error = None
+        if not alive:
+            try:
+                error = f"{type(task.exception()).__name__}: {task.exception()}"
+            except asyncio.CancelledError:
+                error = "cancelled"
+        stats = dict(app_main.gate_stats)
+        task.cancel()
+        try:
+            await task
+        except (asyncio.CancelledError, Exception):
+            pass
+        return alive, error, stats
+
+    try:
+        alive, error, live_stats = asyncio.get_event_loop().run_until_complete(
+            live_loop_smoke())
+        check("Live loop: the match loop survives a real run",
+              alive,
+              error or f"{live_stats.get('ticks', 0)} ticks, "
+                       f"{live_stats.get('events_considered', 0)} events, "
+                       f"{live_stats.get('insights', 0)} insights")
+        check("Live loop: the loop actually produced a match",
+              live_stats.get("ticks", 0) > 20
+              and live_stats.get("events_considered", 0) > 0,
+              f"ticks={live_stats.get('ticks', 0)} "
+              f"events={live_stats.get('events_considered', 0)}")
+        check("Live loop: every published insight passed the numeric critic",
+              live_stats.get("insights", 0) == 0
+              or live_stats.get("grounding_pass", 0) == live_stats.get("insights", 0),
+              f"{live_stats.get('grounding_pass', 0)} of "
+              f"{live_stats.get('insights', 0)} grounded")
+    except Exception as exc:
+        check("Live loop: the match loop survives a real run", False,
+              f"{type(exc).__name__}: {exc}")
 
     print()
     if failures:
