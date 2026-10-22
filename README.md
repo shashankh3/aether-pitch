@@ -14,7 +14,7 @@
 [![Synthetic Data](https://img.shields.io/badge/data-100%25%20synthetic-6f42c1)](#synthetic-data)
 
 **Repository:** `github.com/shashankh3/aether-pitch` · **Branch:** `main`
-**Scale:** 112 tracked files · ~23,900 LOC of Python + TypeScript (77 source files) · **258 automated assertions** (191 backend · 37 headless logic · 30 headless UI render) · 16-resource Azure ARM template
+**Scale:** 112 tracked files · ~25,600 LOC of Python + TypeScript (77 source files) · **258 automated assertions** (191 backend · 37 headless logic · 30 headless UI render) · 16-resource Azure ARM template
 
 > **The hook:** *AETHER PITCH is a live 3D football broadcast where every number on screen is computed by transparent football mathematics, every AI claim is graded by a deterministic numeric critic, and the cloud can die mid-match without the picture ever dropping a frame.*
 
@@ -282,16 +282,16 @@ BROWSER CLIENT (Next.js 14 / React 18 / React Three Fiber)
  ├─ 3D Volumetric Stage: Procedural Stadium · 22 Articulated Avatars (14-part rigs) · Broadcast Camera Rig
  ├─ Broadcast HUD: TopBar · ScoreBug · LeftRail · BottomDock (DVR) · RightDock (8-Tab Control Center)
  ├─ Telemetry Store: 10 Hz WebSocket Ingest ──► 60 FPS interpolation (linear + velocity extrapolation)
-  └─ EdgeEngine (1,653 LOC browser-native twin) ◄── active hot-standby, 0 ms reload on cloud drop
+  └─ EdgeEngine (1,707 LOC browser-native twin) ◄── active hot-standby, 0 ms reload on cloud drop
         │
         │ WebSocket (/ws @ 10 Hz) + REST control plane
         ▼
 FASTAPI BACKEND ENGINE (10 Hz deterministic loop)
-  ├─ Stage A  Synthetic ingest (997 LOC) ──► kinematics, ball physics, auto-eventing, bio-load twin
-  ├─ Stage B  Deterministic math (785 LOC) ──► xT grid, PDR, PPDA, Chaos, pitch control, ghost pass
-  ├─ Stage C  Foundry agent router (1,442 LOC) ──► 4-node insight pipeline + 3-turn war-room
- ├─ RAI & numeric critic (607 LOC) ──► prompt shield + grounding verifier + club-neutrality gate
- └─ Stage D & E  Personalizer (413 LOC) ──► camera directives, overlays, persona & i18n
+  ├─ Stage A  Synthetic ingest (1,075 LOC) ──► kinematics, ball physics, auto-eventing, bio-load twin
+  ├─ Stage B  Deterministic math (858 LOC) ──► xT grid, PDR, PPDA, Chaos, pitch control, ghost pass
+  ├─ Stage C  Foundry agent router (1,520 LOC) ──► 4-node insight pipeline + 3-turn war-room
+  ├─ RAI & numeric critic (689 LOC) ──► prompt shield + grounding verifier + club-neutrality gate
+  └─ Stage D & E  Personalizer (447 LOC) ──► camera directives, overlays, persona & i18n
         │
         ├──► Azure AI Foundry (Azure OpenAI: gpt-4o narrative / gpt-4o-mini triage)
         ├──► Azure AI Translator (real-time EN / ES / AR / HI broadcast localization)
@@ -672,7 +672,7 @@ Run the backend pipeline self-test:
 python backend/test_pipeline.py
 ```
 
-Expected result: `RESULT: ALL PIPELINE TESTS PASSED`. The suite also runs the
+Expected result: `RESULT: ALL 191 PIPELINE TESTS PASSED`. The suite also runs the
 **Official Rules & trademark compliance audit** (synthetic metadata, deterministic
 `seed=42` replay, Stage A–E payload keys, zero third-party brand strings, zero
 external media references, encoding hygiene) and validates the Azure ARM
@@ -688,7 +688,8 @@ npm run smoke
 
 `npm run smoke` boots the production server in-process, requests the page,
 asserts the runtime configuration was injected and the shell rendered with no
-SSR error, then shuts down. `npm run verify` runs both in sequence.
+SSR error, then shuts down. `npm run verify` runs the four frontend suites
+(build, SSR smoke, headless logic, headless UI render) in sequence.
 
 Browser smoke checks cover 1600 × 900 desktop and 390 × 844 mobile layouts: WebGL canvas
 initialization, camera/overlay controls, overlay-packet and rubric dialogs, three-act recap, fan tuner dismissal, and
@@ -699,6 +700,19 @@ Validate the Azure infrastructure template without a subscription:
 ```bash
 python infra/validate_template.py
 ```
+
+Check that every judge-facing number, endpoint path and script name in the docs
+is still true:
+
+```bash
+python tools/doc_lint.py
+```
+
+The doc-lint runs the three headless suites, reads their live assertion counts
+and verifies them against `README.md`, `SUBMISSION_GUIDE.md` and
+`docs/ARCHITECTURE.md` — it also proves that every `/api` path in the docs is a
+real route, that every `npm run` script exists, that every quoted file path
+exists, and that every module size in the architecture map is exact.
 
 Optional backend static check:
 
@@ -753,8 +767,9 @@ For a single-host demo, Docker Compose is the supported zero-setup path. For a p
 Issues and pull requests are welcome. Before opening a pull request:
 
 1. Run `python backend/test_pipeline.py`.
-2. Run `npm run build` in `frontend/`.
-3. Keep new telemetry fields typed in `frontend/src/lib/types.ts` and mirrored in the backend packet schemas.
+2. Run `python tools/doc_lint.py`.
+3. Run `npm run build` in `frontend/`.
+4. Keep new telemetry fields typed in `frontend/src/lib/types.ts` and mirrored in the backend packet schemas.
 
 ## License
 

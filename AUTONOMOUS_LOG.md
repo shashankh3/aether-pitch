@@ -74,3 +74,7 @@ Base commit: `d28ccdf`
 ### 2026-10-22T07:40:18Z — Track B - REST contract tests for every route
 - Files: backend/test_pipeline.py, README.md, SUBMISSION_GUIDE.md, docs/ARCHITECTURE.md, AUTONOMOUS_BACKLOG.md
 - Verification: 191 backend + 37 logic + 30 UI render = 258 assertions; ARM valid; tsc clean; build ok; SSR smoke ok; ui render ok
+
+### 2026-10-22T07:51:04Z — Track F - doc-lint that proves every judge-facing claim against the code
+- Files: tools/doc_lint.py, backend/test_pipeline.py, README.md, SUBMISSION_GUIDE.md, CONTRIBUTING.md, docs/ARCHITECTURE.md, AGENTS.md, overnight_prompt.md, AUTONOMOUS_BACKLOG.md
+- Verification: 191 backend + 37 logic + 30 UI render = 258 assertions; doc-lint 39 checks green; ARM valid; tsc clean; build ok; SSR smoke ok

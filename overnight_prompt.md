@@ -67,18 +67,20 @@ invalidates the submission.
 ## 2. THE VERIFICATION GATE (all must pass before every commit)
 
 ```bash
-python backend/test_pipeline.py      # backend suite (currently 143 assertions)
+python backend/test_pipeline.py      # backend suite (currently 191 assertions)
 python infra/validate_template.py    # Azure ARM template validity
+python tools/doc_lint.py             # every number/endpoint/script in the docs is true
 cd frontend && npx tsc --noEmit       # typecheck
 cd frontend && npm run build         # production build
 cd frontend && npm run smoke         # SSR smoke
-cd frontend && npm run check:logic   # 28 headless logic assertions
+cd frontend && npm run check:logic   # 37 headless logic assertions
 cd frontend && npm run smoke:ui      # 30 headless UI render assertions
 cd .. && git diff --check            # whitespace / conflict markers
 ```
 
 If you change a count in a doc, **measure it** — do not guess. The current
-verified totals are **201 assertions (143 + 28 + 30)**.
+verified totals are **258 assertions (191 + 37 + 30)**; `python tools/doc_lint.py`
+re-measures them on every run and fails if a doc disagrees.
 
 **Never commit a red gate.** If you cannot make something pass, revert your
 change and record the attempt in the log with what you learned. A reverted

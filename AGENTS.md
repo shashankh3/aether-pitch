@@ -36,3 +36,4 @@
 ## Verification Workflow
 - Frontend validity: `cd frontend && npm run build`
 - Backend pipeline validity: `python backend/test_pipeline.py`
+- Judge-facing doc accuracy: `python tools/doc_lint.py`

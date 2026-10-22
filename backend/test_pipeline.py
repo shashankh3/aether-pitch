@@ -397,11 +397,14 @@ def test_rules_and_trademark_compliance(
 
 def main() -> int:
     failures = []
+    passed = [0]
 
     def check(name: str, cond: bool, detail: str = "") -> None:
         status = "PASS" if cond else "FAIL"
         print(f"[{status}] {name}" + (f" — {detail}" if detail else ""))
-        if not cond:
+        if cond:
+            passed[0] += 1
+        else:
             failures.append(name)
 
     # ---- Stage (a): synthetic ingest + auto-eventing --------------------
@@ -2024,7 +2027,7 @@ def main() -> int:
     if failures:
         print(f"RESULT: {len(failures)} FAILED -> {failures}")
         return 1
-    print("RESULT: ALL PIPELINE TESTS PASSED")
+    print(f"RESULT: ALL {passed[0]} PIPELINE TESTS PASSED")
     return 0
 
 

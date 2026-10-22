@@ -2,7 +2,7 @@
 
 ## The verification gate
 
-Every change must leave all six checks green. They run in about a minute:
+Every change must leave all eight checks green. They run in about a minute:
 
 ```bash
 # 1. Backend pipeline, multi-agent, counterfactual and compliance assertions
@@ -11,19 +11,22 @@ python backend/test_pipeline.py
 # 2. Azure ARM template validity (no subscription needed)
 python infra/validate_template.py
 
-# 3. Type safety across the whole contract surface
+# 3. Documentation lint — every number, endpoint and script in the docs is true
+python tools/doc_lint.py
+
+# 4. Type safety across the whole contract surface
 cd frontend && npx tsc --noEmit
 
-# 4. Production build
+# 5. Production build
 npm run build
 
-# 5. Server-rendered smoke test (boots the production server in-process)
+# 6. Server-rendered smoke test (boots the production server in-process)
 npm run smoke
 
-# 6. Headless browser-side logic checks (Stage B twin, sandbox, ledger, dossier)
+# 7. Headless browser-side logic checks (Stage B twin, sandbox, ledger, dossier)
 npm run check:logic
 
-# 7. Judge-facing surfaces all render without throwing
+# 8. Judge-facing surfaces all render without throwing
 npm run smoke:ui
 ```
 

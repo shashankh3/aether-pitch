@@ -27,31 +27,35 @@ network.
 
 ```text
 backend/
-  stage_a_synthetic_engine.py   997 LOC  Stage A — the simulation
-  stage_b_math_engine.py        785 LOC  Stage B — the mathematics
-  stage_c_foundry_agents.py   1,442 LOC  Stage C — Foundry routing + agents
-  stage_d_e_personalizer.py     413 LOC  Stage D/E — render + personalise
-  agent_trace.py                208 LOC  grounded handoff trace
-  rai_shield.py                 267 LOC  prompt shield + neutrality + grounding
-  content_safety.py             132 LOC  Azure AI Content Safety (optional)
-  counterfactual.py             298 LOC  what-if contract + evaluation (no globals)
-  main.py                     1,075 LOC  HTTP/WS surface + match loop
-  test_pipeline.py            1,902 LOC  191 assertions
+  stage_a_synthetic_engine.py 1,075 LOC  Stage A — the simulation
+  stage_b_math_engine.py        858 LOC  Stage B — the mathematics
+  stage_c_foundry_agents.py   1,520 LOC  Stage C — Foundry routing + agents
+  stage_d_e_personalizer.py     447 LOC  Stage D/E — render + personalise
+  agent_trace.py                231 LOC  grounded handoff trace
+  rai_shield.py                 311 LOC  prompt shield + neutrality + grounding
+  content_safety.py             147 LOC  Azure AI Content Safety (optional)
+  counterfactual.py             338 LOC  what-if contract + evaluation (no globals)
+  config.py                      83 LOC  environment + runtime configuration
+  main.py                     1,182 LOC  HTTP/WS surface + match loop
+  test_pipeline.py            2,035 LOC  191 assertions
 
 frontend/src/
-  lib/edgeEngine.ts           1,653 LOC  the browser-native twin
-  lib/telemetry.ts              263 LOC  10 Hz store → 60 fps render
-  lib/types.ts                  827 LOC  the shared contract surface
-  lib/dossier.ts                        audit dossier serialization
-  lib/sandboxStore.ts                   what-if sandbox state
-  lib/ledgerStore.ts                    counterfactual experiment ledger
-  lib/runtimeConfig.ts                  runtime backend coordinates
-  lib/hudContext.tsx                    control-center + palette state
-  app/page.tsx                1,201 LOC  the orchestrator
-  app/layout.tsx                        runtime config injection + error boundary
-  hooks/useResilientMatchEngine.ts      WS + edge failover + drill
-  hooks/useSpeechController.ts          zero-overlap speech
-  hooks/useRenderTelemetry.ts           measured frame rate
+  lib/edgeEngine.ts           1,707 LOC  the browser-native twin
+  lib/telemetry.ts              284 LOC  10 Hz store → 60 fps render
+  lib/types.ts                  893 LOC  the shared contract surface
+  lib/dossier.ts                359 LOC  audit dossier serialization
+  lib/sandboxStore.ts           247 LOC  what-if sandbox state
+  lib/ledgerStore.ts             88 LOC  counterfactual experiment ledger
+  lib/runtimeConfig.ts           53 LOC  runtime backend coordinates
+  lib/hudContext.tsx            137 LOC  control-center + palette state
+  lib/useModalA11y.ts            72 LOC  focus trap + escape handling
+  lib/utils.ts                   14 LOC  shared class-name helper
+  lib/api.ts                      6 LOC  the REST client
+  app/page.tsx                1,281 LOC  the orchestrator
+  app/layout.tsx                108 LOC  runtime config injection + error boundary
+  hooks/useResilientMatchEngine.ts  379 LOC  WS + edge failover + drill
+  hooks/useSpeechController.ts      129 LOC  zero-overlap speech
+  hooks/useRenderTelemetry.ts       55 LOC  measured frame rate
   components/                            HUD, drawers, modals (30 files)
   components/three/                      the 3D scene (12 files)
 
@@ -155,6 +159,7 @@ The 3D stage is not an observer feed — it is a sandbox.
 |---|---|---|
 | Backend | `python backend/test_pipeline.py` | 191 assertions: all five stages, the gate, the trace, the war-room, the counterfactual arbiter, the line shift, the RAI shield, the hub, the retry policy, the xT/pitch-control invariants, the i18n atlas, the REST contract, the compliance audit |
 | ARM | `python infra/validate_template.py` | JSON validity, ARM symbol resolution, dependency integrity, secret handling |
+| Docs | `python tools/doc_lint.py` | Every assertion count, `/api` path, `npm run` script, quoted file path and module size in the judge-facing docs still matches the code |
 | Types | `cd frontend && npx tsc --noEmit` | The whole contract surface |
 | Build | `npm run build` | Production compile |
 | SSR | `npm run smoke` | In-process server render, runtime config injection, no SSR error |

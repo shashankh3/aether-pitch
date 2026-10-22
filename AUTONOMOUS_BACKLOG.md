@@ -1,6 +1,6 @@
 # Autonomous Improvement Backlog
-Last Updated: 2026-10-22T07:40:00Z
-Was Updated: 2026-10-22T04:30:00Z
+Last Updated: 2026-10-22T07:50:00Z
+Was Updated: 2026-10-22T07:40:00Z
 
 Scope: AETHER PITCH (Premier League × Azure "Inside the Game" hackathon).
 Branch: `overnight-auto-improve` (never merge to `main` without review).
@@ -48,9 +48,9 @@ Verification gate (all must pass before a commit):
 - [ ] [Track I] Audit the R3F scene graph for draw-call count, shared-vs-duplicated geometry, and material reuse in the stadium, crowd, and overlay layers
   - files: frontend/src/components/three/*.tsx
   - note: Directly determines whether the 3D pitch holds 60 FPS on the judge's hardware.
-- [ ] [Track F] Add an automated doc-lint that extracts every number, endpoint path, script name and assertion count from `README.md` / `SUBMISSION_GUIDE.md` / `docs/*.md` and verifies each against the code
-  - files: tools/doc_lint.py, backend/test_pipeline.py
-  - note: Judge-facing docs drift silently. The counts were already stale once (90 -> 143). A lint makes staleness impossible.
+- [x] [Track F] Add an automated doc-lint that extracts every number, endpoint path, script name and assertion count from `README.md` / `SUBMISSION_GUIDE.md` / `docs/*.md` and verifies each against the code
+  - files: tools/doc_lint.py, backend/test_pipeline.py, README.md, SUBMISSION_GUIDE.md, CONTRIBUTING.md, docs/ARCHITECTURE.md, AGENTS.md, overnight_prompt.md
+  - note: DONE — `python tools/doc_lint.py` re-runs the three headless suites, reads their live assertion counts out of the result lines and proves every judge-facing claim: the assertion counts in three docs, every `/api` path (both directions - no doc path without a route, no route without a doc), every `npm run` script, every quoted repo path, every `python <script>.py`, the module-map completeness and every module size, the component/file/resource counts and the compliance-scan file count. FOUND + FIXED real drift: the assertion totals (230/163 vs the live 258/191), the logic count in the pre-flight checklist (28 vs 37), the compliance-scan count (56 vs 69), the tracked-file count (108 vs 112), six stale module sizes and two modules missing from the architecture map (config.py, useModalA11y.ts). The backend result line now prints its own count so the lint has a machine-readable source of truth.
 - [ ] [Track F] Rubric coverage audit: for each rubric line in `SUBMISSION_GUIDE.md`, record the concrete evidence (file path, command, and what a judge sees) so every scored dimension is defensible
   - files: SUBMISSION_GUIDE.md, docs/ARCHITECTURE.md
   - note: Strengthen the weakest-evidenced rubric lines rather than the strongest ones.
