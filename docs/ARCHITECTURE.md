@@ -29,20 +29,24 @@ network.
 backend/
   stage_a_synthetic_engine.py 1,075 LOC  Stage A — the simulation
   stage_b_math_engine.py        870 LOC  Stage B — the mathematics
-  stage_c_foundry_agents.py   1,549 LOC  Stage C — Foundry routing + agents
+  stage_c_foundry_agents.py       36 LOC  stable re-export barrel
+  agents/                     1,627 LOC  Foundry router package (8 modules)
   stage_d_e_personalizer.py     498 LOC  Stage D/E — render + personalise
   agent_trace.py                231 LOC  grounded handoff trace
   rai_shield.py                 311 LOC  prompt shield + neutrality + grounding
   content_safety.py             147 LOC  Azure AI Content Safety (optional)
   counterfactual.py             358 LOC  what-if contract + evaluation (no globals)
   config.py                      98 LOC  environment + runtime configuration
-  main.py                     1,318 LOC  HTTP/WS surface + match loop
-  test_pipeline.py            2,517 LOC  237 assertions
+  main.py                     1,157 LOC  HTTP/WS surface + match loop
+  runtime.py                    169 LOC  WebSocket hub + request body guard
+  test_pipeline.py            2,518 LOC  237 assertions
 
 frontend/src/
-  lib/edgeEngine.ts           1,749 LOC  the browser-native twin
+  lib/edgeEngine.ts               1 LOC  stable re-export barrel
+  lib/edgeEngine/             1,782 LOC  the browser-native twin (9 modules)
   lib/telemetry.ts              284 LOC  10 Hz store → 60 fps render
-  lib/types.ts                  907 LOC  the shared contract surface
+  lib/types.ts                    1 LOC  stable re-export barrel
+  lib/types/                    919 LOC  the shared contract surface (6 modules)
   lib/dossier.ts                359 LOC  audit dossier serialization
   lib/sandboxStore.ts           247 LOC  what-if sandbox state
   lib/ledgerStore.ts             88 LOC  counterfactual experiment ledger
@@ -92,8 +96,8 @@ infra/main.json                 491 LOC  ARM template (16 resources)
 | Layer | Where | What it protects |
 |---|---|---|
 | 1. Stage B is deterministic | `stage_b_math_engine.py` | The numbers never depend on a model being reachable. |
-| 2. Stage C has a local fallback | `stage_c_foundry_agents.py` | No Azure key still produces the same schema. |
-| 3. The browser twin | `lib/edgeEngine.ts` | The client can run the whole match with no server. |
+| 2. Stage C has a local fallback | `backend/agents/` | No Azure key still produces the same schema. |
+| 3. The browser twin | `lib/edgeEngine/` | The client can run the whole match with no server. |
 | 4. The hub queues per client | `main.py` (`Hub`) | One slow viewer cannot stall the 10 Hz loop. |
 
 The **cloud-outage drill** is the demo of layers 3 and 4 working together: the
@@ -131,7 +135,7 @@ Pure NumPy, zero heuristics, 100% auditable:
 | `evaluate_defensive_line_shift` | Collective line shift → exposure, trap %, press gain |
 | `bio_load_summary` | Mean load, mean +10 m projection, worst penalty, at-risk list |
 
-### Stage C — Foundry routing and agents (`stage_c_foundry_agents.py`)
+### Stage C — Foundry routing and agents (`backend/agents/`)
 - **4-node insight pipeline** — `Spatial Sentinel` → `Tactical Triage` → `Causal Analyst + Critic` → `Broadcast Director`.
 - **3-turn adversarial war-room** — manager proposes, scout counters, arbiter adjudicates. Each turn is a *separate* model call with its own Stage B tool bundle, and each reads the turns before it.
 - **Counterfactual arbiter** — `POST /api/counterfactual-query` returns a `structural_vulnerability_index`, a compensation move, and a numeric-critic verdict.
@@ -191,7 +195,7 @@ regression in any of those fails the build rather than reaching a judge.
 
 ## 6b. The cross-engine parity harness
 
-The Stage B engine runs on the backend. The browser twin in `lib/edgeEngine.ts`
+The Stage B engine runs on the backend. The browser twin in `lib/edgeEngine/`
 runs when the backend is unreachable. If they ever disagree, a judge sees one
 product online and a different one offline — and the promise that *every
 number is grounded in live telemetry* stops being true.

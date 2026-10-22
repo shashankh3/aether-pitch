@@ -48,8 +48,7 @@ cannot satisfy a check, the change is wrong — fix the change, not the check.
 - `main` is the submission branch. It is pushed only when the whole gate is
   green and the change is a coherent, verified unit.
 - Feature work branches from `main` and merges back with a squash commit.
-- The autonomous improvement branch is `overnight-auto-improve`; it is never
-  merged without a human reading the diff.
+- A branch is never merged without a human reading the diff.
 
 ## Ground rules that are not negotiable
 
@@ -73,7 +72,7 @@ by review:
    this on every run.
 5. **Every backend feature needs a browser twin.** If you add a deterministic
    model in `backend/`, add the matching implementation in
-   `frontend/src/lib/edgeEngine.ts` **and** a parity check. The two engines
+   `frontend/src/lib/edgeEngine/` **and** a parity check. The two engines
    are proven byte-identical, not merely similar.
 6. **Zero-config offline.** No new Azure service may be a hard requirement.
    Every cloud call needs a deterministic local fallback that produces the
@@ -83,7 +82,7 @@ by review:
 
 1. Implement it in `backend/stage_b_math_engine.py` with a docstring stating
    the formula.
-2. Mirror it in `frontend/src/lib/edgeEngine.ts` — same function name, same
+2. Mirror it in `frontend/src/lib/edgeEngine/` — same function name, same
    signature, same arithmetic.
 3. Add a parity assertion to both suites:
 
@@ -129,26 +128,3 @@ by review:
 Include the failing check's output, the command you ran, and whether the
 backend, the browser twin or both are affected. If the two engines disagree,
 that is always a bug — please report it as such.
-
-## Unattended runs (the overnight loop)
-
-`scripts/overnight-watchdog.ps1` (Windows) and `scripts/overnight-watchdog.sh`
-(macOS/Linux) re-launch `opencode run` against `overnight_prompt.md` until a
-wall-clock window closes.
-
-**Cost rule: unattended runs may only use free-tier models.** Both scripts
-enforce this with a hard allowlist (`$AllowedModelPrefixes` /
-`ALLOWED_PREFIXES`). Any provider that bills - Fireworks, paid OpenRouter,
-Azure OpenAI - is *refused before a request is made*, and the loop exits with
-code 2. An unattended run can never spend the owner's credit by accident.
-To use a paid provider you must edit the allowlist deliberately.
-
-Operational notes:
-
-- The brief is inlined into the **user message**, not attached with `--file`.
-  An attached file arrives as file/tool-output content, which a model correctly
-  treats as untrusted and then refuses to act on.
-- The loop aborts after 5 consecutive failed iterations rather than spinning.
-- Drop a `STOP_OVERNIGHT` file in the repo root to stop it cleanly.
-- Progress: `logs/overnight/overnight_status.json`, `overnight_iterations.jsonl`,
-  and one `iter-*.log` per iteration.

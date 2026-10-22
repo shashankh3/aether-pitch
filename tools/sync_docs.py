@@ -43,8 +43,25 @@ def npm() -> str:
     return found
 
 
+PACKAGE_PATHS = {
+    "backend/stage_c_foundry_agents.py": "backend/agents",
+    "frontend/src/lib/edgeEngine.ts": "frontend/src/lib/edgeEngine",
+    "frontend/src/lib/types.ts": "frontend/src/lib/types",
+}
+
+
 def count_lines(rel: str) -> int:
     return len(read(rel).splitlines())
+
+
+def package_lines(rel: str) -> int:
+    """LOC in a stable barrel plus every module in its implementation package."""
+    folder = ROOT / PACKAGE_PATHS[rel]
+    total = count_lines(rel)
+    for path in sorted(folder.rglob("*")):
+        if path.is_file() and path.suffix in (".py", ".ts"):
+            total += len(path.read_text(encoding="utf-8").splitlines())
+    return total
 
 
 def measure_suites() -> dict:
@@ -129,6 +146,8 @@ def main() -> int:
             # The RAI layer is the sum of three modules.
             actual = sum(count_lines(f"backend/{n}") for n in
                          ("rai_shield.py", "agent_trace.py", "content_safety.py"))
+        elif rel in PACKAGE_PATHS:
+            actual = package_lines(rel)
         else:
             actual = count_lines(rel)
         m = re.search(pattern, readme)
@@ -176,6 +195,18 @@ def main() -> int:
         arch = sub_once(arch, pattern,
                         lambda mm, a=actual: f"{mm.group(1)}{a:,}{mm.group(3)}",
                         f"ARCHITECTURE module map for {name}", changes)
+
+    for rel, folder in (
+        ("backend/stage_c_foundry_agents.py", "agents/"),
+        ("frontend/src/lib/edgeEngine.ts", "lib/edgeEngine/"),
+        ("frontend/src/lib/types.ts", "lib/types/"),
+    ):
+        actual = package_lines(rel)
+        arch = sub_once(
+            arch,
+            rf"(?m)(^\s+{re.escape(folder)}\s+)([\d,]+)( LOC)",
+            lambda mm, a=actual: f"{mm.group(1)}{a:,}{mm.group(3)}",
+            f"ARCHITECTURE package size for {folder}", changes)
 
     arch = sub_once(arch, r"(\| Backend \| `python backend/test_pipeline\.py` \| )\d+( assertions)",
                     rf"\g<1>{suites['backend']}\2", "ARCHITECTURE backend count", changes)

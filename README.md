@@ -14,7 +14,7 @@
 [![Synthetic Data](https://img.shields.io/badge/data-100%25%20synthetic-6f42c1)](#synthetic-data)
 
 **Repository:** `github.com/shashankh3/aether-pitch` · **Branch:** `main`
-**Scale:** 121 tracked files · ~29,462 LOC of Python + TypeScript (85 source files) · **356 automated assertions** (237 backend · 89 headless logic · 30 headless UI render) · 16-resource Azure ARM template
+**Scale:** 136 tracked files · ~29,562 LOC of Python + TypeScript (106 source files) · **356 automated assertions** (237 backend · 89 headless logic · 30 headless UI render) · 16-resource Azure ARM template
 
 > **The hook:** *AETHER PITCH is a live 3D football broadcast where every number on screen is computed by transparent football mathematics, every AI claim is graded by a deterministic numeric critic, and the cloud can die mid-match without the picture ever dropping a frame.*
 
@@ -171,7 +171,7 @@ Prefer to be driven? **Controls → Autopilot** runs the full 80-second guided t
   Each agent is a **separate model invocation** with its own tool bundle, and the tools are the deterministic Stage B engine — so an agent reasons about the space without ever inventing a number. The arbiter issues the **Tactical Prescription** (e.g. invert RB into the 78,12 half-space for a 4v3 overload).
 - **Output contract:** `agent_debate_transcript` (`manager_proposal`, `scout_counter`, `arbiter_verdict`), `recommended_adjustment` (title + directive), `projected_30s_xt_delta`, `win_prob_shift_pct`, `target_zones`, `adjustment_vectors`, plus `agent_calls` (agent, deployment, tool bundle, latency, token usage) and `orchestration` — the multi-agent claim is inspectable, not asserted.
 - **Studio (`prod`) tab UI:** each debate card shows its own model deployment, latency, token count and tool count; `+ΔxT` / `+WIN PROB` badges; and **"Project Tactical Shift on 3D Pitch"** which highlights the overload zones as pulsing ground rings and draws the adjustment vectors as glowing arrows on the 3D Digital Twin.
-- **Zero-config fallback:** `edgeWarRoom()` in `frontend/src/lib/edgeEngine.ts` reproduces the identical three-agent, three-turn debate offline.
+- **Zero-config fallback:** `edgeWarRoom()` in `frontend/src/lib/edgeEngine/warRoom.ts` reproduces the identical three-agent, three-turn debate offline.
 
 ### Microsoft Foundry Responsible AI (Best Use of Microsoft Foundry)
 - **Pre-flight Prompt Shield (`backend/rai_shield.py`)** screens every user query **before a token reaches Azure OpenAI**: it detects prompt injection (instruction override, role hijack, jailbreak, prompt exfiltration, guardrail bypass), off-topic queries, and third-party real-world entities. A blocked query never calls the model — the caller gets a grounded, localized deflection back to the live NLA vs MCS telemetry in EN/ES/AR/HI. Verified by an assertion that counts **0 model calls** on a blocked query.
@@ -272,7 +272,7 @@ CounterfactualEvaluation
   - Synthetic metadata is strictly NLA vs MCS in the `AETHER Synthetic League`.
   - `seed=42` replays frame-for-frame identically.
   - `bio_load_profile` and every Stage A–E payload key are present.
-  - **0** third-party sponsor / league / kit-brand / broadcaster / social strings across all shipped `frontend/src` + `backend` sources (75 files scanned).
+  - **0** third-party sponsor / league / kit-brand / broadcaster / social strings across all shipped `frontend/src` + `backend` sources (91 files scanned).
   - **0** external media asset references.
 - **`SUBMISSION_GUIDE.md` §14** ships paste-ready answers for the submission portal: project summary & tagline, Foundry + multi-agent orchestration, cloud-native architecture & edge resilience, the synthetic-data compliance attestation, and prize-track one-liners.
 
@@ -283,14 +283,14 @@ BROWSER CLIENT (Next.js 14 / React 18 / React Three Fiber)
  ├─ 3D Volumetric Stage: Procedural Stadium · 22 Articulated Avatars (14-part rigs) · Broadcast Camera Rig
  ├─ Broadcast HUD: TopBar · ScoreBug · LeftRail · BottomDock (DVR) · RightDock (8-Tab Control Center)
  ├─ Telemetry Store: 10 Hz WebSocket Ingest ──► 60 FPS interpolation (linear + velocity extrapolation)
-  └─ EdgeEngine (1,749 LOC browser-native twin) ◄── active hot-standby, 0 ms reload on cloud drop
+  └─ EdgeEngine (1,782 LOC browser-native twin) ◄── active hot-standby, 0 ms reload on cloud drop
         │
         │ WebSocket (/ws @ 10 Hz) + REST control plane
         ▼
 FASTAPI BACKEND ENGINE (10 Hz deterministic loop)
   ├─ Stage A  Synthetic ingest (1,075 LOC) ──► kinematics, ball physics, auto-eventing, bio-load twin
   ├─ Stage B  Deterministic math (858 LOC) ──► xT grid, PDR, PPDA, Chaos, pitch control, ghost pass
-  ├─ Stage C  Foundry agent router (1,549 LOC) ──► 4-node insight pipeline + 3-turn war-room
+  ├─ Stage C  Foundry agent router (1,627 LOC) ──► 4-node insight pipeline + 3-turn war-room
   ├─ RAI & numeric critic (689 LOC) ──► prompt shield + grounding verifier + club-neutrality gate
   └─ Stage D & E  Personalizer (498 LOC) ──► camera directives, overlays, persona & i18n
         │
@@ -301,7 +301,7 @@ FASTAPI BACKEND ENGINE (10 Hz deterministic loop)
 
 ### Cloud-to-edge zero-downtime failover
 
-Live broadcasts cannot show a loading spinner. Every backend mathematical model, bio-load curve and tactical war-room heuristic has a deterministic TypeScript counterpart inside `edgeEngine.ts`. If the WebSocket drops — or when a judge triggers the **6-Second Failover Drill** in the Data tab — `useResilientMatchEngine.ts` hot-swaps to the browser-native engine mid-frame, measures the exact failover latency, and reconciles state on reconnection.
+Live broadcasts cannot show a loading spinner. Every backend mathematical model, bio-load curve and tactical war-room heuristic has a deterministic TypeScript counterpart inside `frontend/src/lib/edgeEngine/`. If the WebSocket drops — or when a judge triggers the **6-Second Failover Drill** in the Data tab — `useResilientMatchEngine.ts` hot-swaps to the browser-native engine mid-frame, measures the exact failover latency, and reconciles state on reconnection.
 
 ```text
 Cloud drop ─► socket closed ─► EdgeEngine takes the picture (0 frames dropped)
@@ -639,10 +639,12 @@ The frontend interpolates the 10 Hz stream to 60 FPS through a mutable telemetry
 .
 ├── backend/
 │   ├── main.py                        # FastAPI app, match loop, REST + WebSocket hub
+│   ├── runtime.py                     # WebSocket fan-out hub + request body cap
 │   ├── config.py                      # Environment-backed settings
 │   ├── stage_a_synthetic_engine.py    # 10 Hz synthetic match, events, milestones
 │   ├── stage_b_math_engine.py         # Chaos, PDR, xT, Ghost Pass, gating
-│   ├── stage_c_foundry_agents.py      # Azure AI Foundry narratives and studio queries
+│   ├── stage_c_foundry_agents.py      # Stable re-export barrel for the agents package
+│   ├── agents/                        # Foundry core, explain, studio, war-room, roster
 │   ├── stage_d_e_personalizer.py      # Render packets and fan personalization
 │   ├── agent_trace.py                  # Grounded handoff trace + numeric cross-check
 │   ├── test_pipeline.py               # Offline five-stage pipeline self-test
@@ -770,7 +772,7 @@ Issues and pull requests are welcome. Before opening a pull request:
 1. Run `python backend/test_pipeline.py`.
 2. Run `python tools/doc_lint.py`.
 3. Run `npm run build` in `frontend/`.
-4. Keep new telemetry fields typed in `frontend/src/lib/types.ts` and mirrored in the backend packet schemas.
+4. Keep new telemetry fields typed in `frontend/src/lib/types/` and mirrored in the backend packet schemas.
 
 ## License
 

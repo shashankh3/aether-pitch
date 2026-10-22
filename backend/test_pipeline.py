@@ -1614,12 +1614,13 @@ def main() -> int:
         "start", "end", "distance_m", "ball_speed_kmh",
         "defenders_in_cone", "nearest_defender_m", "pass_seq", "scenario",
     }
-    with open(
+    twin_dir = (
         Path(__file__).resolve().parent.parent
-        / "frontend" / "src" / "lib" / "edgeEngine.ts",
-        encoding="utf-8",
-    ) as fh:
-        twin_source = fh.read()
+        / "frontend" / "src" / "lib" / "edgeEngine"
+    )
+    twin_source = "\n".join(
+        p.read_text(encoding="utf-8") for p in sorted(twin_dir.glob("*.ts"))
+    )
     twin_block = twin_source[twin_source.index('type: "PASS"'):]
     twin_block = twin_block[: twin_block.index("ai_gate")]
     missing_twin = sorted(f for f in twin_fields if f not in twin_block)
@@ -1662,7 +1663,7 @@ def main() -> int:
         def json(self):
             return self._body
 
-    import stage_c_foundry_agents as _stage_c
+    import agents.foundry_core as _stage_c
 
     def with_posts(responses):
         calls = {"n": 0}

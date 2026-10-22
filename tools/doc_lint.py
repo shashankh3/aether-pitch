@@ -61,8 +61,26 @@ def run_suite(cmd, cwd) -> tuple:
     return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
 
 
+PACKAGE_PATHS = {
+    "backend/stage_c_foundry_agents.py": "backend/agents",
+    "frontend/src/lib/edgeEngine.ts": "frontend/src/lib/edgeEngine",
+    "frontend/src/lib/types.ts": "frontend/src/lib/types",
+}
+
+
 def line_count(path: pathlib.Path) -> int:
     return len(path.read_text(encoding="utf-8", errors="replace").splitlines())
+
+
+def module_lines(rel: str) -> int:
+    """LOC in a stable barrel plus every module in its implementation package."""
+    path = ROOT / rel
+    total = line_count(path)
+    folder = ROOT / PACKAGE_PATHS[rel]
+    for module in sorted(folder.rglob("*")):
+        if module.is_file() and module.suffix in (".py", ".ts"):
+            total += line_count(module)
+    return total
 
 
 def loc_drift(stated: int, actual: int) -> int:
@@ -408,7 +426,7 @@ def check_scale(texts: dict) -> None:
     check("the README scale line matches the repository", ok, detail)
 
     mm = re.search(r"EdgeEngine \(([\d,]+) LOC browser-native twin\)", readme)
-    actual = line_count(FRONTEND / "src" / "lib" / "edgeEngine.ts")
+    actual = module_lines("frontend/src/lib/edgeEngine.ts")
     check("the README EdgeEngine size is within 5%",
           bool(mm) and loc_acceptable(int(mm.group(1).replace(",", "")), actual),
           f"doc={mm.group(1) if mm else None} actual={actual}")
@@ -425,7 +443,8 @@ def check_scale(texts: dict) -> None:
     }
     for pattern, rel in diagram.items():
         mm = re.search(pattern, readme)
-        actual = line_count(ROOT / rel)
+        actual = (module_lines(rel) if rel in PACKAGE_PATHS
+                  else line_count(ROOT / rel))
         check(f"the README size for {rel} is within 5%",
               bool(mm) and loc_acceptable(int(mm.group(1).replace(",", "")), actual),
               f"doc={mm.group(1) if mm else None} actual={actual}")
