@@ -70,3 +70,7 @@ Base commit: `d28ccdf`
 ### 2026-10-22T07:25:57Z — i18n atlas coverage lock + cp1252 mojibake repair
 - Files: backend/test_pipeline.py, frontend/scripts/logic-check.ts, frontend/src/lib/edgeEngine.ts, README.md, docs/ARCHITECTURE.md, SUBMISSION_GUIDE.md, AUTONOMOUS_BACKLOG.md
 - Verification: 163 backend + 37 logic + 30 UI render = 230 assertions; ARM valid; tsc clean; build ok; SSR smoke ok
+
+### 2026-10-22T07:40:18Z — Track B - REST contract tests for every route
+- Files: backend/test_pipeline.py, README.md, SUBMISSION_GUIDE.md, docs/ARCHITECTURE.md, AUTONOMOUS_BACKLOG.md
+- Verification: 191 backend + 37 logic + 30 UI render = 258 assertions; ARM valid; tsc clean; build ok; SSR smoke ok; ui render ok

@@ -28,20 +28,20 @@ network.
 ```text
 backend/
   stage_a_synthetic_engine.py   997 LOC  Stage A — the simulation
-  stage_b_math_engine.py        855 LOC  Stage B — the mathematics
-  stage_c_foundry_agents.py   1,408 LOC  Stage C — Foundry routing + agents
+  stage_b_math_engine.py        785 LOC  Stage B — the mathematics
+  stage_c_foundry_agents.py   1,442 LOC  Stage C — Foundry routing + agents
   stage_d_e_personalizer.py     413 LOC  Stage D/E — render + personalise
   agent_trace.py                208 LOC  grounded handoff trace
   rai_shield.py                 267 LOC  prompt shield + neutrality + grounding
   content_safety.py             132 LOC  Azure AI Content Safety (optional)
-  counterfactual.py             336 LOC  what-if contract + evaluation (no globals)
+  counterfactual.py             298 LOC  what-if contract + evaluation (no globals)
   main.py                     1,075 LOC  HTTP/WS surface + match loop
-  test_pipeline.py            1,800 LOC  163 assertions
+  test_pipeline.py            1,902 LOC  191 assertions
 
 frontend/src/
-  lib/edgeEngine.ts           1,623 LOC  the browser-native twin
+  lib/edgeEngine.ts           1,653 LOC  the browser-native twin
   lib/telemetry.ts              263 LOC  10 Hz store → 60 fps render
-  lib/types.ts                  825 LOC  the shared contract surface
+  lib/types.ts                  827 LOC  the shared contract surface
   lib/dossier.ts                        audit dossier serialization
   lib/sandboxStore.ts                   what-if sandbox state
   lib/ledgerStore.ts                    counterfactual experiment ledger
@@ -52,8 +52,8 @@ frontend/src/
   hooks/useResilientMatchEngine.ts      WS + edge failover + drill
   hooks/useSpeechController.ts          zero-overlap speech
   hooks/useRenderTelemetry.ts           measured frame rate
-  components/                            HUD, drawers, modals (20 files)
-  components/three/                      the 3D scene (10 files)
+  components/                            HUD, drawers, modals (30 files)
+  components/three/                      the 3D scene (12 files)
 
 infra/main.json                 491 LOC  ARM template (16 resources)
 ```
@@ -153,7 +153,7 @@ The 3D stage is not an observer feed — it is a sandbox.
 
 | Suite | Command | Covers |
 |---|---|---|
-| Backend | `python backend/test_pipeline.py` | 163 assertions: all five stages, the gate, the trace, the war-room, the counterfactual arbiter, the line shift, the RAI shield, the hub, the retry policy, the xT/pitch-control invariants, the i18n atlas, the compliance audit |
+| Backend | `python backend/test_pipeline.py` | 191 assertions: all five stages, the gate, the trace, the war-room, the counterfactual arbiter, the line shift, the RAI shield, the hub, the retry policy, the xT/pitch-control invariants, the i18n atlas, the REST contract, the compliance audit |
 | ARM | `python infra/validate_template.py` | JSON validity, ARM symbol resolution, dependency integrity, secret handling |
 | Types | `cd frontend && npx tsc --noEmit` | The whole contract surface |
 | Build | `npm run build` | Production compile |

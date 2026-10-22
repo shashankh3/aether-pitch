@@ -1,5 +1,5 @@
 # Autonomous Improvement Backlog
-Last Updated: 2026-10-22T04:30:00Z
+Last Updated: 2026-10-22T07:40:00Z
 Was Updated: 2026-10-22T04:30:00Z
 
 Scope: AETHER PITCH (Premier League × Azure "Inside the Game" hackathon).
@@ -24,9 +24,9 @@ Verification gate (all must pass before a commit):
 - [x] [Track B] Lock the i18n atlas coverage as a permanent assertion: every archetype `pick_archetype` can return must have an `es`/`ar`/`hi` translation, and the recap intros must exist for all three
   - files: backend/test_pipeline.py, frontend/scripts/logic-check.ts, frontend/src/lib/edgeEngine.ts
   - note: DONE — 8 backend + 1 twin assertions lock archetype registry containment, branch coverage, es/ar/hi atlas entries, EN story/title coverage, template formatting, genuine-translation and the recap intros. FOUND + FIXED a real judge-facing defect: the edge twin's es/ar/hi strings (and 23 em-dash/Δ/· glyphs) in edgeEngine.ts were double-encoded cp1252 mojibake — Arabic/Hindi fans saw garbage in offline mode. Repaired all 29 tokens and added a permanent source-level mojibake scan to the compliance audit.
-- [ ] [Track B] Add REST contract tests: every route returns JSON with the documented keys, and malformed input is rejected with a 4xx rather than surfacing a 500
+- [x] [Track B] Add REST contract tests: every route returns JSON with the documented keys, and malformed input is rejected with a 4xx rather than surfacing a 500
   - files: backend/test_pipeline.py
-  - note: The counterfactual and studio endpoints were added late and have schema tests but no rejection-path coverage.
+  - note: DONE — an in-process ASGI probe (no server, no port, no new dependency) drives the real FastAPI stack: routing, Pydantic validation and the exception handlers. 28 new assertions cover the documented response keys of every route, the 4xx rejection path of the counterfactual/studio/war-room endpoints, a prompt injection deflected over HTTP by the RAI shield, and a sweep proving no error response ever returns a 5xx or leaks a traceback, a site-packages path or a source path. Also refreshed the stale judge-facing counts in README.md, SUBMISSION_GUIDE.md and docs/ARCHITECTURE.md.
 - [ ] [Track A] Audit every backend `except:` fallback and every frontend `try/catch` for a user-visible failure state - no silent swallow, no dead error branch
   - files: backend/*.py, frontend/src/**/*.ts, frontend/src/**/*.tsx
   - note: Silent catches are how a demo degrades without anyone noticing. The fan should always see *something* actionable.
