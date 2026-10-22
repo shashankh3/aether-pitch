@@ -367,22 +367,23 @@ function ScoreMetric({
   label, value, suffix, detail, tone, icon,
 }: {
   label: string;
-  value: number | string;
+  value: number | string | null;
   suffix?: string;
   detail: string;
   tone: string;
   icon: React.ReactNode;
 }) {
   const numeric = typeof value === "number" ? value : 0;
+  const measured = value !== null;
   return (
     <div className="border border-white/10 bg-slate-950/55 p-1.5">
       <div className="flex items-center justify-between gap-1">
         <span className="flex items-center gap-1 font-tech text-[8px] font-bold uppercase tracking-[0.14em] text-slate-500">
           {icon} {label}
         </span>
-        <span className={cn("font-display text-[12px] font-bold", tone)}>
-          {typeof value === "number" ? value.toFixed(0) : value}
-          {suffix}
+        <span className={cn("font-display text-[12px] font-bold", measured ? tone : "text-slate-500")}>
+          {measured ? (typeof value === "number" ? value.toFixed(0) : value) : "—"}
+          {measured ? suffix : ""}
         </span>
       </div>
       <div className="mt-1 h-1 overflow-hidden bg-white/10">
@@ -403,7 +404,8 @@ function FoundryEvalScorecardPanel({
 }: ScorecardProps) {
   const groundingPct = scorecard?.mathematical_groundedness_pct
     ?? (trace ? Math.round(trace.grounding.score * 100) : 100);
-  const tacticalPct = scorecard?.tactical_coherence_pct ?? 100;
+  const tacticalPct = scorecard?.tactical_coherence_pct ?? null;
+  const tacticalBasis = scorecard?.tactical_coherence_basis;
   const shieldStatus = scorecard?.prompt_shield_status ?? "CLEAR";
   const slaPct = scorecard?.p95_frame_sla_pct ?? 100;
   const hallucinations = scorecard?.hallucinations
@@ -450,7 +452,10 @@ function FoundryEvalScorecardPanel({
           suffix="%"
           tone="text-tactical"
           icon={<Gauge size={9} />}
-          detail="Live score across the active archetype set — gate economy vs Chaos Index."
+          detail={tacticalBasis
+            ? `The numeric critic confirmed ${tacticalBasis.numeric_critic_passed} of `
+              + `${tacticalBasis.published_insights} published insights against live telemetry.`
+            : "No insight has been published yet, so there is nothing to measure."}
         />
         <ScoreMetric
           label="Prompt Shield"

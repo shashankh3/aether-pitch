@@ -788,7 +788,12 @@ export interface WarRoomResponse {
 /* ------------------------------------------- v6.2 Foundry eval scorecard */
 export interface FoundryEvalScorecard {
   mathematical_groundedness_pct: number;
-  tactical_coherence_pct: number;
+  tactical_coherence_pct: number | null;
+  tactical_coherence_basis?: {
+    published_insights: number;
+    numeric_critic_passed: number;
+    source: string;
+  };
   prompt_shield_status: "PROTECTED" | "CLEAR";
   prompt_shield_active: boolean;
   hallucinations: number;

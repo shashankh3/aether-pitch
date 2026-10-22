@@ -518,7 +518,7 @@ Run through this immediately before you submit the repo and record the video.
 | # | Step | Command / action | Pass condition |
 |---|------|------------------|----------------|
 | 1 | Confirm doc hygiene | `grep -rniE "sandbox\|not implemented\|todo\|fixme\|unverified" README.md SUBMISSION_GUIDE.md` | No internal engineering notes in the judge-facing docs |
-| 2 | Backend suite | `python backend/test_pipeline.py` | `RESULT: ALL 215 PIPELINE TESTS PASSED` |
+| 2 | Backend suite | `python backend/test_pipeline.py` | `RESULT: ALL 221 PIPELINE TESTS PASSED` |
 | 3 | ARM template | `python infra/validate_template.py` | `RESULT: ARM TEMPLATE VALIDATION PASSED` |
 | 3b | Documentation lint | `python tools/doc_lint.py` | `RESULT: DOC LINT PASSED` |
 | 4 | Frontend types | `cd frontend && npx tsc --noEmit` | No output |
@@ -585,7 +585,7 @@ page renders with the runtime configuration injected and no SSR error, then
 shuts down — it leaves no background process behind. `npm run check:logic` and
 `npm run smoke:ui` are pure Node: no server, no browser, no network.
 
-Together the four suites make **293 automated assertions** with zero dependencies
+Together the four suites make **299 automated assertions** with zero dependencies
 beyond what the project already ships. `python tools/doc_lint.py` re-runs the
 three headless suites and proves that every assertion count, `/api` path,
 `npm run` script and module size quoted in this guide, the README and
@@ -885,7 +885,9 @@ Everything below is paste-ready. Keep it under any character limit the portal en
 > - **The adversarial bench war-room.** `POST /api/tactical-war-room` runs a genuine **sequential three-call debate**, not one model role-playing three voices. Turn 1: `NLATacticalManagerAgent` proposes a high-leverage adjustment (narrative deployment). Turn 2: `MCSOppositionScoutAgent` models the opponent's optimal counter and reads turn 1 (fast triage deployment). Turn 3: `SpatialArbiterAgent` adjudicates both against the 16×12 Expected Threat tensor and issues one Tactical Prescription with a projected 30-second ΔxT gain, a win-probability swing and the 3D target zones to highlight. Every agent is a separate model invocation with **its own Stage B tool bundle** — the deterministic math engine, not the model, supplies the numbers — and the response returns `agent_calls` (agent, deployment, tool bundle, latency, token usage) so the orchestration is inspectable rather than asserted.
 > - **Ground truth over generation.** A numeric critic cross-checks every number in a generated narrative against the Stage B event and metric snapshot. If a claim cannot be traced back to live state, the narrative is discarded and replaced with the deterministic fallback - the guardrail is visible in the trace, not hidden.
 > - **Foundry Prompt Shield (Responsible AI).** A dedicated RAI layer runs before any model call and detects prompt injection (instruction override, role hijack, jailbreak, prompt exfiltration, guardrail bypass), off-topic queries, and third-party real-world entity references. A blocked query never reaches the model: the response is replaced with a grounded, localized deflection back to the live synthetic match, and every response carries `prompt_shield_status`, `numeric_grounding_pass`, and `club_neutrality_pass`. When an Azure AI Content Safety resource is configured it runs as an independent second layer on top of the deterministic shield.
-> - **Foundry Eval and Responsible AI scorecard.** A live four-metric evaluation panel reports Mathematical Groundedness, Tactical Coherence, Prompt Shield status (hallucinations and policy breaches), and P95 Broadcast Frame SLA against a 100 ms budget. A one-click "Run Live Foundry Grounding Audit" re-verifies the scorecard against a fresh pipeline run and returns a timestamped, verifiable receipt.
+  > - **Foundry Eval and Responsible AI scorecard.** A live four-metric evaluation panel reports Mathematical Groundedness, Tactical Coherence, Prompt Shield status (hallucinations and policy breaches), and P95 Broadcast Frame SLA against a 100 ms budget. A one-click "Run Live Foundry Grounding Audit" re-verifies the scorecard against a fresh pipeline run and returns a timestamped, verifiable receipt.
+  >
+  > Every metric is a measurement, never a constant: Mathematical Groundedness is the numeric critic's cross-check of the narrative against the live Stage B event and metric snapshot; **Tactical Coherence is the share of published insights that numeric critic confirmed** (the panel shows the raw `5 / 5` basis next to the score, and reads "—" rather than a fabricated score when no insight has been published yet); the Prompt Shield status is the real gate verdict; the P95 SLA is the measured pipeline latency against the 100 ms broadcast budget. The audit payload also carries the counts behind each number, so a judge can recompute them.
 >
 > Cloud-optional by design: without credentials every stage runs on a deterministic, zero-key fallback that produces the identical schema, and the UI always labels which route actually ran.
 

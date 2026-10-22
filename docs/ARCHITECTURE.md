@@ -29,15 +29,15 @@ network.
 backend/
   stage_a_synthetic_engine.py 1,075 LOC  Stage A â€” the simulation
   stage_b_math_engine.py        858 LOC  Stage B â€” the mathematics
-  stage_c_foundry_agents.py   1,532 LOC  Stage C â€” Foundry routing + agents
+  stage_c_foundry_agents.py   1,549 LOC  Stage C â€” Foundry routing + agents
   stage_d_e_personalizer.py     498 LOC  Stage D/E â€” render + personalise
   agent_trace.py                231 LOC  grounded handoff trace
   rai_shield.py                 311 LOC  prompt shield + neutrality + grounding
   content_safety.py             147 LOC  Azure AI Content Safety (optional)
   counterfactual.py             358 LOC  what-if contract + evaluation (no globals)
   config.py                      98 LOC  environment + runtime configuration
-  main.py                     1,277 LOC  HTTP/WS surface + match loop
-  test_pipeline.py            2,211 LOC  215 assertions
+  main.py                     1,291 LOC  HTTP/WS surface + match loop
+  test_pipeline.py            2,287 LOC  221 assertions
 
 frontend/src/
   lib/edgeEngine.ts           1,707 LOC  the browser-native twin
@@ -157,7 +157,7 @@ The 3D stage is not an observer feed â€” it is a sandbox.
 
 | Suite | Command | Covers |
 |---|---|---|
-| Backend | `python backend/test_pipeline.py` | 215 assertions: all five stages, the gate, the trace, the war-room, the counterfactual arbiter, the line shift, the RAI shield, the hub, the retry policy, the xT/pitch-control invariants, the i18n atlas, the REST contract, the compliance audit |
+| Backend | `python backend/test_pipeline.py` | 221 assertions: all five stages, the gate, the trace, the war-room, the counterfactual arbiter, the line shift, the RAI shield, the hub, the retry policy, the xT/pitch-control invariants, the i18n atlas, the REST contract, the compliance audit |
 | ARM | `python infra/validate_template.py` | JSON validity, ARM symbol resolution, dependency integrity, secret handling |
 | Docs | `python tools/doc_lint.py` | Every assertion count, `/api` path, `npm run` script, quoted file path and module size in the judge-facing docs still matches the code |
 | Types | `cd frontend && npx tsc --noEmit` | The whole contract surface |

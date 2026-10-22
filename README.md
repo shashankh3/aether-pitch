@@ -14,7 +14,7 @@
 [![Synthetic Data](https://img.shields.io/badge/data-100%25%20synthetic-6f42c1)](#synthetic-data)
 
 **Repository:** `github.com/shashankh3/aether-pitch` · **Branch:** `main`
-**Scale:** 114 tracked files · ~27,003 LOC of Python + TypeScript (79 source files) · **293 automated assertions** (215 backend · 48 headless logic · 30 headless UI render) · 16-resource Azure ARM template
+**Scale:** 114 tracked files · ~27,120 LOC of Python + TypeScript (79 source files) · **299 automated assertions** (221 backend · 48 headless logic · 30 headless UI render) · 16-resource Azure ARM template
 
 > **The hook:** *AETHER PITCH is a live 3D football broadcast where every number on screen is computed by transparent football mathematics, every AI claim is graded by a deterministic numeric critic, and the cloud can die mid-match without the picture ever dropping a frame.*
 
@@ -177,7 +177,7 @@ Prefer to be driven? **Controls → Autopilot** runs the full 80-second guided t
 - **Post-flight numeric critic (`backend/agent_trace.py`)** extracts every numeric claim from a model narrative and cross-checks it against live Stage B tensors within strict tolerance. An ungrounded or club-biased narrative is **rejected and replaced** with the deterministic, objectively grounded alternative; the discarded narrative is retained in the trace for audit.
 - **Azure AI Content Safety (`backend/content_safety.py`)** runs as an optional **second, independent RAI layer** on top of the deterministic shield when configured. It can only add evidence, never remove protection.
 - Every response carries `foundry_safety_shield` with `prompt_shield_status` (`CLEAR` / `PROTECTED`), `numeric_grounding_pass`, `club_neutrality_pass` and the content-safety verdict.
-- **Foundry Eval & Responsible AI Scorecard** in the Control Center **Data (`data`)** tab renders four live telemetry metrics: Mathematical Groundedness, Tactical Coherence, Prompt Shield status (hallucinations / policy breaches), and P95 Broadcast Frame SLA against the 100 ms budget.
+  - **Foundry Eval & Responsible AI Scorecard** in the Control Center **Data (`data`)** tab renders four live telemetry metrics: Mathematical Groundedness, Tactical Coherence, Prompt Shield status (hallucinations / policy breaches), and P95 Broadcast Frame SLA against the 100 ms budget. Every one is a measurement: Tactical Coherence is the share of published insights the numeric critic confirmed against live telemetry (the panel shows the raw `5 / 5` basis beside the score, and reads "—" rather than a fabricated score when nothing has been published yet).
 - **"Run Live Foundry Grounding Audit"** button fetches `/api/health/pipeline-audit` and flashes a verified, timestamped audit receipt.
 
 ### 3D Passing Network & Spatial Pitch Ownership
@@ -289,7 +289,7 @@ BROWSER CLIENT (Next.js 14 / React 18 / React Three Fiber)
 FASTAPI BACKEND ENGINE (10 Hz deterministic loop)
   ├─ Stage A  Synthetic ingest (1,075 LOC) ──► kinematics, ball physics, auto-eventing, bio-load twin
   ├─ Stage B  Deterministic math (858 LOC) ──► xT grid, PDR, PPDA, Chaos, pitch control, ghost pass
-  ├─ Stage C  Foundry agent router (1,532 LOC) ──► 4-node insight pipeline + 3-turn war-room
+  ├─ Stage C  Foundry agent router (1,549 LOC) ──► 4-node insight pipeline + 3-turn war-room
   ├─ RAI & numeric critic (689 LOC) ──► prompt shield + grounding verifier + club-neutrality gate
   └─ Stage D & E  Personalizer (498 LOC) ──► camera directives, overlays, persona & i18n
         │

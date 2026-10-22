@@ -768,6 +768,47 @@ def main() -> int:
         "receiver_target_xy": ghost["receiver_target_xy"],
     }
     app_main.recap_archive.clear()
+
+    # ---- the ghost overlay tuple must keep one shape ----------------------
+    # The insight path and the match loop both publish the ghost overlay
+    # state. When the insight path wrote a shorter tuple than the loop
+    # expected, the loop raised IndexError on the next tick and the live
+    # match died mid-demo. Both writers must produce the same 7-tuple.
+    app_main.last_ghost = None
+    ghost_event = {
+        **copy.deepcopy(enriched),
+        "id": "test_ev_ghost",
+        "type": "PASS",
+        "draw_ghost_pass": True,
+        "ghost_pass": {
+            "x": 78.0, "y": 12.0,
+            "delta_xt": 0.14,
+            "target_id": "NLA_7",
+            "completion_probability": 0.61,
+            "net_xt_gain": 0.031,
+        },
+    }
+    try:
+        asyncio.get_event_loop().run_until_complete(
+            app_main.make_insight(ghost_event, copy.deepcopy(bs), copy.deepcopy(st)))
+        insight_ran = True
+    except Exception as exc:  # the insight path may need a live engine
+        insight_ran = False
+        insight_error = f"{type(exc).__name__}: {exc}"
+    if insight_ran:
+        lg = app_main.last_ghost
+        check("Ghost overlay: the insight path writes the full 7-tuple",
+              isinstance(lg, tuple) and len(lg) == 7,
+              f"len={len(lg) if isinstance(lg, tuple) else lg}")
+        check("Ghost overlay: the tuple carries the fields the loop reads back",
+              isinstance(lg, tuple) and len(lg) == 7
+              and isinstance(lg[3], (int, float))
+              and isinstance(lg[6], (int, float)),
+              f"actual_delta={lg[3] if isinstance(lg, tuple) and len(lg) > 3 else None}")
+    else:
+        check("Ghost overlay: the insight path writes the full 7-tuple", False,
+              f"the insight path could not be exercised: {insight_error}")
+
     for i in range(3):
         archive_event = {
             **copy.deepcopy(enriched),
@@ -1150,9 +1191,11 @@ def main() -> int:
 
     # ---- v6.2 TASK 2: Foundry eval scorecard ----------------------------
     eval_card = audit_packet.get("foundry_eval") or {}
+    coherence_basis = eval_card.get("tactical_coherence_basis") or {}
+    published = int(coherence_basis.get("published_insights") or 0)
+    critic_passed = int(coherence_basis.get("numeric_critic_passed") or 0)
     check("Foundry eval: scorecard telemetry",
           eval_card.get("mathematical_groundedness_pct") is not None
-          and eval_card.get("tactical_coherence_pct") is not None
           and eval_card.get("prompt_shield_status") in ("CLEAR", "PROTECTED")
           and eval_card.get("prompt_shield_active") is True
           and eval_card.get("hallucinations") == 0
@@ -1160,6 +1203,39 @@ def main() -> int:
           and eval_card.get("p95_budget_ms") == 100.0
           and eval_card.get("p95_frame_sla_pct") is not None
           and eval_card.get("eval_suite") == "aether-foundry-eval-v1")
+    # Tactical coherence must be a real measurement over the published
+    # insights - never a constant dressed up as a score.
+    check("Foundry eval: tactical coherence is measured, not a constant",
+          (published > 0
+           and eval_card.get("tactical_coherence_pct")
+           == round(critic_passed / published * 100.0, 1))
+          or (published == 0 and eval_card.get("tactical_coherence_pct") is None),
+          f"published={published} critic_passed={critic_passed} "
+          f"pct={eval_card.get('tactical_coherence_pct')}")
+    check("Foundry eval: the scorecard exposes the numbers behind the score",
+          coherence_basis.get("source") is not None
+          and 0 <= critic_passed <= published,
+          f"basis={coherence_basis}")
+    # With nothing published there is nothing to measure, so the score must
+    # be absent rather than a made-up 100%.
+    cold = FoundryRouter.eval_scorecard(
+        grounding={}, gate_stats={"events_considered": 0, "events_gated": 0,
+                                   "insights": 0, "grounding_pass": 0,
+                                   "chaos_index": 0.0},
+        latency_p95={}, shield={})
+    check("Foundry eval: an unmeasured coherence is null, never a fake score",
+          cold.get("tactical_coherence_pct") is None
+          and (cold.get("tactical_coherence_basis") or {}).get("published_insights") == 0,
+          f"cold={cold.get('tactical_coherence_pct')}")
+    # ... and it must move with the measurement, not with a constant.
+    hot = FoundryRouter.eval_scorecard(
+        grounding={}, gate_stats={"events_considered": 10, "events_gated": 3,
+                                   "insights": 4, "grounding_pass": 3,
+                                   "chaos_index": 0.4},
+        latency_p95={}, shield={})
+    check("Foundry eval: the coherence score tracks the critic pass rate",
+          hot.get("tactical_coherence_pct") == 75.0,
+          f"pct={hot.get('tactical_coherence_pct')}")
 
     # ---- Azure AI Content Safety: optional second RAI layer ---------------
     cs = ContentSafetyClient("", "")

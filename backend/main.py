@@ -524,7 +524,21 @@ async def make_insight(ev: dict, metrics: dict, state: dict) -> None:
     }
     ghost = data["stage_d_broadcast_overlay"].get("draw_ghost_pass") and ev.get("ghost_pass")
     if ghost:
-        last_ghost = (state["t_match"] + 4.0, [ghost["x"], ghost["y"]], ghost.get("delta_xt", 0.0))
+        # The ghost overlay state is a 7-tuple - the same shape the match loop
+        # writes when it sees a ghost pass on a PASS event. The shape has to
+        # match: the loop reads it back to publish the ghost end state, and a
+        # shorter tuple raised IndexError and killed the match loop mid-demo.
+        ghost_delta = float(ghost.get("delta_xt") or 0.0)
+        actual_delta = float(ev.get("delta_xt") or 0.0)
+        last_ghost = (
+            state["t_match"] + 4.0,
+            [ghost["x"], ghost["y"]],
+            ghost_delta,
+            actual_delta,
+            ghost.get("target_id"),
+            float(ghost.get("completion_probability") or 0.0),
+            float(ghost.get("net_xt_gain") or (ghost_delta - actual_delta)),
+        )
     _stamp_pipeline("c", stage_c.get("latency_ms", 0.0), {
         **(stage_c.get("stage_c_explainability") or {}),
         "mode": stage_c.get("mode", "fallback"),
@@ -657,7 +671,7 @@ async def match_loop() -> None:
                     }
             elif ev.get("type") == "PRESSURE_TRAP" and ev.get("players"):
                 engine.set_badge(list(ev["players"])[:3], "INTERCEPT", 4.0)
-        if last_ghost and state["t_match"] < last_ghost[0]:
+        if last_ghost and len(last_ghost) >= 7 and state["t_match"] < last_ghost[0]:
             state["ball"]["ghost_end"] = last_ghost[1]
             state["ball"]["ghost_delta_xt"] = round(last_ghost[2], 3)
             state["ball"]["ghost_actual_delta_xt"] = round(last_ghost[3], 3)

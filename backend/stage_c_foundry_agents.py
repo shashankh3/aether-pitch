@@ -242,7 +242,16 @@ class FoundryRouter:
         gated = int(gate_stats.get("events_gated", 0))
         gate_efficiency = round(gated / considered, 3) if considered else 0.0
         chaos = float(gate_stats.get("chaos_index", 0.0) or 0.0)
-        tactical_coherence = max(0.0, min(1.0, 0.62 + gate_efficiency * 0.3 - chaos * 0.12))
+        # Tactical coherence is MEASURED, not derived from a constant: it is
+        # the share of published insights that the numeric critic confirmed
+        # against live telemetry. Every insight is either grounded or replaced
+        # by the deterministic fallback before it reaches a judge, so this is
+        # a rate over the real published stream. It is null until at least
+        # one insight has been published - a score with nothing behind it
+        # would be a made-up number.
+        published = int(gate_stats.get("insights", 0))
+        grounded = int(gate_stats.get("grounding_pass", 0))
+        coherence = (grounded / published) if published else None
 
         protected = shield.get("prompt_shield_status") == "PROTECTED"
         shield_score = 1.0 if protected or not shield else 1.0
@@ -255,7 +264,15 @@ class FoundryRouter:
 
         return {
             "mathematical_groundedness_pct": round(grounding_score * 100.0, 1),
-            "tactical_coherence_pct": round(tactical_coherence * 100.0, 1),
+            "tactical_coherence_pct": (round(coherence * 100.0, 1)
+                                       if coherence is not None else None),
+            "tactical_coherence_basis": {
+                "published_insights": published,
+                "numeric_critic_passed": grounded,
+                "source": "live numeric critic over published insights",
+            },
+            "gate_efficiency": gate_efficiency,
+            "chaos_index": round(chaos, 3),
             "prompt_shield_status": shield.get("prompt_shield_status", "CLEAR"),
             "prompt_shield_active": True,
             "hallucinations": unmatched,
