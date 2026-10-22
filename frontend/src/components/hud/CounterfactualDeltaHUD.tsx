@@ -42,6 +42,16 @@ export default function CounterfactualDeltaHUD({
   const [adjudicationError, setAdjudicationError] = useState<string | null>(null);
   const lastLoggedRef = useRef<string>("");
 
+  // The live tick arrives 10 times a second. Reading it through a ref keeps
+  // the rescan loop below stable: depending on `tick` directly tore down and
+  // rebuilt the sandbox subscription and the 80 ms interval on every tick,
+  // which (a) dropped any sandbox event that landed in the gap and (b) made
+  // this panel render twice per tick instead of once.
+  const tickRef = useRef(tick);
+  useEffect(() => {
+    tickRef.current = tick;
+  });
+
   useEffect(() => {
     if (!active) {
       setDelta(null);
@@ -50,7 +60,8 @@ export default function CounterfactualDeltaHUD({
       return;
     }
     const refresh = () => {
-      const next = evaluateSandbox(tick);
+      const live = tickRef.current;
+      const next = evaluateSandbox(live);
       setDelta(next);
       // One ledger entry per completed drag, not per animation frame.
       if (next && !sandbox.dragging) {
@@ -59,8 +70,8 @@ export default function CounterfactualDeltaHUD({
           lastLoggedRef.current = key;
           logExperiment({
             kind: "player_drag",
-            clock: tick?.clock ?? "—",
-            minute: Math.round((tick?.t_match ?? 0) / 60),
+            clock: live?.clock ?? "—",
+            minute: Math.round((live?.t_match ?? 0) / 60),
             summary:
               `${next.team} #${next.shirtNumber} ${next.playerName} moved ` +
               `${next.displacementM.toFixed(1)}m ` +
@@ -90,7 +101,7 @@ export default function CounterfactualDeltaHUD({
       unsub();
       clearInterval(timer);
     };
-  }, [active, tick]);
+  }, [active]);
 
   const lineShift = useMemo(() => {
     if (!tick || !active) return null;

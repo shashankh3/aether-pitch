@@ -163,7 +163,7 @@ The 3D stage is not an observer feed â€” it is a sandbox.
 | Types | `cd frontend && npx tsc --noEmit` | The whole contract surface |
 | Build | `npm run build` | Production compile |
 | SSR | `npm run smoke` | In-process server render, runtime config injection, no SSR error |
-| Logic | `npm run check:logic` | 46 headless assertions over the browser twin, the sandbox, the ledger, the dossier and the DVR buffer |
+| Logic | `npm run check:logic` | 48 headless assertions over the browser twin, the sandbox, the ledger, the dossier and the DVR buffer |
 | UI render | `npm run smoke:ui` | 30 assertions â€” every judge-facing surface renders without throwing |
 
 The backend suite also runs the **Official Rules compliance audit** â€” synthetic

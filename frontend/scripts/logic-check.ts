@@ -812,6 +812,44 @@ check(
     /goalBanner\s*&&\s*!alphaMode\s*&&/.test(page)
     && /cinemaMode\s*&&\s*!alphaMode\s*&&/.test(page),
   );
+
+  // --- the 10 Hz render budget -------------------------------------------
+  // The live tick arrives ten times a second. An effect that depends on it
+  // and sets state re-runs on every tick, which both doubles the render
+  // count for that panel and tears down its subscriptions each time.
+  const deltaHud = read(path.join(SRC, "components", "hud", "CounterfactualDeltaHUD.tsx"));
+
+  // Pair each useEffect call with its dependency array, so a useMemo or a
+  // useCallback with a `tick` dependency is not mistaken for one.
+  const effectDeps: string[] = [];
+  for (const m of deltaHud.matchAll(/useEffect\s*\(/g)) {
+    const open = m.index + m[0].length - 1;
+    let depth = 0;
+    let i = open;
+    while (i < deltaHud.length) {
+      if (deltaHud[i] === "(") depth += 1;
+      else if (deltaHud[i] === ")") {
+        depth -= 1;
+        if (depth === 0) break;
+      }
+      i += 1;
+    }
+    const call = deltaHud.slice(open, i + 1).replace(/\)\s*$/, "");
+    const dep = /\[\s*([^\][]*)\s*\]\s*$/.exec(call);
+    if (dep) effectDeps.push(dep[1]);
+  }
+  // The rescan loop is the effect that owns the 80 ms interval.
+  const rescanDeps = effectDeps.filter((d) => /active/.test(d));
+  check(
+    "Render budget: the counterfactual rescan does not re-run on every tick",
+    rescanDeps.length > 0 && !rescanDeps.some((d) => /(^|[,\s])tick([,\s]|$)/.test(d)),
+    `effect deps: ${effectDeps.map((d) => d.trim()).join(" | ") || "none"}`,
+  );
+  check(
+    "Render budget: the live tick is read through a ref, not a dependency",
+    /tickRef\.current\s*=\s*tick/.test(deltaHud)
+    && /tickRef\.current/.test(deltaHud),
+  );
 }
 
 // --- cleanup ----------------------------------------------------------------
