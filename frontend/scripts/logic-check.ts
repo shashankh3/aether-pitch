@@ -42,6 +42,10 @@ import {
 } from "../src/lib/ledgerStore";
 import { buildDossier, dossierToMarkdown } from "../src/lib/dossier";
 import { FailoverDrill } from "../src/lib/failoverDrill";
+import {
+  ARCHETYPES, STORIES, TRANSLATIONS, fillTemplate,
+} from "../src/lib/narrativeAtlas";
+import { classifyArchetype } from "../src/lib/edgeEngine";
 import type {
   MatchRecapStoryboard, MatchTick, PlayerTick, RecapAct, Team,
 } from "../src/lib/types";
@@ -1169,6 +1173,145 @@ check(
     && (expected.bio_load as unknown[]).length === 22,
     `${tick.players.length} players, ${(expected.xt_samples as unknown[]).length} xt points`,
   );
+
+  // --- the archetype classifier and the narrative atlas ------------------
+  // The twin used to classify archetypes with its own conditions and had no
+  // `inversion` branch, and it produced English sentences with a translated
+  // prefix. The same event must be told the same story, in the same four
+  // languages, whether the backend or the twin is answering.
+  const archetypeMatrix: {
+    event: { type?: string; scenario?: string | null; pdr?: number | null; delta_xt?: number | null };
+    metrics?: { chaos_state?: string } | null;
+  }[] = [
+    { event: { scenario: "chaos_counter" } },
+    { event: { scenario: "high_press_turnover" } },
+    { event: { type: "PRESSURE_TRAP" } },
+    { event: { scenario: "tactical_inversion" } },
+    { event: { type: "TACTICAL_INVERSION" } },
+    { event: { type: "PASS", pdr: 90 } },
+    { event: { type: "SHOT", pdr: 95 } },
+    { event: { type: "CLEARANCE", pdr: 95 } },
+    { event: { type: "PASS", pdr: 40, delta_xt: 0.1 } },
+    { event: { type: "PASS", pdr: 40 }, metrics: { chaos_state: "HIGH CHAOS TRANSITION" } },
+    { event: { type: "PASS", pdr: 40 } },
+    { event: {} },
+  ];
+  const expectedArchetypes = [
+    "counter_overload", "pressing_trap", "pressing_trap",
+    "inversion", "inversion",
+    "difficult_progression", "difficult_progression",
+    "rhythm_shift",
+    "threat_surge",
+    "counter_overload",
+    "rhythm_shift",
+    "rhythm_shift",
+  ];
+  const archetypeMismatch: string[] = [];
+  archetypeMatrix.forEach((row, i) => {
+    const got = classifyArchetype(row.event, row.metrics);
+    if (got !== expectedArchetypes[i]) {
+      archetypeMismatch.push(`#${i} twin=${got} expected=${expectedArchetypes[i]}`);
+    }
+  });
+  check(
+    "Parity: the twin's archetype classifier matches the engine's, branch for branch",
+    archetypeMismatch.length === 0,
+    archetypeMismatch.length === 0
+      ? `${archetypeMatrix.length} branches`
+      : archetypeMismatch.join("; "),
+  );
+  check(
+    "Parity: the classifier reaches every archetype, including the inversion",
+    new Set(expectedArchetypes).size === 6
+    && expectedArchetypes.includes("inversion"),
+    `${new Set(expectedArchetypes).size} of 6 archetypes reached`,
+  );
+
+  // The narrative atlas must be a genuine translation, not English with a
+  // translated prefix, and every archetype must have all four languages.
+  const atlasProblems: string[] = [];
+  const values = { team: "NLA", opp: "MCS", player: "D. Keswick", speed: 31.6 };
+  for (const arch of ARCHETYPES) {
+    const story = STORIES[arch];
+    if (!story || story.length < 40) {
+      atlasProblems.push(`${arch} story is missing or too short`);
+    }
+    for (const lang of ["es", "ar", "hi"] as const) {
+      const t = TRANSLATIONS[arch][lang];
+      if (!t || t.length < 20) {
+        atlasProblems.push(`${arch}.${lang} is missing or too short`);
+        continue;
+      }
+      if (t === story) atlasProblems.push(`${arch}.${lang} is English passthrough`);
+      // A genuine translation is not the English sentence with a short
+      // prefix glued on: the shared word count has to be low.
+      const shared = story
+        .split(/\s+/)
+        .filter((w) => w.length > 3 && t.includes(w)).length;
+      if (shared > story.split(/\s+/).length * 0.5) {
+        atlasProblems.push(`${arch}.${lang} is mostly the English sentence`);
+      }
+      // Rendered, it must have no placeholder left behind.
+      const renderedLang = fillTemplate(t, values);
+      if (/\{(team|opp|player|speed)[^}]*\}/.test(renderedLang)) {
+        atlasProblems.push(`${arch}.${lang} leaves a placeholder unsubstituted`);
+      }
+    }
+    const renderedStory = fillTemplate(story, values);
+    if (/\{(team|opp|player|speed)[^}]*\}/.test(renderedStory)) {
+      atlasProblems.push(`${arch} story leaves a placeholder unsubstituted`);
+    }
+  }
+  check(
+    "Parity: every archetype has a genuine translation in all four languages",
+    atlasProblems.length === 0,
+    atlasProblems.length === 0
+      ? `${ARCHETYPES.length} archetypes x 3 market languages`
+      : atlasProblems.slice(0, 4).join("; "),
+  );
+
+  // The rendered story must be substituted and must not be the raw template.
+  const rendered = fillTemplate(STORIES.counter_overload, {
+    team: "NLA", opp: "MCS", player: "D. Keswick", speed: 31.6,
+  });
+  check(
+    "Parity: the rendered story substitutes every placeholder",
+    rendered.includes("NLA")
+    && rendered.includes("32 km/h")
+    && !/\{(team|opp|player|speed)/.test(rendered),
+    rendered.slice(0, 80),
+  );
+
+  // --- the two atlases must be byte-identical ----------------------------
+  // The twin and the engine tell the same story. If the copies drift, a
+  // judge reads a different narrative online than offline.
+  const atlas = (fixture as { atlas?: { stories: Record<string, string>; translations: Record<string, Record<string, string>> } }).atlas;
+  check("Parity: the fixture carries the narrative atlas", !!atlas);
+  if (atlas) {
+    const atlasProblems: string[] = [];
+    for (const [arch, story] of Object.entries(atlas.stories)) {
+      if (STORIES[arch as keyof typeof STORIES] !== story) {
+        atlasProblems.push(`${arch} story differs`);
+      }
+      for (const [lang, text] of Object.entries(
+        atlas.translations[arch] ?? {},
+      )) {
+        if (TRANSLATIONS[arch as keyof typeof TRANSLATIONS]?.[lang] !== text) {
+          atlasProblems.push(`${arch}.${lang} differs`);
+        }
+      }
+    }
+    for (const arch of ARCHETYPES) {
+      if (!(arch in atlas.stories)) atlasProblems.push(`${arch} missing from the engine atlas`);
+    }
+    check(
+      "Parity: the twin's narrative atlas is identical to the engine's",
+      atlasProblems.length === 0,
+      atlasProblems.length === 0
+        ? `${Object.keys(atlas.stories).length} archetypes x 4 languages`
+        : atlasProblems.slice(0, 4).join("; "),
+    );
+  }
 }
 
 // --- cleanup ----------------------------------------------------------------

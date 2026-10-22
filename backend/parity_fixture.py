@@ -116,12 +116,18 @@ def build_fixture() -> dict:
         r = math.pitch_control_split(st, [{"player_id": pid, "x": nx, "y": ny}])
         simulated.append({"player_id": pid, "x": nx, "y": ny, "split": r})
 
+    from stage_d_e_personalizer import STORIES, TRANSLATIONS
+
     return {
         "scenario": {
             "seed": SEED, "start_minute": START_MINUTE, "ticks": TICKS,
             "window_s": 30.0,
         },
         "state": st,
+        "atlas": {
+            "stories": dict(STORIES),
+            "translations": {k: dict(v) for k, v in TRANSLATIONS.items()},
+        },
         "expected": {
             "xt_samples": xt_samples,
             "pitch_control": math.pitch_control_split(st),

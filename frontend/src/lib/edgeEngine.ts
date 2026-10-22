@@ -3,6 +3,10 @@ import type {
   Insight, Pipeline, PlayerStats, PitchControlSplit, PassingNetworkEdge, PlayStyleBadge,
   PoseState, Role, Team, TeamStats, WarRoomResponse,
 } from "./types";
+import {
+  ARCHETYPES, STORIES, TRANSLATIONS, fillTemplate,
+} from "./narrativeAtlas";
+import type { Archetype } from "./narrativeAtlas";
 
 const PITCH_L = 105;
 const PITCH_W = 68;
@@ -274,6 +278,31 @@ function makeEventId(seq: number): string {
   return `edge_evt_${String(seq).padStart(6, "0")}`;
 }
 
+/**
+ * The browser twin's archetype classifier.
+ *
+ * A faithful port of the engine's `pick_archetype`, branch for branch and in
+ * the same order. The twin used its own conditions (a TURNOVER meant a
+ * counter-attack, any high-PDR event meant a difficult progression) and it
+ * had no `inversion` branch at all, so the same event could be told as a
+ * different story offline than it was online.
+ */
+export function classifyArchetype(
+    event: { type?: string; scenario?: string | null; pdr?: number | null; delta_xt?: number | null },
+    metrics?: { chaos_state?: string } | null,
+  ): Archetype {
+  const sc = event.scenario ?? null;
+  if (sc === "chaos_counter") return "counter_overload";
+  if (sc === "high_press_turnover" || event.type === "PRESSURE_TRAP") return "pressing_trap";
+  if (sc === "tactical_inversion" || event.type === "TACTICAL_INVERSION") return "inversion";
+  if ((event.type === "PASS" || event.type === "SHOT") && (event.pdr ?? 0) > 80) {
+    return "difficult_progression";
+  }
+  if ((event.delta_xt ?? 0) > 0.08) return "threat_surge";
+  if (metrics?.chaos_state === "HIGH CHAOS TRANSITION") return "counter_overload";
+  return "rhythm_shift";
+}
+
 export class EdgeEngine {
   private players: EdgePlayer[] = [];
   private byId = new Map<string, EdgePlayer>();
@@ -490,17 +519,9 @@ export class EdgeEngine {
     const ghost = event.ghost_pass ?? null;
     const pdr = event.pdr ?? 0;
     const dxt = event.delta_xt ?? 0;
-    const archetype = event.type === "TURNOVER"
-      ? "counter_overload"
-      : event.type === "PRESSURE_TRAP"
-        ? "pressing_trap"
-        : pdr > 80
-          ? "difficult_progression"
-          : dxt > 0.08
-            ? "threat_surge"
-            : "rhythm_shift";
+    const archetype = classifyArchetype(event, metrics);
     const team = event.team ?? "NLA";
-    const player = event.player_name ?? "the carrier";
+    const player = event.player_name ?? "The carrier";
     const opponent = team === "NLA" ? "MCS" : "NLA";
     const teamRow = metrics.team_stats?.[team];
     const headline = archetype === "counter_overload"
@@ -521,20 +542,21 @@ export class EdgeEngine {
           : archetype === "threat_surge"
             ? `The ball moved into a zone worth ${dxt.toFixed(2)} more xT, dragging the ${opponent} block ${metrics.stretch_m.toFixed(0)}m out of shape.`
             : `Turnover rate is ${metrics.turnover_rate.toFixed(1)} per minute and ball-speed variance is low, so ${team} are circulating without fracturing.`;
-    const story = archetype === "counter_overload"
-      ? `Lightning break! ${team} stole it and exploded forward at ${(event.speed_kmh ?? 31.6).toFixed(0)} km/h — the defence was caught square.`
-      : archetype === "pressing_trap"
-        ? `${opponent} sprang a perfect pressing trap — three defenders swarmed the ball and won it high. The crowd can smell a chance!`
-        : archetype === "difficult_progression"
-          ? `What a pass from ${player} — threaded through a forest of defenders! One mistake there and it is a counter.`
-          : archetype === "threat_surge"
-            ? `${team} are slicing through the pitch — every pass is pulling defenders out of position.`
-            : `Calm, controlled possession from ${team}. They are passing the opponent into submission.`;
+    const story = fillTemplate(
+      STORIES[archetype] ?? STORIES.rhythm_shift,
+      {
+        team,
+        opp: opponent,
+        player,
+        speed: event.speed_kmh ?? event.ball_speed_kmh ?? 30,
+      },
+    );
+    const atlas = TRANSLATIONS[archetype] ?? TRANSLATIONS.rhythm_shift;
     const translations = {
       en: story,
-      es: `¡Momento táctico! ${story}`,
-      ar: `لحظة تكتيكية! ${story}`,
-      hi: `रणनीतिक पल! ${story}`,
+      es: fillTemplate(atlas.es, { team, opp: opponent, player }),
+      ar: fillTemplate(atlas.ar, { team, opp: opponent, player }),
+      hi: fillTemplate(atlas.hi, { team, opp: opponent, player }),
     };
     const eventId = event.id;
     const trace = buildEdgeTrace(event, tick, metrics, archetype, pdr, dxt, ghost, this.insightSeq);

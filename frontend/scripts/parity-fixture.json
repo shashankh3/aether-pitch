@@ -1,4 +1,46 @@
 {
+ "atlas": {
+  "stories": {
+   "counter_overload": "Lightning counter-attack! {team} stole it in midfield and exploded forward at {speed:.0f} km/h — the defence was caught square with nowhere to run.",
+   "difficult_progression": "Absolutely outrageous pass from {player} — through a forest of defenders! One mistake there and it's a counter-attack the other way.",
+   "inversion": "Clever switch by {team}: their right-back has moved into midfield as an extra playmaker. Brave stuff — but that leaves the wing wide open if they lose it!",
+   "pressing_trap": "{team} just sprang a perfectly-timed pressing trap — three defenders swarmed the ball and won it back high up the pitch. The crowd can smell a chance!",
+   "rhythm_shift": "Calm, controlled possession from {team}. They're making the pitch big, passing the opponents into submission — no panic, just patience.",
+   "threat_surge": "{team} are slicing through the pitch — every pass is pulling defenders out of position and the danger zone is glowing red!"
+  },
+  "translations": {
+   "counter_overload": {
+    "ar": "هجمة مرتدة خاطفة! انتزع {team} الكرة في الوسط وانطلق بسرعة جنونية — والدفاع تُرك في مواجهة الفراغ.",
+    "es": "¡Contraataque relámpago! {team} robó en el mediocampo y arrancó a toda velocidad — la defensa quedó desconectada.",
+    "hi": "बिजली जैसा काउंटर-अटैक! {team} ने मिडफ़ील्ड में गेंद छीनी और तेज़ी से दौड़ पड़ा — बचाव पूरी तरह फैल गया।"
+   },
+   "difficult_progression": {
+    "ar": "تمريرة خارقة من {player} وسط غابة من المدافعين! أي خطأ هنا كان يعني هجمة مرتدة.",
+    "es": "¡Pase escandaloso de {player} entre un bosque de piernas! Un error ahí y era contragolpe.",
+    "hi": "{player} का कमाल का पास — डिफेंडर्स के बीच से! वहाँ एक गलती और काउंटर बन जाता।"
+   },
+   "inversion": {
+    "ar": "تحويل جريء من {team}: الظهير الأيمن ينتقل إلى الوسط… لكنه يترك الجناح مفتوحًا!",
+    "es": "Cambio valiente de {team}: el lateral derecho se instala en el mediocampo… ¡pero deja el ala abierta!",
+    "hi": "{team} की स्मार्ट चाल: दायां फुल-बैक मिडफ़ील्ड में उतर गया… लेकिन विंग खुला छूट गया!"
+   },
+   "pressing_trap": {
+    "ar": "فخ ضغط مثالي من {team}! ثلاثة مدافعين حاصروا الكرة واستعادوها في مقدمة الملعب.",
+    "es": "¡Trampa de presión perfecta de {team}! Tres defensores cercaron el balón y lo recuperaron arriba.",
+    "hi": "{team} का शानदार प्रेसिंग ट्रैप! तीन डिफेंडर्स ने गेंद घेरी और ऊपर ही वापस ले ली।"
+   },
+   "rhythm_shift": {
+    "ar": "استحواذ هادئ من {team}: يوسّعون الملعب ويستهلكون الخصم بصبر.",
+    "es": "Posesión serena de {team}: agrandan la cancha y desgastan al rival con paciencia.",
+    "hi": "{team} का शांत कब्ज़ा — मैदान बड़ा करके धैर्य से opponent को थका रहे हैं।"
+   },
+   "threat_surge": {
+    "ar": "{team} يشقّ الملعب! كل تمريرة تشتت الدفاع ومنطقة الخطر تتوهج.",
+    "es": "¡{team} atraviesa el campo! Cada pase descoloca defensas y la zona de peligro arde.",
+    "hi": "{team} पूरे मैदान को चीर रहा है! हर पास बचाव बिखेर रहा है और ख़तरे का ज़ोन लाल हो रहा है।"
+   }
+  }
+ },
  "expected": {
   "bio_load": [
    {

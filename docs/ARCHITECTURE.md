@@ -37,17 +37,18 @@ backend/
   counterfactual.py             358 LOC  what-if contract + evaluation (no globals)
   config.py                      98 LOC  environment + runtime configuration
   main.py                     1,318 LOC  HTTP/WS surface + match loop
-  test_pipeline.py            2,449 LOC  236 assertions
+  test_pipeline.py            2,489 LOC  237 assertions
 
 frontend/src/
-  lib/edgeEngine.ts           1,727 LOC  the browser-native twin
+  lib/edgeEngine.ts           1,749 LOC  the browser-native twin
   lib/telemetry.ts              284 LOC  10 Hz store â†’ 60 fps render
   lib/types.ts                  907 LOC  the shared contract surface
   lib/dossier.ts                359 LOC  audit dossier serialization
   lib/sandboxStore.ts           247 LOC  what-if sandbox state
   lib/ledgerStore.ts             88 LOC  counterfactual experiment ledger
   lib/runtimeConfig.ts           53 LOC  runtime backend coordinates
-  parity_fixture.py          162 LOC  the parity_fixture module
+  lib/narrativeAtlas.ts       92 LOC  the narrativeAtlas module
+  parity_fixture.py          168 LOC  the parity_fixture module
   lib/failoverDrill.ts       199 LOC  the failoverDrill module
   lib/hudContext.tsx            137 LOC  control-center + palette state
   lib/useModalA11y.ts            72 LOC  focus trap + escape handling
@@ -168,13 +169,13 @@ The 3D stage is not an observer feed â€” it is a sandbox.
 
 | Suite | Command | Covers |
 |---|---|---|
-| Backend | `python backend/test_pipeline.py` | 236 assertions: all five stages, the gate, the trace, the war-room, the counterfactual arbiter, the line shift, the RAI shield, the hub, the retry policy, the xT/pitch-control invariants, the i18n atlas, the REST contract, the compliance audit |
+| Backend | `python backend/test_pipeline.py` | 237 assertions: all five stages, the gate, the trace, the war-room, the counterfactual arbiter, the line shift, the RAI shield, the hub, the retry policy, the xT/pitch-control invariants, the i18n atlas, the REST contract, the compliance audit |
 | ARM | `python infra/validate_template.py` | JSON validity, ARM symbol resolution, dependency integrity, secret handling |
 | Docs | `python tools/doc_lint.py` | Every assertion count, `/api` path, `npm run` script, quoted file path and module size in the judge-facing docs still matches the code |
 | Types | `cd frontend && npx tsc --noEmit` | The whole contract surface |
 | Build | `npm run build` | Production compile |
 | SSR | `npm run smoke` | In-process server render, runtime config injection, no SSR error |
-| Logic | `npm run check:logic` | 76 headless assertions over the browser twin, the sandbox, the ledger, the dossier and the DVR buffer |
+| Logic | `npm run check:logic` | 82 headless assertions over the browser twin, the sandbox, the ledger, the dossier and the DVR buffer |
 | UI render | `npm run smoke:ui` | 30 assertions â€” every judge-facing surface renders without throwing |
 
 The backend suite also runs the **Official Rules compliance audit** â€” synthetic
@@ -186,6 +187,36 @@ HUD renders as text is contrast-checked against the panel background at the
 WCAG AA 4.5:1 threshold, every icon-only button must carry an accessible
 name, and every focus-trapped panel must be announced as a dialog. A
 regression in any of those fails the build rather than reaching a judge.
+
+## 6b. The cross-engine parity harness
+
+The Stage B engine runs on the backend. The browser twin in `lib/edgeEngine.ts`
+runs when the backend is unreachable. If they ever disagree, a judge sees one
+product online and a different one offline — and the promise that *every
+number is grounded in live telemetry* stops being true.
+
+So the two engines are compared directly. `backend/parity_fixture.py` runs a
+deterministic scenario through the Python engine and writes its answers to
+`frontend/scripts/parity-fixture.json`; the logic suite recomputes each of
+them with the twin and asserts they match:
+
+| Surface | Compared at |
+|---|---|
+| The 16×12 xT surface | 192 grid points × both attacking directions |
+| The pitch-control split | the three territory percentages |
+| The passing network | every edge, its weight, its distance and its order |
+| The per-player bio-load profile | all 22 players, every field, including the relief directive |
+| The collective defensive line shift | both teams × three target heights, every field |
+| The simulated pitch control | three separate relocations |
+| The narrative atlas | all 6 archetypes × all 4 languages, byte for byte |
+| The archetype classifier | all 12 branches of the classifier, one for one |
+
+The backend suite asserts the fixture still reproduces from the live engine,
+so it cannot go stale silently, and `python backend/parity_fixture.py`
+regenerates it. This harness is what caught the twin relocating only the
+*first* player of a whole defensive block, the twin's xT helper rounding to
+four decimals where the engine did not, and the twin's archetype classifier
+disagreeing with the engine's on every branch.
 
 ## 7. The 3D performance budget
 

@@ -2437,6 +2437,46 @@ def main() -> int:
               and len(exp.get("bio_load") or []) == 22,
               f"{sorted(exp.keys())}")
 
+        # The narrative atlas must be complete and genuine: every archetype in
+        # every market language, never the English sentence with a short
+        # translated prefix glued on, and no placeholder left unsubstituted.
+        from stage_d_e_personalizer import STORIES, TRANSLATIONS
+        atlas_bad: List[str] = []
+        fmt = {"team": "NLA", "opp": "MCS", "player": "D. Keswick", "speed": 31.6}
+        for arch, story in STORIES.items():
+            if arch not in TRANSLATIONS:
+                atlas_bad.append(f"{arch} has no translations")
+                continue
+            try:
+                rendered_story = story.format(**fmt)
+            except (KeyError, IndexError, ValueError) as exc:
+                atlas_bad.append(f"{arch} story does not format: {exc}")
+                rendered_story = story
+            if "{" in rendered_story:
+                atlas_bad.append(f"{arch} story leaves a placeholder unsubstituted")
+            for lang in ("es", "ar", "hi"):
+                text = TRANSLATIONS[arch].get(lang, "")
+                if len(text) < 20:
+                    atlas_bad.append(f"{arch}.{lang} is missing or too short")
+                    continue
+                if text == story:
+                    atlas_bad.append(f"{arch}.{lang} is English passthrough")
+                else:
+                    shared = [w for w in story.split() if len(w) > 3 and w in text]
+                    if len(shared) > len(story.split()) * 0.5:
+                        atlas_bad.append(f"{arch}.{lang} is mostly the English sentence")
+                try:
+                    rendered = text.format(**fmt)
+                except (KeyError, IndexError, ValueError) as exc:
+                    atlas_bad.append(f"{arch}.{lang} does not format: {exc}")
+                    continue
+                if "{" in rendered:
+                    atlas_bad.append(f"{arch}.{lang} leaves a placeholder unsubstituted")
+        check("Stage e: every archetype has a genuine translation in all four languages",
+              not atlas_bad,
+              "; ".join(atlas_bad[:3]) if atlas_bad
+              else f"{len(STORIES)} archetypes x 3 market languages")
+
     print()
     if failures:
         print(f"RESULT: {len(failures)} FAILED -> {failures}")
