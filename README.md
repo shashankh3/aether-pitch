@@ -14,7 +14,7 @@
 [![Synthetic Data](https://img.shields.io/badge/data-100%25%20synthetic-6f42c1)](#synthetic-data)
 
 **Repository:** `github.com/shashankh3/aether-pitch` · **Branch:** `main`
-**Scale:** 118 tracked files · ~28,685 LOC of Python + TypeScript (82 source files) · **350 automated assertions** (237 backend · 83 headless logic · 30 headless UI render) · 16-resource Azure ARM template
+**Scale:** 121 tracked files · ~29,365 LOC of Python + TypeScript (85 source files) · **354 automated assertions** (237 backend · 87 headless logic · 30 headless UI render) · 16-resource Azure ARM template
 
 > **The hook:** *AETHER PITCH is a live 3D football broadcast where every number on screen is computed by transparent football mathematics, every AI claim is graded by a deterministic numeric critic, and the cloud can die mid-match without the picture ever dropping a frame.*
 
@@ -118,6 +118,7 @@ Prefer to be driven? **Controls → Autopilot** runs the full 80-second guided t
 
 ### Fan experience and reliability
 
+- **Plain-language overlay** — every technical metric carries a reading a football fan would use, without losing the term: *xT* shows as **Pass quality**, *PPDA* as **Pressing**, *Bio-Load* as **How tired they are**, *Chaos Index* as **Match tempo**. The top bar switches between **Plain** and **Analyst** in one tap, and an **Explain** sheet lists every metric in plain English, searchable and grouped. The headless suite scans all 195 technical labels a fan reads and fails the build if any has no plain reading — while the analyst panels (Pipeline Inspector, Rubric Verifier, war-room, dossier) deliberately keep the analyst terms.
 - **Fan Personalization Tuner** with live persona, metric, club, player, and language controls, pressed-state semantics, Escape dismissal, and outside-click close.
 - **80-second judge autopilot** that runs a six-step guided tour with synchronized voiceover, a sequenced recap-to-rubric finale, and no modal overlap.
 - **Fan-first Control Center** that keeps the pitch uncluttered by default and reveals the five-stage pipeline ribbon, match-intelligence panel, payload inspector, and one-click rubric audit from one optional drawer; audit data is also available at `GET /api/health/pipeline-audit`.

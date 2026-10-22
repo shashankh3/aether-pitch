@@ -176,7 +176,7 @@ The 3D stage is not an observer feed — it is a sandbox.
 | Types | `cd frontend && npx tsc --noEmit` | The whole contract surface |
 | Build | `npm run build` | Production compile |
 | SSR | `npm run smoke` | In-process server render, runtime config injection, no SSR error |
-| Logic | `npm run check:logic` | 83 headless assertions over the browser twin, the sandbox, the ledger, the dossier and the DVR buffer |
+| Logic | `npm run check:logic` | 87 headless assertions over the browser twin, the sandbox, the ledger, the dossier and the DVR buffer |
 | UI render | `npm run smoke:ui` | 30 assertions — every judge-facing surface renders without throwing |
 
 The backend suite also runs the **Official Rules compliance audit** — synthetic
@@ -219,8 +219,32 @@ regenerates it. This harness is what caught the twin relocating only the
 four decimals where the engine did not, and the twin's archetype classifier
 disagreeing with the engine's on every branch.
 
-## 7. The 3D performance budget
+## 6c. Two audiences, one pitch
 
+The studio is watched by two different people. A judge wants `xT`, `PPDA` and
+`Chaos Index`; an ordinary football fan wants to know what is happening and
+why. Removing the technical language would gut the project, so it is not
+removed.
+
+`lib/terminology.ts` is the single source of truth: every technical term
+carries a plain reading and a one-sentence explanation a fan could repeat to
+a friend. The top bar switches the whole overlay between **Plain** and
+**Analyst**, and an **Explain** sheet lists every metric grouped by
+attacking, defending, fitness, the match and the studio. The technical term
+is always still there, as the small qualifier under the plain reading, so
+nothing is lost.
+
+The two audiences are kept apart on purpose. The *analyst* panels — the
+Pipeline Inspector, the Rubric Verifier, the war-room and the dossier — are
+what a judge is being asked to assess, so they keep the analyst terms
+untouched, and the headless suite fails the build if the plain layer is
+allowed to creep into them.
+
+On the fan-facing side, the suite scans every technical label a fan reads —
+195 of them — and fails if any has no plain reading, so nothing can ship
+unexplained.
+
+## 7. The 3D performance budget
 The pitch runs a live 22-player 3D scene at 10 Hz with a measured frame-time
 chip in the corner. Four things keep that inside the frame budget:
 

@@ -45,6 +45,7 @@ import { FailoverDrill } from "../src/lib/failoverDrill";
 import {
   ARCHETYPES, STORIES, TRANSLATIONS, fillTemplate,
 } from "../src/lib/narrativeAtlas";
+import { TERMS, glossary } from "../src/lib/terminology";
 import { classifyArchetype } from "../src/lib/edgeEngine";
 import type {
   MatchRecapStoryboard, MatchTick, PlayerTick, RecapAct, Team,
@@ -1446,6 +1447,138 @@ check(
       ? `${edgeCases.length} boundary cases: ${edgeCases.map((e) => e.name).join(", ")}`
       : edgeProblems.slice(0, 4).join("; "),
   );
+
+  // --- the plain-language layer ------------------------------------------
+  // A fan-facing label that uses a technical term must be explainable in
+  // plain English. This scans the fan-facing HUD for technical labels and
+  // fails if any of them is missing from the glossary, so nothing can ship
+  // unexplained.
+  {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const SRC = path.resolve(process.cwd(), "src");
+
+    // The terms a fan would not use on a Saturday morning.
+    const TECHNICAL = [
+      "xT", "Expected Threat", "PDR", "PPDA", "Bio-Load", "bio-load",
+      "Chaos Index", "Pitch Control", "Ghost", "Defline", "Territory",
+      "Cognitive Telemetry", "God Mode", "AI GATE", "Tactical Inversion",
+      "Sprint Load Index", "High Intensity", "Press Seconds",
+      "Compactness Area", "Offside Trap", "Press Compression",
+      "Line Cohesion", "Through Ball Exposure", "Target Zones",
+      "Pressing Intensity", "Sprinters", "Completion Probability",
+    ];
+
+    const read = (p: string): string => fs.readFileSync(p, "utf8");
+
+    // The fan-facing surfaces: what a fan reads on the overlay.
+    const FAN_SURFACES = [
+      "hud/TopBar.tsx", "hud/BottomDock.tsx", "hud/LeftRail.tsx",
+      "hud/ProductionPanel.tsx", "hud/DefensiveLineScrubber.tsx",
+      "hud/CounterfactualDeltaHUD.tsx", "hud/RightDock.tsx",
+      "ScoreBug.tsx", "TacticalPulseBar.tsx", "LiveCaptionStrip.tsx",
+      "TwinCastHUD.tsx", "PlayerLock360.tsx", "VisionAutoEventerHUD.tsx",
+      "FanPersonalizationTuner.tsx",
+    ];
+
+    // The glossary is written in the case the studio renders it, but a label
+    // in the source may be in any case, so the lookup is case-insensitive.
+    const explained = new Set(Object.keys(TERMS).map((k) => k.toUpperCase()));
+    const unexplained: string[] = [];
+    let scanned = 0;
+    for (const rel of FAN_SURFACES) {
+      const full = path.join(SRC, "components", rel);
+      if (!fs.existsSync(full)) continue;
+      const src = read(full);
+      // A fan-facing label is either JSX text or a string in a label table
+      // (TwinCastHUD keeps its metrics in `rows` arrays). Both count.
+      const labels: string[] = [];
+      for (const m of src.matchAll(/>([^<>{}]+)</g)) {
+        const t = m[1].replace(/\s+/g, " ").trim();
+        if (t.length >= 2 && t.length <= 80 && /[A-Za-z]/.test(t)) labels.push(t);
+      }
+      for (const m of src.matchAll(/"([A-Za-z][^"\\]{2,60})"/g)) {
+        const t = m[1].replace(/\s+/g, " ").trim();
+        if (t.length >= 2 && t.length <= 80) labels.push(t);
+      }
+      for (const label of labels) {
+        const hit = TECHNICAL.find((t) => label.toUpperCase().includes(t.toUpperCase()));
+        if (!hit) continue;
+        scanned += 1;
+        // The label itself may be the explained term ("Cognitive Telemetry
+        // Density"), or the jargon fragment it contains may be.
+        const labelKey = label.toUpperCase();
+        const covered = explained.has(hit.toUpperCase())
+          || Object.keys(TERMS).some((k) => k.toUpperCase() === labelKey)
+          || Object.keys(TERMS).some(
+            (k) => k.toUpperCase().startsWith(hit.toUpperCase()),
+          );
+        if (!covered) unexplained.push(`${rel}: "${label}"`);
+      }
+    }
+    check(
+      "Plain language: every technical label a fan reads has a plain-English reading",
+      unexplained.length === 0 && scanned > 0,
+      unexplained.length === 0
+        ? `${scanned} technical labels scanned, ${Object.keys(TERMS).length} terms explained`
+        : unexplained.slice(0, 5).join("; "),
+    );
+
+    // Every term must actually be a real explanation, not a repeat of the
+    // technical word. A term that is already plain English ("Pass accuracy")
+    // is allowed to read as itself; a genuine piece of jargon is not.
+    const badTerms: string[] = [];
+    for (const [term, meta] of Object.entries(TERMS)) {
+      if (!meta.plain || meta.plain.length < 3) badTerms.push(`${term} has no plain reading`);
+      if (!meta.detail || meta.detail.length < 25) badTerms.push(`${term} has no explanation`);
+      if (meta.detail.includes("{")) badTerms.push(`${term} leaves a placeholder in the explanation`);
+      const isJargon = TECHNICAL.some((t) => t.toUpperCase() === term.toUpperCase());
+      if (isJargon && meta.plain.toUpperCase() === term.toUpperCase()) {
+        badTerms.push(`${term} is jargon and was not simplified`);
+      }
+    }
+    check(
+      "Plain language: every explanation is a real sentence a fan could read",
+      badTerms.length === 0,
+      badTerms.length === 0
+        ? `${Object.keys(TERMS).length} explanations`
+        : badTerms.slice(0, 5).join("; "),
+    );
+
+    // The glossary must be grouped and complete.
+    const sheet = glossary();
+    check(
+      "Plain language: the glossary covers every term and is grouped for reading",
+      sheet.length >= 30
+      && new Set(sheet.map((e) => e.group)).size === 5
+      && sheet.every((e) => e.plain && e.detail),
+      `${sheet.length} entries in ${new Set(sheet.map((e) => e.group)).size} groups`,
+    );
+
+    // The plain layer is for the fan. The analyst panels - the Pipeline
+    // Inspector, the Rubric Verifier, the war-room, the dossier - must keep
+    // the analyst terms, or a judge is shown a simplified version of the
+    // very thing they are being asked to assess.
+    const ANALYST_PANELS = [
+      "PipelineInspector.tsx",
+      "RubricVerifierModal.tsx",
+      "StudioProducer.tsx",
+      "MatchRecapStudioModal.tsx",
+    ];
+    const simplified: string[] = [];
+    for (const name of ANALYST_PANELS) {
+      const full = path.join(SRC, "components", name);
+      if (!fs.existsSync(full)) continue;
+      if (read(full).includes("MetricLabel")) simplified.push(name);
+    }
+    check(
+      "Plain language: the analyst panels keep the analyst terms",
+      simplified.length === 0,
+      simplified.length === 0
+        ? `${ANALYST_PANELS.length} panels untouched`
+        : simplified.join(", "),
+    );
+  }
 }
 
 // --- cleanup ----------------------------------------------------------------
