@@ -165,7 +165,7 @@ export default function RightDock(props: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="control-center-title"
-        className="clip-ea panel-lux animate-slide-up fixed inset-x-2 bottom-[calc(0.5rem+env(safe-area-inset-bottom))] z-40 flex max-h-[84dvh] flex-col overflow-hidden outline-none sm:inset-x-auto sm:bottom-3 sm:right-2 sm:top-[64px] sm:max-h-none sm:w-[414px] lg:right-3 lg:top-[68px]"
+        className="clip-ea panel-lux animate-slide-up !fixed inset-x-2 bottom-[calc(0.5rem+env(safe-area-inset-bottom))] z-40 flex max-h-[84dvh] flex-col overflow-hidden outline-none sm:inset-x-auto sm:bottom-3 sm:right-2 sm:top-[64px] sm:max-h-none sm:w-[414px] lg:right-3 lg:top-[68px]"
       >
         <span className="hud-sheen opacity-40" aria-hidden />
         <div className="mx-auto mt-1.5 h-1 w-10 shrink-0 rounded-full bg-white/20 sm:hidden" aria-hidden />
