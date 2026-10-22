@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Rajdhani, Teko, Inter, JetBrains_Mono } from "next/font/google";
+import { Rajdhani, Teko, Inter, JetBrains_Mono, Michroma } from "next/font/google";
 import StudioErrorBoundary from "@/components/StudioErrorBoundary";
 import "./globals.css";
 
@@ -25,6 +25,12 @@ const jetbrains = JetBrains_Mono({
   subsets: ["latin"],
   weight: ["400", "600"],
   variable: "--font-jetbrains",
+  display: "swap",
+});
+const michroma = Michroma({
+  subsets: ["latin"],
+  weight: ["400"],
+  variable: "--font-brand",
   display: "swap",
 });
 
@@ -61,8 +67,9 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#04060A",
+  themeColor: "#03050A",
   colorScheme: "dark",
+  viewportFit: "cover",
 };
 
 // The studio is a live dashboard, never a static page. Rendering per request
@@ -89,12 +96,18 @@ export default function RootLayout({
 }) {
   const config = runtimeConfig();
   return (
-    <html lang="en" className={`dark ${rajdhani.variable} ${teko.variable} ${inter.variable} ${jetbrains.variable}`}>
+    <html lang="en" className={`dark ${rajdhani.variable} ${teko.variable} ${inter.variable} ${jetbrains.variable} ${michroma.variable}`}>
       <head>
         <script
           id="aether-runtime-config"
           dangerouslySetInnerHTML={{
             __html: `window.__AETHER_CONFIG__=${JSON.stringify(config)};`,
+          }}
+        />
+        <script
+          id="aether-alpha-boot"
+          dangerouslySetInnerHTML={{
+            __html: `try{if(new URLSearchParams(location.search).get("overlay")==="alpha")document.documentElement.dataset.alpha="1";}catch(e){}`,
           }}
         />
       </head>

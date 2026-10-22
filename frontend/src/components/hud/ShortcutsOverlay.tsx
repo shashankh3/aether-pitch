@@ -28,6 +28,7 @@ const GROUPS: { title: string; rows: [string, string][] }[] = [
   {
     title: "Presentation",
     rows: [
+      ["Ctrl K", "Command deck (all surfaces)"],
       ["H", "Cinema clean-feed toggle"],
       ["F", "Fullscreen toggle"],
       ["Esc", "Exit cinema / close panels"],

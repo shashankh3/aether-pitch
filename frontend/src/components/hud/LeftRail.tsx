@@ -21,7 +21,7 @@ export default function LeftRail({ tick, metrics }: Props) {
       <ScoreBug tick={tick} metrics={metrics} />
       <button
         onClick={() => openControlCenter("stats")}
-        className="clip-skew flex items-center gap-1.5 border border-white/10 bg-slate-950/75 px-2.5 py-1.5 font-tech text-[10px] font-bold uppercase tracking-[0.16em] text-slate-300 transition hover:border-tactical/40 hover:text-white"
+        className="clip-skew hud-action !h-7 !gap-1.5 !px-2.5 !text-[9.5px] hover:!border-tactical/40"
         title="Open Match Intelligence: possession, xT, pressing, player stats"
       >
         <BarChart3 size={12} className="text-tactical" />

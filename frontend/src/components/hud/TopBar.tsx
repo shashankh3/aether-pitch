@@ -1,17 +1,16 @@
 "use client";
-// AETHER PITCH v6.1 — calm top bar: brand, connection, autopilot, one
-// Controls button. Mode tabs and the full language switcher now live inside
-// the Control Center so the default broadcast view stays uncluttered.
 
+import { memo } from "react";
 import {
-  BookOpen, Eye, EyeOff, Languages, Maximize2, Minimize2, Play, Radio, SlidersHorizontal,
-  Square, Trophy, Volume2, VolumeX,
+  BookOpen, Command, Eye, EyeOff, Languages, Maximize2, Minimize2, Play,
+  SlidersHorizontal, Square, Trophy, Volume2, VolumeX,
 } from "lucide-react";
 import type { LangCode } from "@/lib/types";
 import { LANG_LABELS } from "@/lib/types";
 import { AUTOPILOT_TOTAL_SECONDS } from "@/components/JudgeAutopilotTour";
+import AetherMark from "@/components/hud/AetherMark";
 import { useRenderTelemetry } from "@/hooks/useRenderTelemetry";
-import { useHud } from "@/lib/hudContext";
+import { useHud, type HudMode } from "@/lib/hudContext";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -29,79 +28,107 @@ interface Props {
   isSpeaking: boolean;
   isVoiceMuted: boolean;
   onToggleMute: () => void;
-  /** Open the plain-English glossary. */
   onOpenGlossary: () => void;
+  onOpenCommandPalette: () => void;
 }
 
-export default function TopBar({
+const MODE_CHIP: Record<HudMode, { label: string; tone: "green" | "cyan" | "gold" }> = {
+  live: { label: "Live feed", tone: "green" },
+  analysis: { label: "Analysis", tone: "cyan" },
+  studio: { label: "Studio", tone: "gold" },
+};
+
+function TopBar({
   connected, lang, alphaMode, cinemaMode, onToggleCinema,
   isFullscreen, onToggleFullscreen, autopilotActive, autopilotElapsed, autopilotStep, onToggleAutopilot,
-    isSpeaking, isVoiceMuted, onToggleMute, onOpenGlossary,
+  isSpeaking, isVoiceMuted, onToggleMute, onOpenGlossary, onOpenCommandPalette,
 }: Props) {
-  const { controlCenterOpen, openControlCenter, palette, plainLanguage, setPlainLanguage } = useHud();
+  const { controlCenterOpen, openControlCenter, palette, plainLanguage, setPlainLanguage, hudMode } = useHud();
   const { fps, frameMs } = useRenderTelemetry();
+  const mode = MODE_CHIP[hudMode];
+  const progress = autopilotActive
+    ? Math.min(100, Math.max(0, (autopilotElapsed / AUTOPILOT_TOTAL_SECONDS) * 100))
+    : 0;
 
   return (
-    <header className="clip-ea panel-lux pointer-events-auto flex h-[52px] items-center gap-2 px-3">
-      {/* brand + connection */}
-      <div className="flex min-w-0 items-center gap-2.5">
-        <div
-          className="clip-skew flex h-8 w-8 items-center justify-center bg-gradient-to-br from-violetdeep via-[#6d1250] to-crimson"
-          style={{ boxShadow: "0 0 16px rgba(255,30,86,0.35)" }}
-        >
-          <Radio size={16} className="text-white" />
-        </div>
-        <div className="min-w-0 leading-none">
-          <div className="truncate font-display text-[16px] font-bold uppercase tracking-[0.1em] text-white">
+    <header className="clip-ea panel-lux pointer-events-auto relative flex h-[52px] items-center gap-2 overflow-hidden px-2 sm:px-2.5">
+      <div className="hud-sheen" aria-hidden />
+
+      <div className="relative z-[3] flex min-w-0 items-center gap-2.5">
+        <AetherMark
+          size={30}
+          className="hidden shrink-0 drop-shadow-[0_0_14px_rgba(0,240,255,0.45)] sm:block"
+        />
+        <AetherMark
+          size={25}
+          className="shrink-0 drop-shadow-[0_0_12px_rgba(0,240,255,0.4)] sm:hidden"
+        />
+
+        <div className="min-w-0 leading-none max-[359px]:hidden">
+          <div className="truncate font-brand text-[10px] uppercase leading-none tracking-[0.08em] text-white sm:text-[12px] sm:tracking-[0.16em]">
             AETHER<span className="text-tactical">PITCH</span>
           </div>
           <div className="mt-1 hidden items-center gap-1.5 sm:flex">
             <span
-              className={cn("h-1.5 w-1.5 rounded-full", connected ? "animate-breathe" : "bg-slate-600")}
-              style={connected ? { background: palette.positive } : undefined}
+              className={cn("hud-status-dot", connected ? "text-pitch" : "text-gold")}
+              aria-hidden
             />
-            <span className="font-tech text-[8.5px] font-semibold uppercase tracking-[0.3em] text-slate-400">
-              Live 3D Broadcast · 10 Hz
+            <span className="font-tech text-[8px] font-semibold uppercase tracking-[0.26em] text-slate-400">
+              {connected ? "Pipeline live" : "Edge fallback"}
             </span>
-            <span
-              className="border border-white/10 bg-black/40 px-1 py-px font-mono text-[8.5px] font-bold tabular-nums text-slate-300"
-              title="Measured render frame rate and frame time from the requestAnimationFrame loop"
-            >
-              {fps > 0 ? `${fps} FPS` : "-- FPS"}
-              <span className="ml-1 text-slate-500">{frameMs > 0 ? `${frameMs.toFixed(1)}ms` : ""}</span>
+            <span className="hud-chip !px-1.5 !py-0.5 !tracking-[0.1em]">
+              <span className="tabular-nums">{fps > 0 ? fps : "--"}</span> FPS
+              <span className="hidden text-slate-600 md:inline">
+                {frameMs > 0 ? `· ${frameMs.toFixed(1)}ms` : ""}
+              </span>
             </span>
           </div>
         </div>
       </div>
 
-      {/* right control cluster */}
-      <div className="ml-auto flex shrink-0 items-center gap-1">
+      <div className="hud-chip relative z-[3] ml-1 hidden items-center gap-1.5 md:inline-flex" data-tone={mode.tone}>
+        <span className="h-1 w-1 rounded-full bg-current shadow-[0_0_8px_currentColor]" />
+        {mode.label}
+      </div>
+
+      <div className="relative z-[3] ml-auto flex shrink-0 items-center gap-1">
+        <div className="mr-1 hidden items-center gap-2 xl:flex">
+          <span className={cn("signal-bars", !connected && "opacity-40")} aria-hidden>
+            <span /><span /><span /><span />
+          </span>
+          <span className="font-tech text-[8px] font-bold uppercase tracking-[0.2em] text-slate-500">
+            10 Hz
+          </span>
+        </div>
+
+        <span className="hud-divider mr-1 hidden h-6 lg:block" aria-hidden />
+
         <button
           onClick={() => setPlainLanguage(!plainLanguage)}
           aria-pressed={plainLanguage}
           className={cn(
-            "clip-skew flex h-8 items-center gap-1.5 border px-2 font-tech text-[10px] font-bold uppercase tracking-wider transition",
-            plainLanguage
-              ? "border-pitch/40 bg-pitch/10 text-pitch"
-              : "border-white/10 bg-slate-950/75 text-slate-400 hover:border-tactical/40 hover:text-white",
+            "hud-icon-btn hidden sm:inline-flex",
+            plainLanguage && "!border-pitch/35 !bg-pitch/10 !text-pitch",
           )}
           title={plainLanguage
-            ? "Showing plain-English labels — tap for the analyst terms (xT, PPDA, Chaos Index)"
-            : "Showing analyst terms — tap for plain-English labels"}
+            ? "Plain-English labels on — switch to analyst terms"
+            : "Analyst terms on — switch to plain English labels"}
           aria-label={plainLanguage
             ? "Plain English labels on. Switch to analyst terms."
             : "Analyst terms on. Switch to plain English labels."}
         >
-          {plainLanguage ? <Eye size={12} /> : <EyeOff size={12} />}
-          {plainLanguage ? "Plain" : "Analyst"}
+          {plainLanguage ? <Eye size={13} /> : <EyeOff size={13} />}
+          <span className="hidden font-tech text-[8.5px] font-bold uppercase tracking-[0.12em] xl:inline">
+            {plainLanguage ? "Plain" : "Analyst"}
+          </span>
         </button>
 
         <button
           onClick={onToggleMute}
           aria-pressed={isVoiceMuted}
           className={cn(
-            "clip-skew flex h-8 items-center gap-1 border px-2 transition",
-            !isVoiceMuted && !isSpeaking && "border-white/10 bg-slate-950/75 text-slate-400 hover:border-tactical/40 hover:text-white",
+            "hud-icon-btn",
+            !isVoiceMuted && !isSpeaking && "text-slate-400",
           )}
           style={
             isVoiceMuted
@@ -111,17 +138,17 @@ export default function TopBar({
                 : undefined
           }
           title={isVoiceMuted ? "Unmute AI broadcast voice" : "Mute AI broadcast voice"}
+          aria-label={isVoiceMuted ? "Unmute AI voice" : "Mute AI voice"}
         >
           {isVoiceMuted ? <VolumeX size={13} /> : <Volume2 size={13} />}
           {isSpeaking && !isVoiceMuted && (
             <span className="h-1.5 w-1.5 animate-breathe rounded-full" style={{ background: palette.positive }} />
           )}
-          <span className="sr-only">{isVoiceMuted ? "Unmute AI voice" : "Mute AI voice"}</span>
         </button>
 
         <button
           onClick={() => openControlCenter("fan")}
-          className="clip-skew hidden h-8 items-center gap-1.5 border border-white/10 bg-slate-950/75 px-2 font-tech text-[10px] font-bold uppercase tracking-wider text-slate-400 transition hover:border-tactical/40 hover:text-white md:flex"
+          className="hud-action hidden lg:inline-flex"
           title={`Commentary language: ${LANG_LABELS[lang]} — open Fan controls`}
           aria-label={`Commentary language ${LANG_LABELS[lang]} — open Fan controls`}
         >
@@ -131,35 +158,50 @@ export default function TopBar({
 
         <button
           onClick={onOpenGlossary}
-          className="clip-skew flex h-8 items-center gap-1.5 border border-white/10 bg-slate-950/75 px-2 font-tech text-[10px] font-bold uppercase tracking-wider text-slate-400 transition hover:border-tactical/40 hover:text-white"
+          className="hud-icon-btn hidden sm:inline-flex"
           title="What am I looking at? Every metric in plain English"
           aria-label="Open the plain-English glossary"
         >
-          <BookOpen size={12} className="text-gold" />
-          <span className="hidden lg:inline">Explain</span>
+          <BookOpen size={13} className="text-gold" />
         </button>
+
+        <span className="hud-divider mx-1 h-6" aria-hidden />
 
         <button
           onClick={onToggleAutopilot}
           aria-pressed={autopilotActive}
           className={cn(
-            "clip-skew flex h-8 items-center gap-1.5 border px-2 font-tech text-[10px] font-bold uppercase tracking-wider transition",
-            autopilotActive
-              ? "border-crimson/60 bg-crimson/15 text-crimson"
-              : "animate-breathe border-gold/60 bg-gold/15 text-gold hover:bg-gold/25",
+            "hud-action relative hidden overflow-hidden sm:inline-flex",
+            !autopilotActive && "animate-breathe",
           )}
+          data-tone={autopilotActive ? "danger" : "gold"}
           title={`Run the ${AUTOPILOT_TOTAL_SECONDS}-second, 6-step judge autopilot demo`}
         >
-          {autopilotActive ? <Square size={12} /> : <Play size={12} />}
+          {autopilotActive ? <Square size={11} /> : <Play size={11} />}
           <span className="hidden lg:inline">
             {autopilotActive
-              ? `Autopilot ${Math.max(1, autopilotStep + 1)}/6 · ${Math.ceil(AUTOPILOT_TOTAL_SECONDS - autopilotElapsed)}s`
-              : `${AUTOPILOT_TOTAL_SECONDS}s Autopilot`}
+              ? `Auto ${Math.max(1, autopilotStep + 1)}/6 · ${Math.ceil(AUTOPILOT_TOTAL_SECONDS - autopilotElapsed)}s`
+              : `${AUTOPILOT_TOTAL_SECONDS}s Auto`}
           </span>
-          <span className="sr-only lg:hidden">
-            {autopilotActive ? "Stop autopilot" : "Start autopilot"}
-          </span>
-          <Trophy size={12} className="hidden lg:inline" />
+          <span className="lg:hidden">{autopilotActive ? "Stop" : "Auto"}</span>
+          <Trophy size={11} className="hidden xl:inline" />
+          {autopilotActive && (
+            <span
+              className="absolute inset-x-0 bottom-0 h-px bg-current shadow-[0_0_8px_currentColor]"
+              style={{ width: `${progress}%` }}
+              aria-hidden
+            />
+          )}
+        </button>
+
+        <button
+          onClick={onOpenCommandPalette}
+          className="hud-icon-btn"
+          title="Command deck (Ctrl K / ⌘K)"
+          aria-label="Open the command deck"
+        >
+          <Command size={13} />
+          <span className="hidden font-tech text-[8.5px] font-bold tracking-[0.1em] md:inline">K</span>
         </button>
 
         <button
@@ -167,12 +209,8 @@ export default function TopBar({
           aria-expanded={controlCenterOpen}
           aria-controls="control-center"
           aria-label="Open controls"
-          className={cn(
-            "clip-skew flex h-8 items-center gap-1.5 border px-2 font-tech text-[10px] font-bold uppercase tracking-wider transition",
-            controlCenterOpen
-              ? "border-tactical/50 bg-tactical/15 text-tactical"
-              : "border-white/10 bg-slate-950/75 text-slate-300 hover:border-tactical/40 hover:text-white",
-          )}
+          className="hud-action"
+          data-tone={controlCenterOpen ? "cyan" : undefined}
           title="Open all controls: cameras, stats, AI voices, fan, co-pilot, data"
         >
           <SlidersHorizontal size={13} />
@@ -183,15 +221,16 @@ export default function TopBar({
           onClick={onToggleCinema}
           disabled={alphaMode}
           aria-pressed={cinemaMode}
-          className="clip-skew flex h-8 items-center border border-white/10 bg-slate-950/75 px-2 text-slate-400 hover:border-tactical/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+          className="hud-icon-btn disabled:cursor-not-allowed disabled:opacity-30"
           title="Clean broadcast feed (H)"
           aria-label="Enter clean broadcast feed"
         >
           {cinemaMode ? <EyeOff size={13} /> : <Eye size={13} />}
         </button>
+
         <button
           onClick={onToggleFullscreen}
-          className="clip-skew flex h-8 items-center border border-white/10 bg-slate-950/75 px-2 text-slate-400 hover:border-tactical/40 hover:text-white"
+          className="hud-icon-btn"
           title={isFullscreen ? "Exit fullscreen (F)" : "Enter fullscreen (F)"}
           aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
         >
@@ -201,3 +240,5 @@ export default function TopBar({
     </header>
   );
 }
+
+export default memo(TopBar);

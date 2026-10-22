@@ -1,7 +1,4 @@
 "use client";
-// AETHER PITCH v2.0 — top-left dynamic scorebug:
-// crests, live score, match clock, possession indicator and a
-// win-probability / momentum bar.
 
 import type { MatchTick, Metrics } from "@/lib/types";
 import { NLACrest, MCSCrest } from "@/components/Crests";
@@ -18,7 +15,6 @@ export default function ScoreBug({ tick, metrics }: Props) {
   const nla = tick?.score.NLA ?? 0;
   const mcs = tick?.score.MCS ?? 0;
   const chaos = metrics?.chaos_index ?? 0.5;
-  // deterministic presentational win-probability model
   const wpNla = Math.max(0.06, Math.min(0.94,
     0.5 + (nla - mcs) * 0.075 + (chaos - 0.5) * 0.06));
   const wpPct = Math.round(wpNla * 100);
@@ -29,72 +25,103 @@ export default function ScoreBug({ tick, metrics }: Props) {
   const phase = minute >= 90 ? "Full Time" : minute >= 45 ? "2nd Half" : "1st Half";
 
   return (
-    <div className="clip-ea panel-lux hud-enter pointer-events-auto w-[318px] select-none overflow-hidden">
-      <div className="hairline absolute inset-x-0 top-0 h-px opacity-70" />
-      <div className="flex items-center justify-between border-x border-t border-white/15 bg-slate-950/80 px-2 py-0.5 backdrop-blur-xl">
-        <span className="truncate font-display text-[7.5px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-          {meta?.competition ?? "AETHER Synthetic League"} · MD {meta?.matchday ?? 9}
+    <div className="clip-ea panel-lux hud-enter pointer-events-auto w-[min(322px,calc(100vw-16px))] select-none overflow-hidden">
+      <div className="hud-sheen" aria-hidden />
+
+      <div className="relative z-[3] flex items-center justify-between gap-2 border-b border-white/10 bg-black/25 px-2 py-1">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="hud-status-dot text-crimson" aria-hidden />
+          <span className="hud-kicker truncate !text-[7.5px] !tracking-[0.18em] !text-slate-400">
+            {meta?.competition ?? "Aether Synthetic League"}
+          </span>
         </span>
-        <span className="truncate font-tech text-[7.5px] uppercase tracking-[0.1em] text-slate-500">
-          {meta?.venue ?? "Aether Arena"}
+        <span className="shrink-0 font-tech text-[7.5px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+          MD {String(meta?.matchday ?? 9).padStart(2, "0")} · {meta?.venue ?? "Aether Arena"}
         </span>
       </div>
-      <div className="flex items-stretch border border-white/15 bg-slate-950/70 backdrop-blur-xl">
-        <div className="w-[5px] stripes-crimson" />
-        <div className="flex flex-1 items-center justify-between px-2 py-1.5">
-          <div className="flex items-center gap-1.5">
-            <NLACrest size={22} />
-            <span className="font-display text-[17px] font-bold leading-none text-white">NLA</span>
+
+      <div className="sr-only" aria-live="polite">NLA {nla}, MCS {mcs}</div>
+
+      <div className="relative z-[3] flex items-stretch bg-black/15">
+        <div className="w-[3px] shrink-0 bg-gradient-to-b from-crimson via-crimson/70 to-transparent" />
+        <div className="flex flex-1 items-center justify-between gap-1.5 px-2 py-1.5">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="drop-shadow-[0_0_8px_rgba(255,30,86,0.45)]"><NLACrest size={23} /></span>
+            <span className="font-display text-[16px] font-bold leading-none tracking-wide text-white">NLA</span>
           </div>
-          <span className="font-tech text-[24px] font-bold leading-none text-white">{nla}</span>
+          <span
+            key={`nla-${nla}`}
+            className="number-pop font-tech text-[26px] font-bold leading-none tabular-nums text-white"
+          >
+            {nla}
+          </span>
         </div>
-        <div className="flex flex-col items-center justify-center border-x border-white/10 bg-black/50 px-2">
-          <span className="mb-0.5 flex items-center gap-1 font-display text-[7px] font-semibold uppercase tracking-[0.2em] text-crimson">
+
+        <div className="flex min-w-[78px] flex-col items-center justify-center border-x border-white/10 bg-black/40 px-2">
+          <span className="mb-0.5 flex items-center gap-1 font-tech text-[7px] font-bold uppercase tracking-[0.22em] text-crimson">
             <span className="h-1 w-1 rounded-full bg-crimson hud-live-dot" />
             Live
           </span>
-          <span className="font-tech text-[15px] font-bold leading-none text-pitch">{tick?.clock ?? "--:--"}</span>
-          <span className="font-display text-[8.5px] font-semibold uppercase tracking-[0.2em] text-slate-500">{phase}</span>
+          <span className="font-tech text-[16px] font-bold leading-none tabular-nums text-pitch text-glow-cyan">
+            {tick?.clock ?? "--:--"}
+          </span>
+          <span className="mt-0.5 font-display text-[8px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+            {phase}
+          </span>
         </div>
-        <div className="flex flex-1 items-center justify-between px-2 py-1.5">
-          <span className="font-tech text-[24px] font-bold leading-none text-white">{mcs}</span>
-          <div className="flex items-center gap-1.5">
-            <span className="font-display text-[17px] font-bold leading-none text-white">MCS</span>
-            <MCSCrest size={22} />
+
+        <div className="flex flex-1 items-center justify-between gap-1.5 px-2 py-1.5">
+          <span
+            key={`mcs-${mcs}`}
+            className="number-pop font-tech text-[26px] font-bold leading-none tabular-nums text-white"
+          >
+            {mcs}
+          </span>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="font-display text-[16px] font-bold leading-none tracking-wide text-white">MCS</span>
+            <span className="drop-shadow-[0_0_8px_rgba(0,240,255,0.45)]"><MCSCrest size={23} /></span>
           </div>
         </div>
-        <div className="w-[5px] bg-gradient-to-b from-tactical to-sky-700" />
+        <div className="w-[3px] shrink-0 bg-gradient-to-b from-tactical via-tactical/70 to-transparent" />
       </div>
-      <div className="grid grid-cols-3 border-x border-b border-white/15 bg-slate-950/75 backdrop-blur-xl">
+
+      <div className="relative z-[3] grid grid-cols-3 border-y border-white/10 bg-slate-950/55">
         {[
-          ["POSSESSION", `${nlaStats?.possession_pct?.toFixed(0) ?? "—"} / ${mcsStats?.possession_pct?.toFixed(0) ?? "—"}%`],
-          ["PASS ACC", `${nlaStats?.pass_accuracy?.toFixed(0) ?? "—"} / ${mcsStats?.pass_accuracy?.toFixed(0) ?? "—"}%`],
+          ["POSS", `${nlaStats?.possession_pct?.toFixed(0) ?? "—"} / ${mcsStats?.possession_pct?.toFixed(0) ?? "—"}%`],
+          ["PASS", `${nlaStats?.pass_accuracy?.toFixed(0) ?? "—"} / ${mcsStats?.pass_accuracy?.toFixed(0) ?? "—"}%`],
           ["SHOTS", `${nlaStats?.shots ?? "—"} / ${mcsStats?.shots ?? "—"}`],
-        ].map(([label, value], i) => (
-          <div key={label} className={`px-1.5 py-1 text-center ${i > 0 ? "border-l border-white/10" : ""}`}>
-            <div className="font-display text-[7px] font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</div>
-            <div className="font-tech text-[10px] font-bold text-slate-200">{value}</div>
+        ].map(([label, value], index) => (
+          <div key={label} className={`px-1.5 py-1 text-center ${index > 0 ? "border-l border-white/10" : ""}`}>
+            <div className="font-tech text-[7.5px] font-bold uppercase tracking-[0.2em] text-slate-500">{label}</div>
+            <div className="mt-0.5 font-tech text-[10.5px] font-bold tabular-nums text-slate-200">{value}</div>
           </div>
         ))}
       </div>
-      {/* win probability / momentum bar */}
-      <div className="border-x border-b border-white/15 bg-slate-950/70 px-2 py-1.5 backdrop-blur-xl">
-        <div className="mb-1 flex items-center justify-between font-tech text-[9px] font-bold uppercase tracking-[0.18em]">
+
+      <div className="relative z-[3] bg-slate-950/50 px-2 py-1.5">
+        <div className="mb-1 flex items-center justify-between font-tech text-[8.5px] font-bold uppercase tracking-[0.16em]">
           <span className="text-crimson">NLA {wpPct}%</span>
-          <span className="text-slate-500">
+          <span className="hud-label !text-[7.5px] !tracking-[0.2em] !text-slate-500">
             <MetricLabel label="WIN PROBABILITY" plain={plainLanguage} />
           </span>
           <span className="text-tactical">{100 - wpPct}% MCS</span>
         </div>
-        <div className="flex h-[7px] overflow-hidden">
-          <div className="h-full bg-gradient-to-r from-crimson to-[#FF5C86] transition-all duration-700"
-            style={{ width: `${wpNla * 100}%` }} />
-          <div className="h-full flex-1 bg-gradient-to-r from-sky-700 to-tactical transition-all duration-700" />
+        <div className="relative flex h-[8px] overflow-hidden border border-white/10 bg-black/50">
+          <div
+            className="h-full bg-gradient-to-r from-crimson via-[#ff4d79] to-[#ff7b9c] transition-all duration-700"
+            style={{ width: `${wpNla * 100}%` }}
+          />
+          <div className="h-full flex-1 bg-gradient-to-r from-[#0b5f80] via-[#0b9fbd] to-tactical transition-all duration-700" />
+          <span className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(90deg,transparent_0_9px,rgba(0,0,0,0.55)_9px_10px)]" aria-hidden />
+          <span className="pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-white/60 shadow-[0_0_6px_rgba(255,255,255,0.6)]" aria-hidden />
         </div>
         {tick && (
-          <div className="mt-1 flex items-center justify-between font-tech text-[8.5px] uppercase tracking-[0.16em] text-slate-500">
-            <span>Possession: <span className={tick.possession === "NLA" ? "text-crimson" : "text-tactical"}>{tick.possession}</span></span>
-            <span>{tick.players.length} players tracked</span>
+          <div className="mt-1 flex items-center justify-between font-tech text-[8px] uppercase tracking-[0.16em] text-slate-500">
+            <span>
+              Possession{" "}
+              <span className={tick.possession === "NLA" ? "text-crimson" : "text-tactical"}>{tick.possession}</span>
+            </span>
+            <span className="tabular-nums">{tick.players.length} tracked · 10 Hz</span>
           </div>
         )}
       </div>

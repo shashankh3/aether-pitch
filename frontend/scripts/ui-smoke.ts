@@ -43,6 +43,9 @@ import LeftRail from "../src/components/hud/LeftRail";
 import ProductionPanel from "../src/components/hud/ProductionPanel";
 import ShortcutsOverlay from "../src/components/hud/ShortcutsOverlay";
 import TopBar from "../src/components/hud/TopBar";
+import CommandPalette from "../src/components/hud/CommandPalette";
+import BootSequence from "../src/components/hud/BootSequence";
+import SpatialLoading from "../src/components/hud/SpatialLoading";
 import JudgeAutopilotTour from "../src/components/JudgeAutopilotTour";
 import MatchRecapStudioModal from "../src/components/MatchRecapStudioModal";
 import StudioErrorBoundary from "../src/components/StudioErrorBoundary";
@@ -400,9 +403,34 @@ render("TopBar (brand + engine status)", () =>
         isVoiceMuted: false,
         onToggleMute: noop,
         onOpenGlossary: noop,
+        onOpenCommandPalette: noop,
       }),
     ),
   );
+
+render("CommandPalette (command deck)", () =>
+  createElement(CommandPalette, {
+    open: true,
+    onClose: noop,
+    onScenario: noop,
+    onCamera: noop,
+    onToggleAutopilot: noop,
+    onToggleCinema: noop,
+    onToggleFullscreen: noop,
+    onToggleAlpha: noop,
+    onShowGlossary: noop,
+    onShowRubric: noop,
+    onShowRecap: noop,
+  }),
+);
+
+render("BootSequence (cinematic boot)", () =>
+  createElement(BootSequence),
+);
+
+render("SpatialLoading (3D lazy fallback)", () =>
+  createElement(SpatialLoading),
+);
 
 render("JudgeAutopilotTour (80 s tour banner)", () =>
   createElement(JudgeAutopilotTour, {

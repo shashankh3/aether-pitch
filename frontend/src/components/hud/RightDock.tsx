@@ -165,21 +165,28 @@ export default function RightDock(props: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="control-center-title"
-        className="clip-ea panel-lux animate-slide-up fixed inset-x-2 bottom-2 z-40 flex max-h-[82dvh] flex-col overflow-hidden outline-none sm:inset-x-auto sm:bottom-3 sm:right-2 sm:top-[64px] sm:max-h-none sm:w-[404px] lg:right-3 lg:top-[68px]"
+        className="clip-ea panel-lux animate-slide-up fixed inset-x-2 bottom-[calc(0.5rem+env(safe-area-inset-bottom))] z-40 flex max-h-[84dvh] flex-col overflow-hidden outline-none sm:inset-x-auto sm:bottom-3 sm:right-2 sm:top-[64px] sm:max-h-none sm:w-[414px] lg:right-3 lg:top-[68px]"
       >
+        <span className="hud-sheen opacity-40" aria-hidden />
+        <div className="mx-auto mt-1.5 h-1 w-10 shrink-0 rounded-full bg-white/20 sm:hidden" aria-hidden />
+
         {/* header */}
-        <div className="flex shrink-0 items-start justify-between gap-2 border-b border-white/10 px-3 py-2.5">
+        <div className="relative z-[3] flex shrink-0 items-start justify-between gap-2 border-b border-white/10 px-3 pb-2.5 pt-1.5 sm:pt-2.5">
           <div className="min-w-0">
-            <h2 id="control-center-title" className="font-display text-[14px] font-bold uppercase tracking-[0.18em] text-white">
+            <div className="hud-kicker flex items-center gap-1.5 !text-tactical">
+              <span className="h-1 w-1 rounded-full bg-tactical shadow-[0_0_8px_rgba(0,240,255,0.9)]" />
+              Auxiliary control
+            </div>
+            <h2 id="control-center-title" className="mt-1 font-display text-[15px] font-bold uppercase tracking-[0.18em] text-white">
               Control Center
             </h2>
             <p className="mt-0.5 font-tech text-[9px] uppercase tracking-[0.16em] text-slate-500">
-              Optional tools · the pitch stays primary
+              {active.label} matrix · the pitch stays primary
             </p>
           </div>
           <button
             onClick={() => setControlCenterOpen(false)}
-            className="clip-skew flex h-8 w-8 shrink-0 items-center justify-center border border-white/10 bg-slate-950/75 text-slate-400 transition hover:border-crimson/40 hover:text-white"
+            className="hud-icon-btn shrink-0 hover:!border-crimson/40"
             title="Close (Esc)"
             aria-label="Close control center"
           >
@@ -188,28 +195,54 @@ export default function RightDock(props: Props) {
         </div>
 
         {/* tab strip: all eight tools visible, no horizontal hunting */}
-        <div className="shrink-0 border-b border-white/10 p-1.5">
-          <div className="grid grid-cols-4 gap-1" role="tablist" aria-label="Control center sections">
-            {CONTROL_TABS.map((t) => {
+        <div className="relative z-[3] shrink-0 border-b border-white/10 p-1.5">
+          <div
+            className="grid grid-cols-4 gap-1"
+            role="tablist"
+            aria-label="Control center sections"
+            onKeyDown={(event) => {
+              const index = CONTROL_TABS.findIndex((tab) => tab.id === controlTab);
+              let next: (typeof CONTROL_TABS)[number] | null = null;
+              if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+                next = CONTROL_TABS[(index + 1) % CONTROL_TABS.length];
+              } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+                next = CONTROL_TABS[(index - 1 + CONTROL_TABS.length) % CONTROL_TABS.length];
+              }
+              if (!next) return;
+              event.preventDefault();
+              setControlTab(next.id);
+              requestAnimationFrame(() => document.getElementById(`tab-${next!.id}`)?.focus());
+            }}
+          >
+            {CONTROL_TABS.map((t, index) => {
               const Icon = t.icon;
               const selected = controlTab === t.id;
               return (
                 <button
                   key={t.id}
+                  id={`tab-${t.id}`}
                   role="tab"
                   aria-selected={selected}
+                  aria-controls={`panel-${t.id}`}
+                  tabIndex={selected ? 0 : -1}
                   onClick={() => setControlTab(t.id)}
                   className={cn(
                     "relative flex min-h-[44px] flex-col items-center justify-center gap-1 border px-1 py-1.5 font-tech text-[9.5px] font-bold uppercase tracking-[0.08em] transition",
                     selected
-                      ? "border-tactical/40 bg-tactical/[0.12] text-tactical"
+                      ? "border-tactical/40 bg-tactical/[0.12] text-tactical shadow-[inset_0_0_22px_rgba(0,240,255,0.06)]"
                       : "border-transparent text-slate-400 hover:border-white/10 hover:bg-white/[0.04] hover:text-white",
                   )}
                 >
+                  <span className="absolute left-1 top-1 font-mono text-[6.5px] tracking-[0.18em] text-slate-600">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
                   <Icon size={14} />
                   {t.label}
+                  {selected && (
+                    <span className="absolute inset-x-3 bottom-0 h-px bg-tactical shadow-[0_0_10px_rgba(0,240,255,0.9)]" aria-hidden />
+                  )}
                   {t.id === "fan" && fanActive && (
-                    <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-gold" />
+                    <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-gold shadow-[0_0_8px_rgba(255,194,77,0.8)]" />
                   )}
                 </button>
               );
@@ -218,7 +251,13 @@ export default function RightDock(props: Props) {
         </div>
 
         {/* content */}
-        <div className="scroll-slim min-h-0 flex-1 overflow-y-auto p-2">
+        <div
+          key={controlTab}
+          id={`panel-${controlTab}`}
+          role="tabpanel"
+          aria-labelledby={`tab-${controlTab}`}
+          className="scroll-slim panel-enter relative z-[3] min-h-0 flex-1 overflow-y-auto p-2"
+        >
           {controlTab === "cams" && (
             <div className="space-y-2">
               <CameraDirectorBar
@@ -374,9 +413,10 @@ export default function RightDock(props: Props) {
         </div>
 
         {/* footer */}
-        <div className="flex shrink-0 items-center justify-between gap-2 border-t border-white/10 px-3 py-2">
-          <span className="font-tech text-[8.5px] uppercase tracking-[0.16em] text-slate-600">
-            {active.label} controls
+        <div className="relative z-[3] flex shrink-0 items-center justify-between gap-2 border-t border-white/10 px-3 py-2">
+          <span className="flex items-center gap-1.5 font-tech text-[8.5px] uppercase tracking-[0.16em] text-slate-600">
+            <span className={cn("h-1 w-1 rounded-full", connected ? "bg-pitch shadow-[0_0_6px_#00FF85]" : "bg-gold shadow-[0_0_6px_#FFC24D]")} />
+            {active.label} · {connected ? "pipeline live" : "edge fallback"}
           </span>
           <div className="flex items-center gap-2">
             <button

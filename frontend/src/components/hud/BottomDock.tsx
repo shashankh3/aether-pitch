@@ -101,12 +101,17 @@ export default function BottomDock(props: Props) {
             </span>
           </div>
           <div
-            className="min-w-0 flex-1 px-4 py-2"
+            className="relative min-w-0 flex-1 overflow-hidden px-4 py-2"
             style={{
               background: "linear-gradient(100deg, rgba(5,8,14,0.96) 0%, rgba(10,16,28,0.86) 100%)",
               borderTop: `2px solid ${ltIsAlert ? "#FF1E56" : "#00F0FF"}`,
+              boxShadow: ltIsAlert
+                ? "0 0 34px rgba(255,30,86,0.28)"
+                : "0 0 34px rgba(0,240,255,0.2)",
+              backdropFilter: "blur(14px)",
             }}
           >
+            <span className="hud-sheen opacity-60" aria-hidden />
             <div
               className="truncate font-display text-[21px] font-bold uppercase italic leading-tight tracking-wide text-white"
               style={{ textShadow: ltIsAlert ? "0 0 18px rgba(255,30,86,0.55)" : "0 0 18px rgba(0,240,255,0.4)" }}
@@ -237,8 +242,9 @@ export default function BottomDock(props: Props) {
       )}
 
       {/* ---------- the calm dock ---------- */}
-      <div className="clip-ea glass grid grid-cols-5 gap-1 p-1.5">
-        {TOOLS.map((tool) => {
+      <div className="clip-ea panel-lux relative grid grid-cols-5 gap-1 overflow-hidden p-1.5">
+        <span className="hud-sheen opacity-50" aria-hidden />
+        {TOOLS.map((tool, index) => {
           const Icon = tool.icon;
           const selected = dockTool === tool.id;
           const hasPlayer = tool.id === "player" && !!player;
@@ -249,10 +255,10 @@ export default function BottomDock(props: Props) {
               onClick={() => toggleTool(tool.id)}
               aria-expanded={selected}
               className={cn(
-                "clip-skew relative flex min-h-[48px] flex-col items-center justify-center gap-0.5 border px-1 py-1.5 font-tech text-[9.5px] font-bold uppercase tracking-[0.08em] transition",
+                "group relative flex min-h-[52px] flex-col items-center justify-center gap-1 border px-1 py-1.5 font-tech text-[9.5px] font-bold uppercase tracking-[0.08em] transition",
                 selected
-                  ? "border-tactical/45 bg-tactical/15 text-tactical"
-                  : "border-white/[0.07] bg-white/[0.025] text-slate-400 hover:border-white/15 hover:bg-white/[0.06] hover:text-white",
+                  ? "border-tactical/50 bg-tactical/[0.13] text-tactical shadow-[inset_0_0_26px_rgba(0,240,255,0.08)]"
+                  : "border-white/[0.07] bg-white/[0.025] text-slate-400 hover:border-tactical/25 hover:bg-white/[0.055] hover:text-white",
               )}
               title={
                 tool.id === "player"
@@ -262,15 +268,28 @@ export default function BottomDock(props: Props) {
                     : "God Mode match scenarios and recap"
               }
             >
-              <Icon size={16} />
+              <span className="absolute left-1 top-1 font-mono text-[6.5px] tracking-[0.18em] text-slate-600">
+                {String(index + 1).padStart(2, "0")}
+              </span>
+              <span className={cn(
+                "flex h-7 w-7 items-center justify-center border transition",
+                selected
+                  ? "border-tactical/45 bg-tactical/10 text-tactical shadow-[0_0_16px_rgba(0,240,255,0.18)]"
+                  : "border-white/10 bg-white/[0.03] text-slate-400 group-hover:border-tactical/30 group-hover:text-white",
+              )}>
+                <Icon size={15} />
+              </span>
               {tool.label}
+              {selected && (
+                <span className="absolute inset-x-3 bottom-0 h-px bg-tactical shadow-[0_0_10px_rgba(0,240,255,0.9)]" aria-hidden />
+              )}
               {hasPlayer && (
-                <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center bg-crimson px-1 font-tech text-[8px] font-bold text-white">
+                <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center bg-crimson px-1 font-tech text-[8px] font-bold text-white shadow-[0_0_10px_rgba(255,30,86,0.6)]">
                   {player.shirt_number}
                 </span>
               )}
               {tool.id === "moments" && momentLive && (
-                <span className="absolute right-2 top-2 h-1.5 w-1.5 animate-breathe rounded-full bg-gold" />
+                <span className="absolute right-2 top-2 h-1.5 w-1.5 animate-breathe rounded-full bg-gold shadow-[0_0_8px_rgba(255,194,77,0.8)]" />
               )}
             </button>
           );
@@ -279,20 +298,26 @@ export default function BottomDock(props: Props) {
         <button
           data-dock-trigger
           onClick={() => openControlCenter("stats")}
-          className="clip-skew flex min-h-[48px] flex-col items-center justify-center gap-0.5 border border-white/[0.07] bg-white/[0.025] px-1 py-1.5 font-tech text-[9.5px] font-bold uppercase tracking-[0.08em] text-slate-400 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
+          className="group relative flex min-h-[52px] flex-col items-center justify-center gap-1 border border-white/[0.07] bg-white/[0.025] px-1 py-1.5 font-tech text-[9.5px] font-bold uppercase tracking-[0.08em] text-slate-400 transition hover:border-tactical/25 hover:bg-white/[0.055] hover:text-white"
           title="Match intelligence: possession, xT, pressing, player stats"
         >
-          <BarChart3 size={16} />
+          <span className="absolute left-1 top-1 font-mono text-[6.5px] tracking-[0.18em] text-slate-600">04</span>
+          <span className="flex h-7 w-7 items-center justify-center border border-white/10 bg-white/[0.03] text-slate-400 transition group-hover:border-tactical/30 group-hover:text-white">
+            <BarChart3 size={15} />
+          </span>
           Stats
         </button>
 
         <button
           data-dock-trigger
           onClick={() => openControlCenter()}
-          className="clip-skew flex min-h-[48px] flex-col items-center justify-center gap-0.5 border border-white/[0.07] bg-white/[0.025] px-1 py-1.5 font-tech text-[9.5px] font-bold uppercase tracking-[0.08em] text-slate-400 transition hover:border-tactical/30 hover:bg-tactical/10 hover:text-white"
+          className="group relative flex min-h-[52px] flex-col items-center justify-center gap-1 border border-white/[0.07] bg-white/[0.025] px-1 py-1.5 font-tech text-[9.5px] font-bold uppercase tracking-[0.08em] text-slate-400 transition hover:border-tactical/30 hover:bg-tactical/10 hover:text-white"
           title="Open all controls"
         >
-          <SlidersHorizontal size={16} />
+          <span className="absolute left-1 top-1 font-mono text-[6.5px] tracking-[0.18em] text-slate-600">05</span>
+          <span className="flex h-7 w-7 items-center justify-center border border-white/[0.1] bg-white/[0.03] text-slate-400 transition group-hover:border-tactical/30 group-hover:text-tactical">
+            <SlidersHorizontal size={15} />
+          </span>
           Controls
         </button>
       </div>

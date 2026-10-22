@@ -8,18 +8,28 @@
 // This file is the orchestrator: all data wiring, handlers and transient
 // broadcast graphics (lower-third, GOAL slam, autopilot banner, modals).
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import HoloPitch3D, { type OverlayToggles } from "@/components/three/HoloPitch3D";
+import type { OverlayToggles } from "@/components/three/HoloPitch3D";
 import TacticalPulseBar from "@/components/TacticalPulseBar";
 import BroadcastAlphaModal, { SMPTEChip } from "@/components/BroadcastAlphaModal";
-import PlainLanguageSheet from "@/components/hud/PlainLanguageSheet";
-import RubricVerifierModal from "@/components/RubricVerifierModal";
-import MatchRecapStudioModal from "@/components/MatchRecapStudioModal";
 import LiveCaptionStrip from "@/components/LiveCaptionStrip";
 import StudioErrorBoundary from "@/components/StudioErrorBoundary";
 import JudgeFirstRunCard from "@/components/JudgeFirstRunCard";
 import CounterfactualDeltaHUD from "@/components/hud/CounterfactualDeltaHUD";
 import DefensiveLineScrubber from "@/components/hud/DefensiveLineScrubber";
+import BootSequence from "@/components/hud/BootSequence";
+import CommandPalette from "@/components/hud/CommandPalette";
+import SpatialLoading from "@/components/hud/SpatialLoading";
+
+const HoloPitch3D = dynamic(() => import("@/components/three/HoloPitch3D"), {
+  ssr: false,
+  loading: () => <SpatialLoading />,
+});
+const RightDock = dynamic(() => import("@/components/hud/RightDock"), { ssr: false });
+const PlainLanguageSheet = dynamic(() => import("@/components/hud/PlainLanguageSheet"), { ssr: false });
+const RubricVerifierModal = dynamic(() => import("@/components/RubricVerifierModal"), { ssr: false });
+const MatchRecapStudioModal = dynamic(() => import("@/components/MatchRecapStudioModal"), { ssr: false });
 import {
   clearSandbox, type SandboxDelta,
 } from "@/lib/sandboxStore";
@@ -28,7 +38,6 @@ import JudgeAutopilotTour, {
 } from "@/components/JudgeAutopilotTour";
 import TopBar from "@/components/hud/TopBar";
 import LeftRail from "@/components/hud/LeftRail";
-import RightDock from "@/components/hud/RightDock";
 import BottomDock from "@/components/hud/BottomDock";
 import ShortcutsOverlay from "@/components/hud/ShortcutsOverlay";
 import { HudProvider, useHud } from "@/lib/hudContext";
@@ -147,6 +156,7 @@ function StudioOrchestrator() {
   // ---- presentation / clean-feed controls ----
   const [cinemaMode, setCinemaMode] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
 
   // ---- v5.0 judge autopilot (engine lives here so TopBar + banner share it) ----
   const [showRecap, setShowRecap] = useState(false);
@@ -207,6 +217,11 @@ function StudioOrchestrator() {
       document.documentElement.requestFullscreen?.().catch(() => {});
     }
   }, []);
+
+  const handleToggleCinema = useCallback(() => setCinemaMode((value) => !value), []);
+  const handleOpenGlossary = useCallback(() => setShowGlossary(true), []);
+  const handleOpenCommandPalette = useCallback(() => setCommandOpen(true), []);
+  const handleCloseCommandPalette = useCallback(() => setCommandOpen(false), []);
 
   const toggleAlpha = useCallback(() => {
     setAlphaMode((a) => {
@@ -297,6 +312,11 @@ function StudioOrchestrator() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCommandOpen((open) => !open);
+        return;
+      }
       if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
       const target = e.target as HTMLElement | null;
       if (target && (
@@ -907,7 +927,9 @@ function StudioOrchestrator() {
       : ["#FF1E56", "#FF5C86", "#FFFFFF", "#FFC24D", "#7F0F26"];
 
   return (
-    <main className="relative h-[100dvh] w-screen overflow-hidden bg-obsidian">
+    <main className="relative h-[100dvh] w-screen overflow-hidden overscroll-none bg-obsidian">
+      <BootSequence />
+
       {/* chroma / checkerboard backdrop behind the transparent WebGL canvas */}
       {alphaMode && <div className="fixed inset-0 z-0" style={alphaBackdropStyle} />}
 
@@ -938,6 +960,7 @@ function StudioOrchestrator() {
           <div className="scene-grade" aria-hidden />
           <div className="scene-scanlines" aria-hidden />
           <div className="scene-grain" aria-hidden />
+          <div className="scene-sweep" aria-hidden />
           <div className="broadcast-frame" aria-hidden>
             <span className="frame-corner frame-corner-tl" />
             <span className="frame-corner frame-corner-tr" />
@@ -960,6 +983,11 @@ function StudioOrchestrator() {
         )}
       >
         <div className={cn("absolute inset-0", alphaMode && "hidden")}>
+          <div className="hud-ruler hud-ruler-left" aria-hidden />
+          <div className="hud-ruler hud-ruler-right" aria-hidden />
+          <span className="hud-frame-tag hud-frame-tag-left" aria-hidden>Aether // Sys-04</span>
+          <span className="hud-frame-tag hud-frame-tag-right" aria-hidden>10.00 Hz // Spatial</span>
+
           {/* ---------- calm top bar ---------- */}
           <div className="pointer-events-auto absolute inset-x-2 top-2 z-20 lg:inset-x-3 lg:top-3">
             <TopBar
@@ -967,17 +995,18 @@ function StudioOrchestrator() {
               lang={lang}
               alphaMode={alphaMode}
               cinemaMode={cinemaMode}
-              onToggleCinema={() => setCinemaMode((v) => !v)}
+              onToggleCinema={handleToggleCinema}
               isFullscreen={isFullscreen}
               onToggleFullscreen={toggleFullscreen}
               autopilotActive={autopilotActive}
               autopilotElapsed={autopilotElapsed}
               autopilotStep={autopilotStep}
               onToggleAutopilot={toggleAutopilot}
-                isSpeaking={isSpeaking}
-                isVoiceMuted={isVoiceMuted}
-                onToggleMute={toggleMute}
-                onOpenGlossary={() => setShowGlossary(true)}
+              isSpeaking={isSpeaking}
+              isVoiceMuted={isVoiceMuted}
+              onToggleMute={toggleMute}
+              onOpenGlossary={handleOpenGlossary}
+              onOpenCommandPalette={handleOpenCommandPalette}
             />
           </div>
 
@@ -1046,7 +1075,7 @@ function StudioOrchestrator() {
           </div>
 
           {/* ---------- five-button fan dock ---------- */}
-          <div className="pointer-events-none absolute inset-x-2 bottom-2 z-20 flex justify-center lg:bottom-3">
+          <div className="pointer-events-none absolute inset-x-2 bottom-[calc(0.5rem+env(safe-area-inset-bottom))] z-20 flex justify-center lg:bottom-[calc(0.75rem+env(safe-area-inset-bottom))]">
             <div className="pointer-events-auto w-full max-w-[700px]">
               <BottomDock
                 tick={tick}
@@ -1200,6 +1229,13 @@ function StudioOrchestrator() {
           aria-atomic="true"
           className="pointer-events-none fixed inset-0 z-[45] flex items-center justify-center overflow-hidden"
         >
+          <span className="goal-flash" aria-hidden />
+          <span className="goal-streak left-[6%] top-[36%]" aria-hidden />
+          <span
+            className="goal-streak right-[4%] top-[64%]"
+            style={{ animationDelay: "120ms", width: "38vw" }}
+            aria-hidden
+          />
           <div className="absolute inset-0 overflow-hidden" aria-hidden>
             {Array.from({ length: 36 }).map((_, i) => (
               <span
@@ -1273,17 +1309,40 @@ function StudioOrchestrator() {
       <JudgeFirstRunCard onRunAutopilot={toggleAutopilot} alphaMode={alphaMode} />
 
       {/* ---------- modals (outside the pointer-events-none HUD wrapper) ---------- */}
-      <BroadcastAlphaModal open={showAlphaModal} onClose={() => setShowAlphaModal(false)} insight={latest} />
-      <PlainLanguageSheet open={showGlossary} onClose={() => setShowGlossary(false)} />
-      <RubricVerifierModal open={showRubric} onClose={() => setShowRubric(false)} />
-      <MatchRecapStudioModal
-        open={showRecap}
-        onClose={() => setShowRecap(false)}
-        onLoadAct={handleLoadRecapAct}
-        lang={lang}
-        tick={tick}
-        events={events}
+      {showAlphaModal && (
+        <BroadcastAlphaModal open onClose={() => setShowAlphaModal(false)} insight={latest} />
+      )}
+      {showGlossary && (
+        <PlainLanguageSheet open onClose={() => setShowGlossary(false)} />
+      )}
+      {showRubric && (
+        <RubricVerifierModal open onClose={() => setShowRubric(false)} />
+      )}
+      {showRecap && (
+        <MatchRecapStudioModal
+          open
+          onClose={() => setShowRecap(false)}
+          onLoadAct={handleLoadRecapAct}
+          lang={lang}
+          tick={tick}
+          events={events}
+        />
+      )}
+
+      <CommandPalette
+        open={commandOpen}
+        onClose={handleCloseCommandPalette}
+        onScenario={inject}
+        onCamera={pickCamera}
+        onToggleAutopilot={toggleAutopilot}
+        onToggleCinema={handleToggleCinema}
+        onToggleFullscreen={toggleFullscreen}
+        onToggleAlpha={toggleAlpha}
+        onShowGlossary={handleOpenGlossary}
+        onShowRubric={() => setShowRubric(true)}
+        onShowRecap={() => setShowRecap(true)}
       />
+
       <ShortcutsOverlay />
     </main>
   );
