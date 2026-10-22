@@ -1262,7 +1262,7 @@ function StudioOrchestrator() {
         />
       )}
 
-      <JudgeFirstRunCard onRunAutopilot={toggleAutopilot} />
+      <JudgeFirstRunCard onRunAutopilot={toggleAutopilot} alphaMode={alphaMode} />
 
       {/* ---------- modals (outside the pointer-events-none HUD wrapper) ---------- */}
       <BroadcastAlphaModal open={showAlphaModal} onClose={() => setShowAlphaModal(false)} insight={latest} />

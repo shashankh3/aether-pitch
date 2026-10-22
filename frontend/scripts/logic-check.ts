@@ -776,6 +776,42 @@ check(
       ? `${dialogFiles.length} focus-trapped panels`
       : badDialogs.map((f) => path.basename(f)).join(", "),
   );
+  // --- the alpha clean-feed contract -------------------------------------
+  // ?overlay=alpha is a broadcast deliverable: a transparent feed for
+  // compositing. Nothing may sit over it. Each surface below is hidden by a
+  // different mechanism, so the contract is checked mechanism by mechanism.
+  const page = read(path.join(SRC, "app", "page.tsx"));
+  const rightDock = read(path.join(SRC, "components", "hud", "RightDock.tsx"));
+  const firstRun = read(path.join(SRC, "components", "JudgeFirstRunCard.tsx"));
+
+  check(
+    "Alpha feed: the HUD shell is hidden behind a clean feed",
+    /alphaMode\s*&&\s*"hidden"/.test(page),
+    "the HUD wrapper carries the alpha hide",
+  );
+  check(
+    "Alpha feed: the autopilot banner is disabled",
+    /active=\{autopilotActive\s*&&\s*!alphaMode\}/.test(page),
+  );
+  check(
+    "Alpha feed: the control centre closes and renders nothing",
+    /!\s*controlCenterOpen\s*\|\|\s*alphaMode\)\s*return null/.test(rightDock),
+  );
+  check(
+    "Alpha feed: the caption strip and the counterfactual HUD are gated",
+    /!alphaMode\s*&&\s*!cinemaMode\s*&&\s*<LiveCaptionStrip\s*\/>/.test(page)
+    && /!alphaMode\s*&&\s*!cinemaMode\s*&&\s*\(/.test(page),
+  );
+  check(
+    "Alpha feed: the first-run card is suppressed on a clean feed",
+    /alphaMode\??:\s*boolean/.test(firstRun)
+    && /!visible\s*\|\|\s*alphaMode\)\s*return null/.test(firstRun),
+  );
+  check(
+    "Alpha feed: the goal slam and the cinema overlay are gated",
+    /goalBanner\s*&&\s*!alphaMode\s*&&/.test(page)
+    && /cinemaMode\s*&&\s*!alphaMode\s*&&/.test(page),
+  );
 }
 
 // --- cleanup ----------------------------------------------------------------

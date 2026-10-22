@@ -49,7 +49,13 @@ const PROOFS: ProofRow[] = [
   },
 ];
 
-export default function JudgeFirstRunCard({ onRunAutopilot }: { onRunAutopilot?: () => void }) {
+export default function JudgeFirstRunCard({
+  onRunAutopilot,
+  alphaMode = false,
+}: {
+  onRunAutopilot?: () => void;
+  alphaMode?: boolean;
+}) {
   const { openControlCenter } = useHud();
   const [visible, setVisible] = useState(false);
 
@@ -81,7 +87,10 @@ export default function JudgeFirstRunCard({ onRunAutopilot }: { onRunAutopilot?:
     dismiss();
   };
 
-  if (!visible) return null;
+  // A clean alpha feed is a broadcast deliverable: nothing may sit over it.
+  // The card appears on a judge's first visit, which is exactly when a judge
+  // is most likely to open ?overlay=alpha straight from the pre-flight guide.
+  if (!visible || alphaMode) return null;
 
   return (
     <div
