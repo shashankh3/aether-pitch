@@ -570,6 +570,7 @@ report the cloud route when credentials are present.
 | **Best Multi-Agent System** | `POST /api/tactical-war-room` | A genuine sequential three-call debate, not one model role-playing three roles | `agent_calls[]` — three entries, each with its own `deployment`, `tools`, `latency_ms` and token counts; `orchestration.rounds = 3`; the scout reads turn 1 and the arbiter reads turns 1–2 |
 | **Best Azure Cloud Native** | `python infra/validate_template.py` | The Azure estate is real, complete and self-consistent | 16 ARM resources: AI Services + Translator + opt-in Content Safety (3 Cognitive Services accounts), 2 model deployments, Key Vault, a user-assigned managed identity + 2 role assignments, Container Apps ×2 on a managed environment, App Insights, a Log Analytics workspace and 2 metric alerts |
 | | `GET /api/health` | Zero-downtime edge resilience is real, not a claim | the live WebSocket client count, the per-stage route, and the cloud→edge hot-swap state |
+| | `npm run check:logic` | The cloud-outage drill is a verified state machine, not a scripted animation | 22 assertions drive a six-second drill in milliseconds: the phase order (`outage → reconciling → verified`), the measured swap latency, **zero dropped frames**, the 1 Hz badge republication, the refusal of a second trigger, the socket-reopen clock cross-check, and timer disposal on unmount |
 
 The **Pre-Flight Execution Checklist** (§8b) turns the same evidence into a
 15-minute rehearsal, and §8b's last step is the 6-second cloud-outage drill

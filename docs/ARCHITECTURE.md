@@ -93,6 +93,15 @@ infra/main.json                 491 LOC  ARM template (16 resources)
 | 3. The browser twin | `lib/edgeEngine.ts` | The client can run the whole match with no server. |
 | 4. The hub queues per client | `main.py` (`Hub`) | One slow viewer cannot stall the 10 Hz loop. |
 
+The **cloud-outage drill** is the demo of layers 3 and 4 working together: the
+cloud stream is dropped, the deterministic edge engine keeps the 3D scene
+running with zero dropped frames, and the cloud reconnects and reconciles the
+match clock. Its state machine lives in `lib/failoverDrill.ts` with the clock
+and timers injected, so a six-second drill is driven deterministically in the
+headless logic suite — 22 assertions cover the phase order, the measured swap
+latency, the zero-dropped-frames claim, the 1 Hz badge republication, the
+refusal of a second trigger, the socket-reopen cross-check and timer disposal.
+
 ---
 
 ## 4. The five stages
