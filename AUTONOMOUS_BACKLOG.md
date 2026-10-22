@@ -1,12 +1,12 @@
 # Autonomous Improvement Backlog
-Last Updated: 2026-10-21T22:26:41Z
-Was Updated: 2026-10-22T00:00:00Z
+Last Updated: 2026-10-22T04:30:00Z
+Was Updated: 2026-10-22T04:30:00Z
 
 Scope: AETHER PITCH (Premier League × Azure "Inside the Game" hackathon).
 Branch: `overnight-auto-improve` (never merge to `main` without review).
 Verification gate (all must pass before a commit):
 `python backend/test_pipeline.py` · `python infra/validate_template.py` ·
-`cd frontend && npx tsc --noEmit` · `npm run build` · `npm run smoke` · `npm run check:logic`
+`cd frontend && npx tsc --noEmit` · `npm run build` · `npm run smoke` · `npm run check:logic` · `npm run smoke:ui`
 
 ## Pending Tasks
 - [x] [Track C] Replace the `any` casts in `frontend/scripts/logic-check.ts` with typed helpers so the logic suite is type-safe rather than `any`-driven
@@ -14,7 +14,46 @@ Verification gate (all must pass before a commit):
 - [ ] [Track C] Tighten `backend/main.py` typing: `Dict[str, Any]` responses are unchecked — add `TypedDict` shapes for the audit and counterfactual payloads
 - [ ] [Track E] Split the 1,623-line `frontend/src/lib/edgeEngine.ts` into `edgeEngine/` (simulation, math, war-room, bio-load) with a barrel re-export so imports stay stable
 - [ ] [Track E] Split the 1,408-line `backend/stage_c_foundry_agents.py` — extract the war-room, counterfactual arbiter and RAI shield into focused modules
-- [ ] [Track F] Add a `CONTRIBUTING.md` describing the verification gate, the branch policy and the compliance rules contributors must not break
+- [x] [Track F] Add a `CONTRIBUTING.md` describing the verification gate, the branch policy and the compliance rules contributors must not break
+  - files: CONTRIBUTING.md
+  - note: DONE - written in the docs commit; `docs/ARCHITECTURE.md` and `docs/RUNTIME_CONFIG.md` landed in the same batch
+
+- [ ] [Track B] Add property-based invariant tests for the Stage B xT grid and pitch control: values stay in [0,1], translational/rotational symmetry holds, the grid degrades gracefully for an empty squad, and the vectorised path still matches the scalar reference
+  - files: backend/test_pipeline.py, frontend/scripts/logic-check.ts
+  - note: The vectorised territory attribution is the single highest-blast-radius numeric code in the repo. A silent off-by-one in the grid index would corrupt every number a judge sees. Invariants catch what exact-value tests cannot.
+- [ ] [Track B] Lock the i18n atlas coverage as a permanent assertion: every archetype `pick_archetype` can return must have an `es`/`ar`/`hi` translation, and the recap intros must exist for all three
+  - files: backend/test_pipeline.py
+  - note: Verified manually on 2026-10-22 (6 archetypes x 3 languages, all covered) but NOT locked by a test. A new archetype without translations would silently fall back to English and undercut the multi-language rubric line.
+- [ ] [Track B] Add REST contract tests: every route returns JSON with the documented keys, and malformed input is rejected with a 4xx rather than surfacing a 500
+  - files: backend/test_pipeline.py
+  - note: The counterfactual and studio endpoints were added late and have schema tests but no rejection-path coverage.
+- [ ] [Track A] Audit every backend `except:` fallback and every frontend `try/catch` for a user-visible failure state - no silent swallow, no dead error branch
+  - files: backend/*.py, frontend/src/**/*.ts, frontend/src/**/*.tsx
+  - note: Silent catches are how a demo degrades without anyone noticing. The fan should always see *something* actionable.
+- [ ] [Track A] Verify the `?overlay=alpha` SMPTE mode still renders every judge-facing surface unobstructed after the recent HUD additions
+  - files: frontend/scripts/ui-smoke.ts, frontend/src/app/page.tsx
+  - note: The alpha overlay is the broadcast deliverable. A HUD element that leaks into it breaks the cut.
+- [ ] [Track D] Count React renders per second in the 10 Hz HUD with a player locked, and fix any component that re-renders more than once per tick
+  - files: frontend/src/hooks/useResilientMatchEngine.ts, frontend/src/components/hud/*.tsx
+  - note: The match loop runs at 10 Hz. A double-render per tick doubles the R3F frame cost on low-end judge laptops.
+- [ ] [Track D] Audit every `useFrame` callback for per-frame allocations (`new THREE.Vector3`, array/object literals, closures that capture new values) and hoist them
+  - files: frontend/src/components/three/*.tsx
+  - note: Per-frame allocation is the classic R3F GC-hitch cause. The FPS chip measures frame time, so a hitch here is visible to the judge.
+- [ ] [Track G] Accessibility audit of the 30 judge-facing HUD surfaces: `aria-*` on interactive elements, keyboard reachability, focus trapping in modals, and colour-contrast of the palette against WCAG AA
+  - files: frontend/src/components/hud/*.tsx, frontend/scripts/ui-smoke.ts
+  - note: `useModalA11y.ts` already exists but coverage is partial. The colourblind palette is a rubric item - verify the contrast ratios rather than asserting they were chosen carefully.
+- [ ] [Track H] API surface security review: CORS posture, request body size limits, error-message leakage of internals, and input validation on the counterfactual and studio endpoints
+  - files: backend/main.py, backend/counterfactual.py, backend/stage_c_foundry_agents.py
+  - note: An enterprise-judged project gets looked at for this. The ARM template already ships Key Vault and a managed identity; the API should match that posture.
+- [ ] [Track I] Audit the R3F scene graph for draw-call count, shared-vs-duplicated geometry, and material reuse in the stadium, crowd, and overlay layers
+  - files: frontend/src/components/three/*.tsx
+  - note: Directly determines whether the 3D pitch holds 60 FPS on the judge's hardware.
+- [ ] [Track F] Add an automated doc-lint that extracts every number, endpoint path, script name and assertion count from `README.md` / `SUBMISSION_GUIDE.md` / `docs/*.md` and verifies each against the code
+  - files: tools/doc_lint.py, backend/test_pipeline.py
+  - note: Judge-facing docs drift silently. The counts were already stale once (90 -> 143). A lint makes staleness impossible.
+- [ ] [Track F] Rubric coverage audit: for each rubric line in `SUBMISSION_GUIDE.md`, record the concrete evidence (file path, command, and what a judge sees) so every scored dimension is defensible
+  - files: SUBMISSION_GUIDE.md, docs/ARCHITECTURE.md
+  - note: Strengthen the weakest-evidenced rubric lines rather than the strongest ones.
 
 ## In Progress
 - None

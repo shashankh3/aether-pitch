@@ -16,3 +16,7 @@ out/
 *.log
 .DS_Store
 .zcode/
+
+# Overnight watchdog run artifacts
+logs/
+STOP_OVERNIGHT
