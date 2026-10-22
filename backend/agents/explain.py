@@ -156,13 +156,13 @@ class ExplainMixin:
     async def _azure_explain(self, ctx: dict, fallback: dict) -> dict:
         compact = self._compact_ctx(ctx)
         t_triage = time.perf_counter()
-        triage_raw = await asyncio.to_thread(
-            self._chat, self.s.triage_deployment,
+        triage_raw = await self._achat(
+            self.s.triage_deployment,
             [{"role": "system", "content":
               "You classify football tactical moments. Reply with EXACTLY one label from: "
               + ", ".join(ARCHETYPES)},
              {"role": "user", "content": json.dumps(compact)}],
-            max_tokens=10, temperature=0.0,
+            max_tokens=10, temperature=0.0, timeout=3.0,
         )
         triage_ms = round((time.perf_counter() - t_triage) * 1000.0, 2)
         match = re.search(r"\w+", triage_raw or "")
@@ -171,8 +171,8 @@ class ExplainMixin:
             archetype = fallback["archetype"]
 
         t_narrative = time.perf_counter()
-        narrative_raw = await asyncio.to_thread(
-            self._chat, self.s.narrative_deployment,
+        narrative_raw = await self._achat(
+            self.s.narrative_deployment,
             [{"role": "system", "content":
               "You are an elite broadcast football analyst. Given a tactical context snapshot, "
               "return STRICT JSON only (no markdown) with keys: moment_headline (<=10 words), "
@@ -202,13 +202,13 @@ class ExplainMixin:
         }
 
     async def _azure_recap(self, ctx: dict, fallback: dict) -> dict:
-        raw = await asyncio.to_thread(
-            self._chat, self.s.narrative_deployment,
+        raw = await self._achat(
+            self.s.narrative_deployment,
             [{"role": "system", "content":
               "You are a studio broadcast producer. Compile the top-3 match inflection points into "
               "STRICT JSON only: {\"title\": str, \"items\": [{\"clock\": str, \"headline\": str, \"detail\": str} x3]}."},
              {"role": "user", "content": json.dumps(self._compact_ctx(ctx))}],
-            max_tokens=500, temperature=0.5, timeout=6.0, json_mode=True,
+            max_tokens=500, temperature=0.5, timeout=5.0, json_mode=True,
         )
         cleaned = re.sub(r"^```(json)?|```$", "", (raw or "").strip(), flags=re.M).strip()
         parsed = json.loads(cleaned)

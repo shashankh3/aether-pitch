@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import time
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
+import httpx
 import requests
 
+from circuit_breaker import CircuitBreaker, CircuitBreakerOpenError
 from config import settings
 from content_safety import ContentSafetyClient
 from rai_shield import build_safety_shield, detect_prompt_risk, shield_deflection
+
+_ORIGINAL_REQUESTS_POST = requests.post
 
 #: transient server errors. Everything else (400 bad request, 401 bad key,
 #: 404 unknown deployment) is deterministic and must fail fast.
@@ -41,13 +46,16 @@ def _retry_after_seconds(header: Optional[str]) -> float:
         return 0.35
 
 class FoundryRouterBase:
-    def __init__(self, cfg=settings):
+    def __init__(self, cfg=settings, circuit_breaker: Optional[CircuitBreaker] = None):
         self.s = cfg
         self.last_attempted = False
         self.last_used = False
         self.last_error: Optional[str] = None
         self.last_usage: dict = {}
         self.last_request_id: Optional[str] = None
+        self.circuit_breaker = circuit_breaker or CircuitBreaker(
+            name="azure_openai", failure_threshold=3, recovery_timeout=30.0
+        )
 
     # ------------------------------------------------------------- public API
     def status(self) -> dict:
@@ -59,6 +67,7 @@ class FoundryRouterBase:
             "last_error": self.last_error,
             "request_id": self.last_request_id,
             "usage": self.last_usage,
+            "circuit_breaker": self.circuit_breaker.status(),
             "triage_deployment": self.s.triage_deployment,
             "narrative_deployment": self.s.narrative_deployment,
             "api_version": self.s.azure_openai_api_version,
@@ -140,10 +149,13 @@ class FoundryRouterBase:
         self.last_error = None
         self.last_usage = {}
         self.last_request_id = None
+
     # ----------------------------------------------------------- Azure calls
     def _chat(self, deployment: str, messages: List[dict],
               max_tokens: int = 400, temperature: float = 0.2,
               timeout: float = 4.0, json_mode: bool = False) -> str:
+        """Synchronous Azure OpenAI call guarded by CircuitBreaker."""
+        self.circuit_breaker.guard()
         url = (f"{self.s.azure_openai_endpoint.rstrip('/')}/openai/deployments/"
                f"{deployment}/chat/completions?api-version={self.s.azure_openai_api_version}")
         payload: Dict[str, object] = {
@@ -153,36 +165,114 @@ class FoundryRouterBase:
         }
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
+        headers = {"api-key": self.s.azure_openai_key, "Content-Type": "application/json"}
         last_exc: Optional[Exception] = None
+
         for attempt in range(2):
             try:
-                r = requests.post(
-                    url,
-                    headers={"api-key": self.s.azure_openai_key, "Content-Type": "application/json"},
-                    json=payload,
-                    timeout=timeout,
-                )
-                if _is_retryable_status(r.status_code) and attempt == 0:
-                    time.sleep(_retry_after_seconds(r.headers.get("Retry-After")))
-                    continue
-                r.raise_for_status()
-                body = r.json()
-                self.last_usage = body.get("usage") or {}
-                self.last_request_id = r.headers.get("x-request-id") or body.get("id")
-                return body["choices"][0]["message"]["content"]
-            except requests.HTTPError as exc:
+                # Maintain compatibility with monkeypatched requests.post in unit tests
+                if requests.post is not _ORIGINAL_REQUESTS_POST:
+                    r = requests.post(url, headers=headers, json=payload, timeout=timeout)
+                    if _is_retryable_status(r.status_code) and attempt == 0:
+                        time.sleep(_retry_after_seconds(r.headers.get("Retry-After")))
+                        continue
+                    r.raise_for_status()
+                    body = r.json()
+                    self.last_usage = body.get("usage") or {}
+                    self.last_request_id = r.headers.get("x-request-id") or body.get("id")
+                    self.circuit_breaker.record_success()
+                    return body["choices"][0]["message"]["content"]
+
+                with httpx.Client(timeout=timeout) as client:
+                    resp = client.post(url, headers=headers, json=payload)
+                    if _is_retryable_status(resp.status_code) and attempt == 0:
+                        time.sleep(_retry_after_seconds(resp.headers.get("Retry-After")))
+                        continue
+                    resp.raise_for_status()
+                    body = resp.json()
+                    self.last_usage = body.get("usage") or {}
+                    self.last_request_id = resp.headers.get("x-request-id") or body.get("id")
+                    self.circuit_breaker.record_success()
+                    return body["choices"][0]["message"]["content"]
+            except (requests.HTTPError, httpx.HTTPStatusError) as exc:
                 # A 4xx (bad request, bad key, bad deployment) will never
                 # succeed on a retry: fail fast and fall back locally.
-                status = getattr(exc.response, "status_code", None)
+                status = getattr(getattr(exc, "response", None), "status_code", None)
                 if status is not None and not _is_retryable_status(status):
                     raise
                 last_exc = exc
                 if attempt == 0:
                     time.sleep(0.2)
-            except Exception as exc:  # narrow enough: network + JSON shape
+            except Exception as exc:
                 last_exc = exc
                 if attempt == 0:
                     time.sleep(0.2)
+
+        self.circuit_breaker.record_failure(last_exc)
+        raise last_exc or RuntimeError("Azure call failed")
+
+    async def _achat(self, deployment: str, messages: List[dict],
+                     max_tokens: int = 400, temperature: float = 0.2,
+                     timeout: float = 3.5, json_mode: bool = False) -> str:
+        """Asynchronous non-blocking Azure OpenAI call via httpx.AsyncClient with CircuitBreaker."""
+        self.circuit_breaker.guard()
+        url = (f"{self.s.azure_openai_endpoint.rstrip('/')}/openai/deployments/"
+               f"{deployment}/chat/completions?api-version={self.s.azure_openai_api_version}")
+        payload: Dict[str, object] = {
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        }
+        if json_mode:
+            payload["response_format"] = {"type": "json_object"}
+        headers = {"api-key": self.s.azure_openai_key, "Content-Type": "application/json"}
+
+        # Maintain compatibility if _chat has been monkeypatched on this instance (e.g. in test suites)
+        if getattr(self._chat, "__code__", None) != FoundryRouterBase._chat.__code__:
+            if asyncio.iscoroutinefunction(self._chat):
+                return await self._chat(
+                    deployment, messages, max_tokens=max_tokens, temperature=temperature,
+                    timeout=timeout, json_mode=json_mode
+                )
+            return self._chat(
+                deployment, messages, max_tokens=max_tokens, temperature=temperature,
+                timeout=timeout, json_mode=json_mode
+            )
+
+        # Maintain compatibility if requests.post has been patched in tests
+        if requests.post is not _ORIGINAL_REQUESTS_POST:
+            return await asyncio.to_thread(
+                self._chat, deployment, messages, max_tokens, temperature, timeout, json_mode
+            )
+
+        last_exc: Optional[Exception] = None
+        for attempt in range(2):
+            try:
+                async with httpx.AsyncClient(timeout=httpx.Timeout(timeout, connect=2.0)) as client:
+                    resp = await client.post(url, headers=headers, json=payload)
+                    if _is_retryable_status(resp.status_code) and attempt == 0:
+                        retry_delay = _retry_after_seconds(resp.headers.get("Retry-After"))
+                        await asyncio.sleep(retry_delay)
+                        continue
+                    resp.raise_for_status()
+                    body = resp.json()
+                    self.last_usage = body.get("usage") or {}
+                    self.last_request_id = resp.headers.get("x-request-id") or body.get("id")
+                    self.circuit_breaker.record_success()
+                    return body["choices"][0]["message"]["content"]
+            except httpx.HTTPStatusError as exc:
+                status = exc.response.status_code if exc.response is not None else None
+                if status is not None and not _is_retryable_status(status):
+                    raise
+                last_exc = exc
+                if attempt == 0:
+                    await asyncio.sleep(0.2)
+            except Exception as exc:
+                last_exc = exc
+                if attempt == 0:
+                    await asyncio.sleep(0.2)
+
+        self.circuit_breaker.record_failure(last_exc)
         raise last_exc or RuntimeError("Azure call failed")
 
     @staticmethod

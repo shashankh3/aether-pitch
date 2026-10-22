@@ -29,7 +29,7 @@ class CounterfactualArbiterMixin:
         try:
             tools = {**self._counterfactual_tools(ctx), "counterfactual": evaluation}
             t0 = time.perf_counter()
-            raw = self._chat(
+            raw = await self._achat(
                 self.s.narrative_deployment,
                 [
                     {"role": "system", "content": COUNTERFACTUAL_ARBITER["system"]},

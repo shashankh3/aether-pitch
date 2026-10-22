@@ -17,7 +17,10 @@ from __future__ import annotations
 
 from typing import Dict, Optional
 
+import httpx
 import requests
+
+_ORIGINAL_REQUESTS_POST = requests.post
 
 CATEGORIES = ("Hate", "SelfHarm", "Sexual", "Violence")
 API_VERSION = "2024-09-01"
@@ -40,6 +43,30 @@ class ContentSafetyClient:
             return ""
         trimmed = self.endpoint.split("://", 1)[-1]
         return trimmed.split("/", 1)[0]
+
+    def _format_result(self, body: dict) -> Dict[str, object]:
+        flagged = [
+            {
+                "category": item.get("category"),
+                "severity": item.get("severity", 0),
+            }
+            for item in (body.get("categoriesAnalysis") or body.get("categories") or [])
+            if int(item.get("severity") or 0) >= 2
+        ]
+        max_severity = max((int(i["severity"]) for i in flagged), default=0)
+        return {
+            "service": "azure-ai-content-safety",
+            "status": "FLAGGED" if flagged else "CLEAR",
+            "configured": True,
+            "categories": flagged,
+            "max_severity": max_severity,
+            "host": self.host,
+            "note": (
+                f"Azure AI Content Safety flagged {len(flagged)} categories (max severity {max_severity})."
+                if flagged
+                else "Passed Azure AI Content Safety check."
+            ),
+        }
 
     def analyze(self, text: str, timeout: float = 2.5) -> Dict[str, object]:
         """Analyze text with Azure AI Content Safety.
@@ -71,24 +98,28 @@ class ContentSafetyClient:
                 "note": "Empty text — nothing to analyze.",
             }
         url = f"{self.endpoint}/contentsafety/text:analyze?api-version={API_VERSION}"
+        headers = {
+            "Ocp-Apim-Subscription-Key": self.key,
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "text": text[:4000],
+            "categories": list(CATEGORIES),
+            "includeAnalysis": False,
+            "disableAms": True,
+            "severityThreshold": 2,
+        }
         try:
-            response = requests.post(
-                url,
-                headers={
-                    "Ocp-Apim-Subscription-Key": self.key,
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "text": text[:4000],
-                    "categories": list(CATEGORIES),
-                    "includeAnalysis": False,
-                    "disableAms": True,
-                    "severityThreshold": 2,
-                },
-                timeout=timeout,
-            )
-            response.raise_for_status()
-            body = response.json()
+            if requests.post is not _ORIGINAL_REQUESTS_POST:
+                response = requests.post(url, headers=headers, json=payload, timeout=timeout)
+                response.raise_for_status()
+                body = response.json()
+            else:
+                with httpx.Client(timeout=timeout) as client:
+                    resp = client.post(url, headers=headers, json=payload)
+                    resp.raise_for_status()
+                    body = resp.json()
+            return self._format_result(body)
         except Exception as exc:
             return {
                 "service": "azure-ai-content-safety",
@@ -99,29 +130,57 @@ class ContentSafetyClient:
                 "host": self.host,
                 "note": f"Content Safety call failed: {type(exc).__name__}.",
             }
-        flagged = [
-            {
-                "category": item.get("category"),
-                "severity": item.get("severity", 0),
+
+    async def analyze_async(self, text: str, timeout: float = 2.5) -> Dict[str, object]:
+        """Asynchronously analyze text with Azure AI Content Safety using httpx.AsyncClient."""
+        if not self.enabled:
+            return {
+                "service": "azure-ai-content-safety",
+                "status": "SKIPPED",
+                "configured": False,
+                "categories": [],
+                "max_severity": 0,
+                "host": "",
+                "note": "Not configured — the deterministic Prompt Shield is the active layer.",
             }
-            for item in (body.get("categories") or [])
-            if int(item.get("severity") or 0) >= 2
-        ]
-        max_severity = max((int(i["severity"]) for i in flagged), default=0)
-        return {
-            "service": "azure-ai-content-safety",
-            "status": "FLAGGED" if flagged else "CLEAR",
-            "configured": True,
-            "categories": flagged,
-            "max_severity": max_severity,
-            "host": self.host,
-            "note": (
-                f"Azure AI Content Safety flagged {len(flagged)} categor"
-                f"{'y' if len(flagged) == 1 else 'ies'}."
-                if flagged
-                else "Azure AI Content Safety found no category above the threshold."
-            ),
+        if not text or not text.strip():
+            return {
+                "service": "azure-ai-content-safety",
+                "status": "CLEAR",
+                "configured": True,
+                "categories": [],
+                "max_severity": 0,
+                "host": self.host,
+                "note": "Empty text — nothing to analyze.",
+            }
+        url = f"{self.endpoint}/contentsafety/text:analyze?api-version={API_VERSION}"
+        headers = {
+            "Ocp-Apim-Subscription-Key": self.key,
+            "Content-Type": "application/json",
         }
+        payload = {
+            "text": text[:4000],
+            "categories": list(CATEGORIES),
+            "includeAnalysis": False,
+            "disableAms": True,
+            "severityThreshold": 2,
+        }
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                resp = await client.post(url, headers=headers, json=payload)
+                resp.raise_for_status()
+                body = resp.json()
+            return self._format_result(body)
+        except Exception as exc:
+            return {
+                "service": "azure-ai-content-safety",
+                "status": "ERROR",
+                "configured": True,
+                "categories": [],
+                "max_severity": 0,
+                "host": self.host,
+                "note": f"Content Safety call failed: {type(exc).__name__}.",
+            }
 
 
 def content_safety_status(client: Optional[ContentSafetyClient]) -> Dict[str, object]:

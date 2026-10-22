@@ -52,7 +52,7 @@ class WarRoomMixin:
         try:
             tools = self._war_room_tools(ctx)
             result = await asyncio.wait_for(
-                asyncio.to_thread(self._run_war_room_debate, ctx, tools, fallback), 22.0
+                self._run_war_room_debate_async(ctx, tools, fallback), 22.0
             )
             self.last_used = True
             return result
@@ -106,6 +106,107 @@ class WarRoomMixin:
         if line_shift:
             tools["defensive_line_shift"] = line_shift
         return tools
+
+    async def _run_war_room_debate_async(self, ctx: dict, tools: dict, fallback: dict) -> dict:
+        """Sequential three-turn debate executed asynchronously via non-blocking _achat."""
+        calls: List[dict] = []
+        turns: List[dict] = []
+        statements: Dict[str, str] = {}
+        degraded_turns: List[str] = []
+        arbiter_payload: dict = {}
+
+        for spec in WAR_ROOM_AGENTS:
+            deployment = (
+                self.s.narrative_deployment
+                if spec["deployment"] == "narrative"
+                else self.s.triage_deployment
+            )
+            bundle = {name: tools[name] for name in spec["tools"] if name in tools}
+            t0 = time.perf_counter()
+            raw = await self._achat(
+                deployment,
+                [
+                    {"role": "system", "content": spec["system"]},
+                    {"role": "user", "content": json.dumps({
+                        "brief": ctx.get("query") or "Adversarial bench war-room on the live match.",
+                        "telemetry": self._compact_ctx(ctx),
+                        "your_tools": bundle,
+                        "prior_turns": turns,
+                        "output_contract": spec["contract"],
+                    })},
+                ],
+                max_tokens=spec["max_tokens"],
+                temperature=spec["temperature"],
+                timeout=spec["timeout"],
+                json_mode=True,
+            )
+            latency = round((time.perf_counter() - t0) * 1000.0, 1)
+            parsed = self._parse_agent_json(raw)
+            usage = self.last_usage or {}
+            calls.append({
+                "id": spec["id"],
+                "agent": spec["agent"],
+                "role": spec["role"],
+                "deployment": deployment,
+                "tools": list(bundle.keys()),
+                "latency_ms": latency,
+                "prompt_tokens": usage.get("prompt_tokens"),
+                "completion_tokens": usage.get("completion_tokens"),
+                "total_tokens": usage.get("total_tokens"),
+            })
+            turn_text = (
+                parsed.get("statement")
+                or parsed.get("arbiter_verdict")
+                or ""
+            )
+            if not turn_text:
+                degraded_turns.append(spec["agent"])
+                turn_text = (
+                    f"{spec['agent']} returned a response the studio could not parse; "
+                    f"the deterministic Stage B reading is being used instead."
+                )
+            turns.append({"agent": spec["agent"], "turn": spec["turn"], "statement": turn_text})
+            statements[spec["id"]] = turn_text
+            if spec["id"] == "spatial_arbiter":
+                arbiter_payload = parsed
+
+        prescription = fallback
+        required = (
+            "recommended_adjustment", "projected_30s_xt_delta",
+            "win_prob_shift_pct", "target_zones",
+        )
+        if all(k in arbiter_payload for k in required):
+            prescription = {
+                **fallback,
+                "recommended_adjustment": arbiter_payload["recommended_adjustment"],
+                "projected_30s_xt_delta": arbiter_payload["projected_30s_xt_delta"],
+                "win_prob_shift_pct": arbiter_payload["win_prob_shift_pct"],
+                "target_zones": arbiter_payload["target_zones"],
+                "adjustment_vectors": arbiter_payload.get(
+                    "adjustment_vectors", fallback["adjustment_vectors"]),
+            }
+
+        return {
+            **prescription,
+            "agent_debate_transcript": {
+                "manager_proposal": statements.get("nla_tactical_manager", ""),
+                "scout_counter": statements.get("mcs_opposition_scout", ""),
+                "arbiter_verdict": statements.get("spatial_arbiter", ""),
+            },
+            "agent_calls": calls,
+            "degraded": bool(degraded_turns),
+            "degraded_agents": degraded_turns,
+            "orchestration": {
+                "mode": "sequential_debate",
+                "rounds": len(calls),
+                "agents": [c["agent"] for c in calls],
+                "tool_surface": sorted(tools.keys()),
+                "note": "Each agent is a separate model call with its own tool bundle; "
+                        "the scout reads the manager and the arbiter reads both.",
+            },
+            "mode": "azure",
+            "model": f"azure-foundry:{self.s.narrative_deployment}",
+        }
 
     def _run_war_room_debate(self, ctx: dict, tools: dict, fallback: dict) -> dict:
         """Sequential three-turn debate. Each turn is a separate model call."""

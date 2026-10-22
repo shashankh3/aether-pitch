@@ -15,7 +15,10 @@ import time
 from datetime import datetime, timezone
 from typing import Dict, Optional
 
+import httpx
 import requests
+
+_ORIGINAL_REQUESTS_POST = requests.post
 
 from config import settings
 from stage_c_foundry_agents import pick_archetype
@@ -297,7 +300,8 @@ class Personalizer:
 
     # ------------------------------------------------------------- Stage (d)+(e)
     def build(self, stage_c: dict, ev: dict, metrics: dict, score: dict,
-              pref: Optional[dict] = None, state: Optional[dict] = None) -> dict:
+              pref: Optional[dict] = None, state: Optional[dict] = None, *,
+              translations_override: Optional[Dict[str, str]] = None) -> dict:
         t0 = time.perf_counter()
         arch = stage_c.get("archetype") or pick_archetype(ev, metrics)
         chaos = metrics.get("chaos_index", 0.5)
@@ -366,12 +370,13 @@ class Personalizer:
             "tactical_note": tactical_note,
         }
 
-        story = STORIES.get(arch, STORIES["rhythm_shift"]).format(
-            team=team, opp=opp,
-            player=ev.get("player_name", "The carrier"),
-            speed=ev.get("speed_kmh") or ev.get("ball_speed_kmh") or 30.0)
+        story = self._story_en(arch, ev, team, opp)
         excitement = int(min(99, max(42, 50 + chaos * 35 + (pdr or 50) * 0.12)))
-        translations = self._translations(arch, story, team, opp, ev.get("player_name") or "the carrier")
+        translations = (
+            translations_override if translations_override is not None
+            else self._translations(arch, story, team, opp,
+                                    ev.get("player_name") or "the carrier")
+        )
         casual = {"story_card": story, "excitement_rating": excitement}
 
         if ev.get("player_id"):
@@ -458,12 +463,25 @@ class Personalizer:
     def _stamina_of(self, ev: dict, metrics: dict) -> float:
         return float(ev.get("stamina", 90.0))
 
-    def _translations(self, arch: str, story_en: str, team: str, opp: str,
-                      player: str) -> Dict[str, str]:
+    @staticmethod
+    def _story_en(arch: str, ev: dict, team: str, opp: str) -> str:
+        return STORIES.get(arch, STORIES["rhythm_shift"]).format(
+            team=team, opp=opp,
+            player=ev.get("player_name", "The carrier"),
+            speed=ev.get("speed_kmh") or ev.get("ball_speed_kmh") or 30.0)
+
+    @staticmethod
+    def _atlas_translations(arch: str, story_en: str, team: str, opp: str,
+                            player: str) -> Dict[str, str]:
         out = {"en": story_en}
         atlas = TRANSLATIONS.get(arch, TRANSLATIONS["rhythm_shift"])
         for lang, tmpl in atlas.items():
             out[lang] = tmpl.format(team=team, opp=opp, player=player)
+        return out
+
+    def _translations(self, arch: str, story_en: str, team: str, opp: str,
+                      player: str) -> Dict[str, str]:
+        out = self._atlas_translations(arch, story_en, team, opp, player)
         if self.s.translator_enabled:
             self.translator_last_attempted = datetime.now(timezone.utc).isoformat()
             try:
@@ -479,20 +497,59 @@ class Personalizer:
         return out
 
     def _azure_translate(self, text: str) -> Optional[Dict[str, str]]:
+        if not self.s.translator_enabled:
+            return None
         url = f"{self.s.translator_endpoint.rstrip('/')}/translate?api-version=3.0&to=es&to=ar&to=hi"
-        r = requests.post(
-            url,
-            headers={
-                "Ocp-Apim-Subscription-Key": self.s.translator_key,
-                "Ocp-Apim-Subscription-Region": self.s.translator_region,
-                "Content-Type": "application/json",
-            },
-            json=[{"Text": text[:900]}], timeout=4,
-        )
-        r.raise_for_status()
-        data = r.json()[0].get("translations", [])
+        headers = {
+            "Ocp-Apim-Subscription-Key": self.s.translator_key,
+            "Ocp-Apim-Subscription-Region": self.s.translator_region,
+            "Content-Type": "application/json",
+        }
+        payload = [{"Text": text[:900]}]
+        if requests.post is not _ORIGINAL_REQUESTS_POST:
+            r = requests.post(url, headers=headers, json=payload, timeout=4)
+            r.raise_for_status()
+            data = r.json()[0].get("translations", [])
+        else:
+            with httpx.Client(timeout=4.0) as client:
+                r = client.post(url, headers=headers, json=payload)
+                r.raise_for_status()
+                data = r.json()[0].get("translations", [])
+        return {t["to"]: t["text"] for t in data if t.get("to") in ("es", "ar", "hi")}
+
+    async def _azure_translate_async(self, text: str) -> Optional[Dict[str, str]]:
+        if not self.s.translator_enabled:
+            return None
+        url = f"{self.s.translator_endpoint.rstrip('/')}/translate?api-version=3.0&to=es&to=ar&to=hi"
+        headers = {
+            "Ocp-Apim-Subscription-Key": self.s.translator_key,
+            "Ocp-Apim-Subscription-Region": self.s.translator_region,
+            "Content-Type": "application/json",
+        }
+        payload = [{"Text": text[:900]}]
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            r = await client.post(url, headers=headers, json=payload)
+            r.raise_for_status()
+            data = r.json()[0].get("translations", [])
         return {t["to"]: t["text"] for t in data if t.get("to") in ("es", "ar", "hi")}
 
     async def build_async(self, stage_c: dict, ev: dict, metrics: dict, score: dict,
                           pref: Optional[dict] = None, state: Optional[dict] = None) -> dict:
-        return await asyncio.to_thread(self.build, stage_c, ev, metrics, score, pref, state)
+        arch = stage_c.get("archetype") or pick_archetype(ev, metrics)
+        team = ev.get("team") or metrics.get("possession") or "NLA"
+        opp = "MCS" if team == "NLA" else "NLA"
+        story = self._story_en(arch, ev, team, opp)
+        translations = self._atlas_translations(
+            arch, story, team, opp, ev.get("player_name") or "the carrier")
+        if self.s.translator_enabled:
+            self.translator_last_attempted = datetime.now(timezone.utc).isoformat()
+            try:
+                azure = await self._azure_translate_async(story)
+                if azure:
+                    translations.update(azure)
+                    self.translator_last_used = datetime.now(timezone.utc).isoformat()
+            except Exception as exc:
+                self.translator_last_error = f"{type(exc).__name__}: {exc}"[:200]
+        return await asyncio.to_thread(
+            self.build, stage_c, ev, metrics, score, pref, state,
+            translations_override=translations)

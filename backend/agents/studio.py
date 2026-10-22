@@ -29,7 +29,7 @@ class StudioQueryMixin:
             self.last_attempted = True
             try:
                 raw = await asyncio.wait_for(
-                    asyncio.to_thread(self._azure_studio_query, ctx, fallback), 8.0
+                    self._azure_studio_query_async(ctx, fallback), 6.0
                 )
                 # structural guard: fall back if the model dropped required keys
                 required = ("agent_reasoning_chain", "studio_answer_localized",
@@ -48,6 +48,31 @@ class StudioQueryMixin:
                 self.last_error = f"{type(exc).__name__}: {exc}"
         return self.apply_safety_shield(
             {**fallback, "mode": "fallback"}, ctx, fallback=fallback)
+
+    async def _azure_studio_query_async(self, ctx: dict, fallback: dict) -> dict:
+        raw = await self._achat(
+            self.s.narrative_deployment,
+            [{"role": "system", "content":
+              "You are The 12th Man, an agentic broadcast studio co-pilot wired into a live "
+              "3D tactical engine. Given the query and the live 60s spatial telemetry, return "
+              "STRICT JSON only (no markdown) with keys: "
+              "answer (the same 2-3 sentence answer in the requested language), "
+              "agent_specialist (one of Match Analyst, Spatial Analyst, Ghost-Pass Counterfactual, Story Director), "
+              "grounding_citations (array of 2-3 objects with label, value, source, detail), "
+              "suggested_actions (array of 2-3 objects with id, label, type, payload, reason; type in "
+              "[FOCUS_GAP, LOCK_PLAYER, SHOW_GHOST_PASS, GENERATE_RECAP]), "
+              "agent_reasoning_chain (array of exactly 3 short reasoning steps citing the numbers), "
+              "studio_answer_localized (2-3 sentences in the requested language), "
+              "commentator_cue_15s (one punchy 15-second commentator line), "
+              "scene_directive (object with keys camera_mode in [TELE_BROADCAST, TACTICAL_DRONE, "
+              "PLAYER_LOCK_3RD_PERSON, ACTION_ZOOM], spotlight_player_ids (<=3 ids), "
+              "enable_offside_wall (bool), enable_compactness_polygon (bool), draw_ghost_pass (bool), "
+              "highlight_pitch_zone ({x_min,x_max,y_min,y_max,label}) using the provided spatial stats."},
+             {"role": "user", "content": json.dumps(self._compact_ctx(ctx))}],
+            max_tokens=550, temperature=0.4, timeout=5.0, json_mode=True,
+        )
+        cleaned = re.sub(r"^```(json)?|```$", "", (raw or "").strip(), flags=re.M).strip()
+        return json.loads(cleaned)
 
     def _azure_studio_query(self, ctx: dict, fallback: dict) -> dict:
         raw = self._chat(
