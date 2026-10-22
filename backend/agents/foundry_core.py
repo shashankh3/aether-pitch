@@ -10,7 +10,7 @@ from typing import Dict, List, Optional
 import httpx
 import requests
 
-from circuit_breaker import CircuitBreaker, CircuitBreakerOpenError
+from circuit_breaker import CircuitBreaker
 from config import settings
 from content_safety import ContentSafetyClient
 from rai_shield import build_safety_shield, detect_prompt_risk, shield_deflection
@@ -110,8 +110,6 @@ class FoundryRouterBase:
         grounded = int(gate_stats.get("grounding_pass", 0))
         coherence = (grounded / published) if published else None
 
-        protected = shield.get("prompt_shield_status") == "PROTECTED"
-        shield_score = 1.0 if protected or not shield else 1.0
         breaches = 0 if (shield.get("club_neutrality_pass", True)
                          and shield.get("numeric_grounding_pass", True)) else 1
 

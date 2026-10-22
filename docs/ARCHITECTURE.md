@@ -30,7 +30,7 @@ backend/
   stage_a_synthetic_engine.py 1,075 LOC  Stage A — the simulation
   stage_b_math_engine.py        870 LOC  Stage B — the mathematics
   stage_c_foundry_agents.py       36 LOC  stable re-export barrel
-  agents/                     1,843 LOC  Foundry router package (8 modules)
+  agents/                     1,841 LOC  Foundry router package (8 modules)
   stage_d_e_personalizer.py     555 LOC  Stage D/E — render + personalise
   agent_trace.py                231 LOC  grounded handoff trace
   rai_shield.py                 311 LOC  prompt shield + neutrality + grounding
@@ -61,7 +61,7 @@ frontend/src/
   lib/useModalA11y.ts            72 LOC  focus trap + escape handling
   lib/utils.ts                   14 LOC  shared class-name helper
   lib/api.ts                      6 LOC  the REST client
-  app/page.tsx                1,349 LOC  the orchestrator
+  app/page.tsx                1,352 LOC  the orchestrator
   app/layout.tsx                121 LOC  runtime config injection + error boundary
   hooks/useResilientMatchEngine.ts  336 LOC  WS + edge failover + drill
   hooks/useSpeechController.ts      129 LOC  zero-overlap speech

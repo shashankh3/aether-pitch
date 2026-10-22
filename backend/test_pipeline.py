@@ -2470,7 +2470,7 @@ def main() -> int:
         # every market language, never the English sentence with a short
         # translated prefix glued on, and no placeholder left unsubstituted.
         from stage_d_e_personalizer import STORIES, TRANSLATIONS
-        atlas_bad: List[str] = []
+        atlas_bad: list[str] = []
         fmt = {"team": "NLA", "opp": "MCS", "player": "D. Keswick", "speed": 31.6}
         for arch, story in STORIES.items():
             if arch not in TRANSLATIONS:

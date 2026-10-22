@@ -312,18 +312,21 @@ function StudioOrchestrator() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.repeat) return;
+      const modalOpen = !!document.querySelector('[aria-modal="true"]');
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        if (modalOpen && !commandOpen) return;
         e.preventDefault();
         setCommandOpen((open) => !open);
         return;
       }
-      if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
       const target = e.target as HTMLElement | null;
       if (target && (
         target.tagName === "INPUT" || target.tagName === "TEXTAREA"
         || target.tagName === "SELECT" || target.isContentEditable
       )) return;
-      if (document.querySelector('[aria-modal="true"]')) return;
+      if (modalOpen) return;
       const key = e.key.toLowerCase();
       if (key === "f") {
         e.preventDefault();
@@ -351,7 +354,7 @@ function StudioOrchestrator() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [alphaMode, cinemaMode, inject, busy, toggleFullscreen, openControlCenter, setShortcutsOpen]);
+  }, [alphaMode, cinemaMode, commandOpen, inject, busy, toggleFullscreen, openControlCenter, setShortcutsOpen]);
 
   // ---- pill targets: locked / carrier / receiver / spotlighted / sprinters ----
   const keySig = tick

@@ -33,12 +33,16 @@ export default function BootSequence() {
 
   useEffect(() => {
     if (phase !== "boot") return;
-    const skip = () => setPhase("leave");
-    window.addEventListener("pointerdown", skip, { once: true });
-    window.addEventListener("keydown", skip, { once: true });
+    const skip = (event: Event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setPhase("leave");
+    };
+    window.addEventListener("pointerdown", skip, { capture: true, once: true });
+    window.addEventListener("keydown", skip, { capture: true, once: true });
     return () => {
-      window.removeEventListener("pointerdown", skip);
-      window.removeEventListener("keydown", skip);
+      window.removeEventListener("pointerdown", skip, true);
+      window.removeEventListener("keydown", skip, true);
     };
   }, [phase]);
 
