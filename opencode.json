@@ -3,8 +3,8 @@
   "permission": {
     "question": "deny",
     "task": { "*": "allow" },
-    "webfetch": { "*": "allow" },
-    "websearch": { "*": "allow" },
+    "webfetch": "allow",
+    "websearch": "allow",
     "read": {
       "*": "allow",
       "*.env": "deny",

@@ -8,6 +8,13 @@
     bearings from AUTONOMOUS_BACKLOG.md / AUTONOMOUS_LOG.md, so state survives
     between iterations.
 
+    Robustness:
+      * model failover - if the primary model errors, the next in the list is
+        tried within the same iteration
+      * loud failure - if every model fails for N consecutive iterations the
+        loop aborts instead of spinning uselessly
+      * clean stop - drop a STOP_OVERNIGHT file in the repo root
+
     The loop is detached from any interactive shell - stdout and stderr go to a
     log file, so it will not hold a terminal open.
 
@@ -20,6 +27,10 @@
 .PARAMETER Branch
     Branch the agent must be on. Default overnight-auto-improve.
 
+.PARAMETER Models
+    Comma-separated model list, tried in order. Default kimi-k3 -> glm-5p3 ->
+    the free OpenRouter MiniMax.
+
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\overnight-watchdog.ps1
 #>
@@ -31,6 +42,8 @@ param(
     [string]$PromptFile = 'overnight_prompt.md',
     [string]$LogDir = 'logs\overnight',
     [string]$StopFile = 'STOP_OVERNIGHT',
+    [string]$Models = 'fireworks-ai/accounts/fireworks/models/kimi-k3,fireworks-ai/accounts/fireworks/models/glm-5p3,openrouter/minimax/minimax-m3.1-flash:free',
+    [int]$MaxConsecutiveFailures = 5,
     [switch]$DryRun
 )
 
@@ -44,6 +57,7 @@ $log = Join-Path $LogDir "watchdog-$stamp.log"
 $status = Join-Path $LogDir 'overnight_status.json'
 $iterations = Join-Path $LogDir 'overnight_iterations.jsonl'
 $lockFile = Join-Path $LogDir 'watchdog.lock'
+$modelList = $Models -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
 
 function Say([string]$m) {
     $line = "[{0}] {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $m
@@ -88,11 +102,13 @@ if ($branchNow.Trim() -ne $Branch) {
 
 $opencodeVer = (& opencode --version 2>&1 | Select-Object -First 1)
 $endTime = (Get-Date).AddHours($Hours)
-Say "watchdog start - opencode $($opencodeVer.Trim()) - window $($Hours)h - ends $($endTime.ToString('yyyy-MM-dd HH:mm:ss'))"
+Say "watchdog start - opencode $($opencodeVer.Trim()) - window $Hours h - ends $($endTime.ToString('yyyy-MM-dd HH:mm:ss'))"
 Say "repo $repoRoot | branch $Branch | log $log"
+Say "model failover order: $($modelList -join ' -> ')"
 
 $iteration = 0
-$headBefore = (git rev-parse --short HEAD 2>$null)
+$consecutiveFailures = 0
+$lastModel = ''
 
 while ((Get-Date) -lt $endTime) {
     $iteration++
@@ -107,46 +123,70 @@ while ((Get-Date) -lt $endTime) {
 
     Say "--- iteration $iteration starting (${remaining}s remaining) ---"
 
-    $promptText = Get-Content -LiteralPath $PromptFile -Raw -Encoding UTF8
-    $headBefore = (git rev-parse --short HEAD 2>$null)
-
-    # The prompt is attached as a file (not a giant argv string) so quoting and
-    # newlines survive; the message tells the agent to read it first.
-    $message = @'
+    $message = @"
 Read the attached `overnight_prompt.md` FIRST and follow it exactly.
 It is your complete brief for this session. Begin at section 0 (ORIENTATION).
 Do not ask questions - no one is there to answer them.
-Work on the `overnight-auto-improve` branch, run the full verification gate
-before every commit, and keep going until the window closes.
-'@
+Work on the `$Branch` branch, run the full verification gate before every commit,
+and keep going until the window closes.
+"@
 
+    $headBefore = (git rev-parse --short HEAD 2>$null)
     $outFile = Join-Path $LogDir "iter-$stamp-$iteration.log"
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $usedModel = ''
+    $code = 1
+    $allOut = @()
 
-    try {
-        if ($DryRun) {
-            $result = "DRY RUN - opencode not launched. Prompt chars: $($promptText.Length)"
-            $code = 0
-        } else {
-            $result = & opencode run --auto --print-logs --log-level INFO `
-                --file $PromptFile $message 2>&1
-            $code = $LASTEXITCODE
+    foreach ($model in $modelList) {
+        Say "    trying model $model"
+        try {
+            if ($DryRun) {
+                $out = "DRY RUN - model $model not launched."
+                $code = 0
+            } else {
+                # NOTE: the message must come BEFORE --file, otherwise the
+                # positional is swallowed by the --file array option.
+                $out = & opencode run --auto --print-logs --log-level INFO `
+                    --title "overnight-iter-$iteration" -m $model $message `
+                    "--file=$PromptFile" 2>&1
+                $code = $LASTEXITCODE
+            }
+        } catch {
+            $out = $_ | Out-String
+            $code = 1
         }
-    } catch {
-        $result = $_ | Out-String
-        $code = 1
+        $allOut += "===== model: $model (exit $code) ====="
+        $allOut += ($out | Out-String)
+        if ($code -eq 0) { $usedModel = $model; break }
+        Say "    model $model failed (exit $code) - trying next"
     }
     $sw.Stop()
 
-    $result | Out-File -LiteralPath $outFile -Encoding UTF8
+    $allOut | Out-File -LiteralPath $outFile -Encoding UTF8
     $headAfter = (git rev-parse --short HEAD 2>$null)
 
-    Say "--- iteration $iteration done: exit=$code in $([int]$sw.Elapsed.TotalSeconds)s; HEAD $headBefore -> $headAfter ---"
+    if ($code -eq 0) {
+        $consecutiveFailures = 0
+        $lastModel = $usedModel
+        Say "--- iteration $iteration done: OK via $usedModel in $([int]$sw.Elapsed.TotalSeconds)s; HEAD $headBefore -> $headAfter ---"
+    } else {
+        $consecutiveFailures++
+        Say "--- iteration $iteration FAILED: every model errored (exit $code) in $([int]$sw.Elapsed.TotalSeconds)s; HEAD $headBefore -> $headAfter ---"
+        if ($consecutiveFailures -ge $MaxConsecutiveFailures) {
+            Say "FATAL: $consecutiveFailures consecutive failed iterations - aborting the loop rather than spinning."
+            @{ status = 'aborted'; reason = "$consecutiveFailures consecutive failures"; iteration = $iteration
+               head = $headAfter; ended = (Get-Date).ToString('o'); log = $log } |
+                ConvertTo-Json | Set-Content -LiteralPath $status -Encoding UTF8
+            break
+        }
+    }
 
     $record = [ordered]@{
         iteration   = $iteration
         started_utc = (Get-Date).ToUniversalTime().ToString('o')
         exit_code   = $code
+        model       = $usedModel
         seconds     = [int]$sw.Elapsed.TotalSeconds
         head_before = $headBefore
         head_after  = $headAfter
@@ -154,7 +194,7 @@ before every commit, and keep going until the window closes.
     }
     Add-Content -LiteralPath $iterations -Value ($record | ConvertTo-Json -Compress) -Encoding UTF8
 
-    @{ status = 'running'; iteration = $iteration; head = $headAfter
+    @{ status = 'running'; iteration = $iteration; head = $headAfter; model = $usedModel
        ends = $endTime.ToString('o'); log = $log } |
         ConvertTo-Json | Set-Content -LiteralPath $status -Encoding UTF8
 
@@ -167,7 +207,7 @@ before every commit, and keep going until the window closes.
 }
 
 Say "watchdog finished after $iteration iteration(s). Window closed."
-@{ status = 'finished'; iterations = $iteration
+@{ status = 'finished'; iterations = $iteration; model = $lastModel
    head = (git rev-parse --short HEAD 2>$null)
    ended = (Get-Date).ToString('o'); log = $log } |
     ConvertTo-Json | Set-Content -LiteralPath $status -Encoding UTF8
