@@ -518,13 +518,13 @@ Run through this immediately before you submit the repo and record the video.
 | # | Step | Command / action | Pass condition |
 |---|------|------------------|----------------|
 | 1 | Confirm doc hygiene | `grep -rniE "sandbox\|not implemented\|todo\|fixme\|unverified" README.md SUBMISSION_GUIDE.md` | No internal engineering notes in the judge-facing docs |
-| 2 | Backend suite | `python backend/test_pipeline.py` | `RESULT: ALL 191 PIPELINE TESTS PASSED` |
+| 2 | Backend suite | `python backend/test_pipeline.py` | `RESULT: ALL 215 PIPELINE TESTS PASSED` |
 | 3 | ARM template | `python infra/validate_template.py` | `RESULT: ARM TEMPLATE VALIDATION PASSED` |
 | 3b | Documentation lint | `python tools/doc_lint.py` | `RESULT: DOC LINT PASSED` |
 | 4 | Frontend types | `cd frontend && npx tsc --noEmit` | No output |
 | 5 | Production build | `npm run build` | `✓ Compiled successfully` |
 | 6 | SSR smoke | `npm run smoke` | `RESULT: SSR SMOKE PASSED` |
-| 6b | Headless logic | `npm run check:logic` | `RESULT: ALL 37 FRONTEND LOGIC CHECKS PASSED` |
+| 6b | Headless logic | `npm run check:logic` | `RESULT: ALL 40 FRONTEND LOGIC CHECKS PASSED` |
 | 6c | Headless UI render | `npm run smoke:ui` | `RESULT: ALL 30 COMPONENT RENDER CHECKS PASSED` |
 | 7 | **Live visual boot** | Terminal 1: `cd backend && python -m uvicorn main:app --reload --port 8000`<br>Terminal 2: `cd frontend && npm run dev` | 3D canvas renders at 60 FPS; no console errors |
 | 8 | Colourblind palette | Controls → **Fan** → toggle the palette | 3D defensive lasers and HUD pills shift to cyan/amber |
@@ -570,7 +570,7 @@ cd ../frontend
 npx tsc --noEmit
 npm run build
 npm run smoke          # server-rendered smoke test: 200, runtime config, no SSR errors
-npm run check:logic    # 37 headless assertions: browser twin, sandbox, ledger, dossier, DVR
+npm run check:logic    # 40 headless assertions: browser twin, sandbox, ledger, dossier, DVR
 npm run smoke:ui       # 30 assertions: every judge-facing HUD surface renders
 
 cd ..
@@ -585,7 +585,7 @@ page renders with the runtime configuration injected and no SSR error, then
 shuts down — it leaves no background process behind. `npm run check:logic` and
 `npm run smoke:ui` are pure Node: no server, no browser, no network.
 
-Together the four suites make **258 automated assertions** with zero dependencies
+Together the four suites make **285 automated assertions** with zero dependencies
 beyond what the project already ships. `python tools/doc_lint.py` re-runs the
 three headless suites and proves that every assertion count, `/api` path,
 `npm run` script and module size quoted in this guide, the README and

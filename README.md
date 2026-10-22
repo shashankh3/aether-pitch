@@ -14,7 +14,7 @@
 [![Synthetic Data](https://img.shields.io/badge/data-100%25%20synthetic-6f42c1)](#synthetic-data)
 
 **Repository:** `github.com/shashankh3/aether-pitch` · **Branch:** `main`
-**Scale:** 112 tracked files · ~25,600 LOC of Python + TypeScript (77 source files) · **258 automated assertions** (191 backend · 37 headless logic · 30 headless UI render) · 16-resource Azure ARM template
+**Scale:** 113 tracked files · ~26,681 LOC of Python + TypeScript (78 source files) · **285 automated assertions** (215 backend · 40 headless logic · 30 headless UI render) · 16-resource Azure ARM template
 
 > **The hook:** *AETHER PITCH is a live 3D football broadcast where every number on screen is computed by transparent football mathematics, every AI claim is graded by a deterministic numeric critic, and the cloud can die mid-match without the picture ever dropping a frame.*
 
@@ -289,9 +289,9 @@ BROWSER CLIENT (Next.js 14 / React 18 / React Three Fiber)
 FASTAPI BACKEND ENGINE (10 Hz deterministic loop)
   ├─ Stage A  Synthetic ingest (1,075 LOC) ──► kinematics, ball physics, auto-eventing, bio-load twin
   ├─ Stage B  Deterministic math (858 LOC) ──► xT grid, PDR, PPDA, Chaos, pitch control, ghost pass
-  ├─ Stage C  Foundry agent router (1,520 LOC) ──► 4-node insight pipeline + 3-turn war-room
+  ├─ Stage C  Foundry agent router (1,532 LOC) ──► 4-node insight pipeline + 3-turn war-room
   ├─ RAI & numeric critic (689 LOC) ──► prompt shield + grounding verifier + club-neutrality gate
-  └─ Stage D & E  Personalizer (447 LOC) ──► camera directives, overlays, persona & i18n
+  └─ Stage D & E  Personalizer (498 LOC) ──► camera directives, overlays, persona & i18n
         │
         ├──► Azure AI Foundry (Azure OpenAI: gpt-4o narrative / gpt-4o-mini triage)
         ├──► Azure AI Translator (real-time EN / ES / AR / HI broadcast localization)

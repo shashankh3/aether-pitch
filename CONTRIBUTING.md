@@ -14,6 +14,10 @@ python infra/validate_template.py
 # 3. Documentation lint — every number, endpoint and script in the docs is true
 python tools/doc_lint.py
 
+#    If it fails on a stale figure, fix it from the measurement rather than by
+#    hand:  python tools/sync_docs.py
+#    (--check reports what would change without writing)
+
 # 4. Type safety across the whole contract surface
 cd frontend && npx tsc --noEmit
 

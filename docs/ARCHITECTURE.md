@@ -29,15 +29,15 @@ network.
 backend/
   stage_a_synthetic_engine.py 1,075 LOC  Stage A — the simulation
   stage_b_math_engine.py        858 LOC  Stage B — the mathematics
-  stage_c_foundry_agents.py   1,520 LOC  Stage C — Foundry routing + agents
-  stage_d_e_personalizer.py     447 LOC  Stage D/E — render + personalise
+  stage_c_foundry_agents.py   1,532 LOC  Stage C — Foundry routing + agents
+  stage_d_e_personalizer.py     498 LOC  Stage D/E — render + personalise
   agent_trace.py                231 LOC  grounded handoff trace
   rai_shield.py                 311 LOC  prompt shield + neutrality + grounding
   content_safety.py             147 LOC  Azure AI Content Safety (optional)
-  counterfactual.py             338 LOC  what-if contract + evaluation (no globals)
-  config.py                      83 LOC  environment + runtime configuration
-  main.py                     1,182 LOC  HTTP/WS surface + match loop
-  test_pipeline.py            2,035 LOC  191 assertions
+  counterfactual.py             358 LOC  what-if contract + evaluation (no globals)
+  config.py                      98 LOC  environment + runtime configuration
+  main.py                     1,277 LOC  HTTP/WS surface + match loop
+  test_pipeline.py            2,211 LOC  215 assertions
 
 frontend/src/
   lib/edgeEngine.ts           1,707 LOC  the browser-native twin
@@ -157,13 +157,13 @@ The 3D stage is not an observer feed — it is a sandbox.
 
 | Suite | Command | Covers |
 |---|---|---|
-| Backend | `python backend/test_pipeline.py` | 191 assertions: all five stages, the gate, the trace, the war-room, the counterfactual arbiter, the line shift, the RAI shield, the hub, the retry policy, the xT/pitch-control invariants, the i18n atlas, the REST contract, the compliance audit |
+| Backend | `python backend/test_pipeline.py` | 215 assertions: all five stages, the gate, the trace, the war-room, the counterfactual arbiter, the line shift, the RAI shield, the hub, the retry policy, the xT/pitch-control invariants, the i18n atlas, the REST contract, the compliance audit |
 | ARM | `python infra/validate_template.py` | JSON validity, ARM symbol resolution, dependency integrity, secret handling |
 | Docs | `python tools/doc_lint.py` | Every assertion count, `/api` path, `npm run` script, quoted file path and module size in the judge-facing docs still matches the code |
 | Types | `cd frontend && npx tsc --noEmit` | The whole contract surface |
 | Build | `npm run build` | Production compile |
 | SSR | `npm run smoke` | In-process server render, runtime config injection, no SSR error |
-| Logic | `npm run check:logic` | 37 headless assertions over the browser twin, the sandbox, the ledger, the dossier and the DVR buffer |
+| Logic | `npm run check:logic` | 40 headless assertions over the browser twin, the sandbox, the ledger, the dossier and the DVR buffer |
 | UI render | `npm run smoke:ui` | 30 assertions — every judge-facing surface renders without throwing |
 
 The backend suite also runs the **Official Rules compliance audit** — synthetic

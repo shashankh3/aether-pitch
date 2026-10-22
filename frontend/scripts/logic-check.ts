@@ -655,6 +655,129 @@ check(
   `${telemetry.passLinks.size} links held (cap 96)`,
 );
 
+// ---------------------------------------------------------------------------
+// Accessibility gate: the judge-facing HUD is scanned at build time so the
+// WCAG AA contrast and the accessible-name rules cannot silently regress.
+//
+// A screen reader announces an icon-only control as just "button", and the
+// default Tailwind slate 500/600 fail AA as body text on the dark studio
+// panels (4.02:1 and 2.53:1 against #080F1E). Both are checked here.
+// ---------------------------------------------------------------------------
+{
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+
+  const SRC = path.resolve(process.cwd(), "src");
+  const TAILWIND = path.resolve(process.cwd(), "tailwind.config.ts");
+
+  const read = (p: string): string => fs.readFileSync(p, "utf8");
+
+  const walk = (dir: string): string[] =>
+    fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) return walk(full);
+      return /\.(tsx|ts|css)$/.test(e.name) ? [full] : [];
+    });
+
+  // --- WCAG contrast ------------------------------------------------------
+  const toLinear = (c: number): number =>
+    c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  const luminance = (hex: string): number => {
+    const h = hex.replace("#", "");
+    const r = parseInt(h.slice(0, 2), 16) / 255;
+    const g = parseInt(h.slice(2, 4), 16) / 255;
+    const b = parseInt(h.slice(4, 6), 16) / 255;
+    return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+  };
+  const contrast = (fg: string, bg: string): number => {
+    const a = luminance(fg);
+    const b = luminance(bg);
+    const [hi, lo] = a > b ? [a, b] : [b, a];
+    return (hi + 0.05) / (lo + 0.05);
+  };
+
+  // The panel background the HUD text sits on.
+  const PANEL_BG = "#080F1E";
+  // Default Tailwind slate, overridden by the project where it fails AA.
+  const DEFAULT_SLATE: Record<string, string> = {
+    "100": "#F1F5F9", "200": "#E2E8F0",
+    "300": "#CBD5E1", "400": "#94A3B8", "500": "#64748B", "600": "#475569",
+    "700": "#334155", "800": "#1E293B", "900": "#0F172A",
+  };
+
+  const tw = read(TAILWIND);
+  const override = /slate:\s*\{([\s\S]*?)\}/.exec(tw);
+  const slate: Record<string, string> = { ...DEFAULT_SLATE };
+  if (override) {
+    for (const m of override[1].matchAll(/(\d{3}):\s*"(#[0-9A-Fa-f]{6})"/g)) {
+      slate[m[1]] = m[2];
+    }
+  }
+
+  const files = walk(SRC);
+  const usedTokens = new Set<string>();
+  for (const f of files) {
+    for (const m of read(f).matchAll(/text-slate-(\d{3})/g)) usedTokens.add(m[1]);
+  }
+  // 800/900 are backgrounds, not body text; the palette below only claims to
+  // cover the tokens the HUD actually renders as text.
+  const textTokens = [...usedTokens].filter((t) => Number(t) < 800).sort();
+
+  const failing = textTokens
+    .map((t) => ({ t, ratio: contrast(slate[t] ?? "#000000", PANEL_BG) }))
+    .filter((x) => x.ratio < 4.5);
+
+  check(
+    "A11y: every slate token rendered as text clears WCAG AA (4.5:1)",
+    failing.length === 0,
+    failing.length === 0
+      ? `${textTokens.length} text tokens checked, lowest ${Math.min(
+          ...textTokens.map((t) => contrast(slate[t] ?? "#000000", PANEL_BG)),
+        ).toFixed(2)}:1`
+      : `failing: ${failing.map((f) => `slate-${f.t}=${f.ratio.toFixed(2)}:1`).join(", ")}`,
+  );
+
+  // --- accessible names on icon-only buttons -----------------------------
+  const BUTTON = /<button\b([^>]*)>([\s\S]*?)<\/button>/g;
+  const unnamed: string[] = [];
+  for (const f of files) {
+    if (!f.endsWith(".tsx")) continue;
+    const src = read(f);
+    for (const m of src.matchAll(BUTTON)) {
+      const [, attrs, body] = m;
+      if (/aria-label|aria-labelledby|title=/.test(attrs)) continue;
+      const withoutTags = body.replace(/<[^>]*>/g, " ");
+      const withoutExpr = withoutTags.replace(/\{[^}]*\}/g, " ");
+      const hasText = /[A-Za-z]/.test(withoutExpr) || /["'][A-Za-z][^"']*["']/.test(body);
+      if (hasText) continue;
+      if (!/<(?:[A-Z][A-Za-z0-9]*|svg)\b/.test(body)) continue;
+      const line = src.slice(0, m.index).split("\n").length;
+      unnamed.push(`${path.relative(process.cwd(), f)}:${line}`);
+    }
+  }
+  check(
+    "A11y: every icon-only button carries an accessible name",
+    unnamed.length === 0,
+    unnamed.length === 0 ? "no unnamed icon buttons" : unnamed.join(", "),
+  );
+
+  // --- modal semantics ----------------------------------------------------
+  const dialogFiles = files.filter(
+    (f) => f.endsWith(".tsx") && /useModalA11y\(/.test(read(f)),
+  );
+  const badDialogs = dialogFiles.filter((f) => {
+    const src = read(f);
+    return !/role="dialog"/.test(src) || !/aria-modal/.test(src);
+  });
+  check(
+    "A11y: every focus-trapped panel is announced as a dialog",
+    badDialogs.length === 0,
+    badDialogs.length === 0
+      ? `${dialogFiles.length} focus-trapped panels`
+      : badDialogs.map((f) => path.basename(f)).join(", "),
+  );
+}
+
 // --- cleanup ----------------------------------------------------------------
 clearSandbox();
 clearLedger();

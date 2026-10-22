@@ -61,7 +61,7 @@ export default function PipelineRibbon({
           const seen = pipeline?.payloads?.[s.id];
           return (
             <span key={s.id} className="flex min-w-0 items-center gap-0.5">
-              {i > 0 && <ChevronRight size={8} className="shrink-0 text-slate-700" />}
+              {i > 0 && <ChevronRight size={8} className="shrink-0 text-slate-600" />}
               <span
                 className={cn(
                   "flex min-w-0 items-center gap-1 border border-white/10 bg-black/35 px-1.5 py-0.5",
