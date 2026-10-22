@@ -122,6 +122,8 @@ def _influence_surface(
         base_y = override[1] if override else float(p.get("y", 0.0))
         px = base_x + float(p.get("vx", 0.0)) * 0.45
         py = base_y + float(p.get("vy", 0.0)) * 0.45
+        if not (math.isfinite(px) and math.isfinite(py)):
+            continue  # corrupt telemetry: the player is absent from the surface
         d2 = (_GRID_X - px) ** 2 + (_GRID_Y - py) ** 2
         near = d2 <= _REACH_M2
         if not near.any():
@@ -196,8 +198,14 @@ class TacticalMathEngine:
         return grid
 
     def xt_value(self, team: str, x: float, y: float) -> float:
-        """Bilinear xT at a point for `team` (grid always points at each team's own attack)."""
+        """Bilinear xT at a point for `team` (grid always points at each team's own attack).
+
+        A non-finite coordinate is corrupt telemetry: it is out of play, so it
+        reads as the minimum-threat cell rather than leaking into the surface.
+        """
         xs = x if team == "NLA" else PITCH_L - x
+        if not (math.isfinite(xs) and math.isfinite(y)):
+            return XT_MIN
         fx = _clip(xs / PITCH_L * XT_COLS - 0.5, 0.0, XT_COLS - 1.001)
         fy = _clip(y / PITCH_W * XT_ROWS - 0.5, 0.0, XT_ROWS - 1.001)
         x0, y0 = int(fx), int(fy)

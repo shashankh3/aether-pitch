@@ -1288,8 +1288,12 @@ def main() -> int:
     # ---- vectorised territory attribution must equal the scalar reference --
     import math as _pymath
 
-    def _scalar_split(state: dict) -> dict:
+    def _scalar_split(state: dict, overrides=None) -> dict:
         """The pre-optimisation scalar implementation, kept as a reference."""
+        moved = {
+            o.get("player_id"): (float(o.get("x", 0.0)), float(o.get("y", 0.0)))
+            for o in (overrides or [])
+        }
         nla_cells = mcs_cells = neutral_cells = 0
         for row in range(XT_ROWS):
             for col in range(XT_COLS):
@@ -1299,8 +1303,13 @@ def main() -> int:
                 for pl in state["players"]:
                     if pl.get("role") == "GK":
                         continue
-                    px = float(pl.get("x", 0.0)) + float(pl.get("vx", 0.0)) * 0.45
-                    py = float(pl.get("y", 0.0)) + float(pl.get("vy", 0.0)) * 0.45
+                    ov = moved.get(pl.get("id"))
+                    base_x, base_y = ov if ov else (
+                        float(pl.get("x", 0.0)), float(pl.get("y", 0.0)))
+                    px = base_x + float(pl.get("vx", 0.0)) * 0.45
+                    py = base_y + float(pl.get("vy", 0.0)) * 0.45
+                    if not (_pymath.isfinite(px) and _pymath.isfinite(py)):
+                        continue  # matches the vectorised engine: absent
                     d2 = (cx - px) ** 2 + (cy - py) ** 2
                     if d2 > 400.0:
                         continue
@@ -1332,6 +1341,143 @@ def main() -> int:
             break
     check("Stage b: vectorised territory split equals the scalar reference",
           parity_ok, "192-cell x 22-player attribution")
+
+    # ---- Stage B spatial invariants (property-style fuzz) ----------------
+    import random as _random
+
+    _rng = _random.Random(20261022)
+    fuzz_pts = [(_rng.uniform(-60.0, 165.0), _rng.uniform(-40.0, 108.0))
+                for _ in range(600)]
+    fuzz_pts += [(float("nan"), 34.0), (50.0, float("nan")),
+                 (float("inf"), 0.0), (float("-inf"), PITCH_W),
+                 (0.0, 0.0), (PITCH_L, PITCH_W), (-1e9, 1e9)]
+    xt_bounded = True
+    for fx, fy in fuzz_pts:
+        for team in ("NLA", "MCS"):
+            v = math.xt_value(team, fx, fy)
+            if not (XT_MIN - 1e-12 <= v <= XT_MAX + 1e-12):
+                xt_bounded = False
+    check("Stage b invariants: xT stays inside [XT_MIN, XT_MAX] for any coordinate",
+          xt_bounded, f"{len(fuzz_pts)} fuzzed points incl. NaN/inf")
+    check("Stage b invariants: corrupt (NaN/inf) coordinates read as minimum threat",
+          math.xt_value("NLA", float("nan"), 34.0) == XT_MIN
+          and math.xt_value("MCS", 50.0, float("inf")) == XT_MIN)
+    mirror_xt_ok = True
+    for i in range(421):  # 0.25 m grid: PITCH_L - (PITCH_L - x) is bit-exact
+        fx = i * 0.25
+        for _ in range(12):
+            fy = _rng.uniform(0.0, PITCH_W)
+            if math.xt_value("NLA", fx, fy) != math.xt_value("MCS", PITCH_L - fx, fy):
+                mirror_xt_ok = False
+                break
+    check("Stage b invariants: xT is mirror-symmetric about the halfway line",
+          mirror_xt_ok, "xt(NLA, x, y) == xt(MCS, 105-x, y), 5052 samples")
+    mono_ok = True
+    for fy in (2.0, 17.0, 34.0, 51.0, 66.0):
+        prev = -1.0
+        for i in range(211):
+            v = math.xt_value("NLA", i * (PITCH_L - 0.1) / 210.0, fy)
+            if v < prev - 1e-12:
+                mono_ok = False
+                break
+            prev = v
+    check("Stage b invariants: xT never decreases toward the attacking goal",
+          mono_ok, "5 horizontal sweeps x 211 samples")
+
+    split_neutral = {"nla_territory_pct": 50.0, "mcs_territory_pct": 50.0,
+                     "neutral_pct": 0.0}
+    gk_only = {"players": [
+        {"id": "NLA_1", "team": "NLA", "role": "GK", "x": 5.0, "y": 34.0},
+        {"id": "MCS_1", "team": "MCS", "role": "GK", "x": 100.0, "y": 34.0},
+    ]}
+    check("Stage b invariants: the grid degrades gracefully for an empty squad",
+          math.pitch_control_split({"players": []}) == split_neutral
+          and math.pitch_control_split({}) == split_neutral
+          and math.pitch_control_split(gk_only) == split_neutral,
+          "empty / missing / keeper-only squads all yield 50-50")
+
+    def _mirror_y(state: dict) -> dict:
+        out = dict(state)
+        out["players"] = [
+            {**p, "y": PITCH_W - float(p.get("y", 0.0)),
+             "vy": -float(p.get("vy", 0.0))}
+            for p in state.get("players", [])
+        ]
+        return out
+
+    def _mirror_x_swap(state: dict) -> dict:
+        swap = {"NLA": "MCS", "MCS": "NLA"}
+        out = dict(state)
+        out["players"] = [
+            {**p, "x": PITCH_L - float(p.get("x", 0.0)),
+             "vx": -float(p.get("vx", 0.0)),
+             "team": swap.get(p.get("team"), p.get("team"))}
+            for p in state.get("players", [])
+        ]
+        return out
+
+    outfield_donor = next(p for p in st["players"] if p["role"] != "GK")
+    st_nan = dict(st)
+    st_nan["players"] = list(st["players"]) + [
+        {**outfield_donor, "id": "NLA_99", "x": float("nan")},
+        {**outfield_donor, "id": "NLA_98", "vx": float("nan")},
+    ]
+    check("Stage b invariants: a corrupt player is absent from the territory surface",
+          math.pitch_control_split(st_nan) == math.pitch_control_split(st),
+          "NaN position / velocity cannot neutralise a team's grid")
+
+    partition_ok = mirror_ok = swap_ok = ov_parity_ok = True
+    st_inv = st
+    for _ in range(12):
+        base = math.pitch_control_split(st_inv)
+        vals = (base["nla_territory_pct"], base["mcs_territory_pct"],
+                base["neutral_pct"])
+        if (any(not (0.0 <= v <= 100.0) for v in vals)
+                or abs(sum(vals) - 100.0) > 0.3):
+            partition_ok = False
+        if math.pitch_control_split(_mirror_y(st_inv)) != base:
+            mirror_ok = False
+        swapped = math.pitch_control_split(_mirror_x_swap(st_inv))
+        if (swapped["nla_territory_pct"] != base["mcs_territory_pct"]
+                or swapped["mcs_territory_pct"] != base["nla_territory_pct"]
+                or swapped["neutral_pct"] != base["neutral_pct"]):
+            swap_ok = False
+        movers = _rng.sample(st_inv["players"], 2)
+        overrides = [
+            {"player_id": movers[0]["id"],
+             "x": _rng.uniform(10.0, 95.0), "y": _rng.uniform(5.0, 63.0)},
+            {"player_id": movers[1]["id"],
+             "x": _rng.uniform(10.0, 95.0), "y": _rng.uniform(5.0, 63.0)},
+        ]
+        if _scalar_split(st_inv, overrides) != math.pitch_control_split(
+                st_inv, overrides):
+            ov_parity_ok = False
+        st_inv, raw_inv = eng.tick(0.1)
+        math.update(st_inv, raw_inv, st_inv["t_match"], st_inv.get("scenario"), 0.1)
+    check("Stage b invariants: territory is always a [0,100] partition of ~100%",
+          partition_ok, "12 simulated ticks")
+    check("Stage b invariants: a width-axis mirror leaves the split identical",
+          mirror_ok, "y -> 68-y, vy -> -vy")
+    check("Stage b invariants: a length-axis mirror swaps the two teams' shares",
+          swap_ok, "x -> 105-x with the team labels exchanged")
+    check("Stage b invariants: sandbox overrides match the scalar reference",
+          ov_parity_ok, "24 random displacements across 12 ticks")
+
+    # The influence kernel depends only on relative position: shifting a lone
+    # player by exactly one cell must reproduce the surface one cell over.
+    import numpy as _np
+    from stage_b_math_engine import _influence_surface
+    cell_w = PITCH_L / XT_COLS
+    lone = [{"id": "NLA_7", "team": "NLA", "role": "MID",
+             "x": 30.0, "y": 20.0, "vx": 2.0, "vy": -1.0, "speed_kmh": 18.0}]
+    nla_a, _ = _influence_surface(lone, {})
+    nla_b, _ = _influence_surface([{**lone[0], "x": 30.0 + cell_w}], {})
+    nla_c, _ = _influence_surface(
+        [{**lone[0], "y": 20.0 + PITCH_W / XT_ROWS}], {})
+    check("Stage b invariants: the influence kernel is translation-invariant",
+          _np.allclose(nla_a[:, :-1], nla_b[:, 1:], rtol=1e-9, atol=1e-12)
+          and _np.allclose(nla_a[:-1, :], nla_c[1:, :], rtol=1e-9, atol=1e-12),
+          "a one-cell player shift reproduces the surface one cell over")
 
     # ---- model-output boundary + preference normalisation ---------------
     parse = FoundryRouter._parse_agent_json

@@ -14,7 +14,7 @@
 [![Synthetic Data](https://img.shields.io/badge/data-100%25%20synthetic-6f42c1)](#synthetic-data)
 
 **Repository:** `github.com/shashankh3/aether-pitch` · **Branch:** `main`
-**Scale:** 108 tracked files · ~14,000 LOC (Python 3.11 + TypeScript 5 / React 18) · **201 automated assertions** (143 backend · 28 headless logic · 30 headless UI render) · 16-resource Azure ARM template
+**Scale:** 108 tracked files · ~14,000 LOC (Python 3.11 + TypeScript 5 / React 18) · **220 automated assertions** (154 backend · 36 headless logic · 30 headless UI render) · 16-resource Azure ARM template
 
 > **The hook:** *AETHER PITCH is a live 3D football broadcast where every number on screen is computed by transparent football mathematics, every AI claim is graded by a deterministic numeric critic, and the cloud can die mid-match without the picture ever dropping a frame.*
 

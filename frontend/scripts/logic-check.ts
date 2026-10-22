@@ -43,7 +43,7 @@ import {
 } from "../src/lib/ledgerStore";
 import { buildDossier, dossierToMarkdown } from "../src/lib/dossier";
 import type {
-  MatchRecapStoryboard, MatchTick, PlayerTick, RecapAct,
+  MatchRecapStoryboard, MatchTick, PlayerTick, RecapAct, Team,
 } from "../src/lib/types";
 
 let failures = 0;
@@ -162,6 +162,145 @@ check(
   "the vectorised browser twin equals the scalar reference",
   parityOk,
   "192-cell x 22-player attribution",
+);
+
+// --- Stage B spatial invariants (property-style, parity with Stage B) ------
+let lcg = 20261022;
+const rand = () => {
+  lcg = (lcg * 1103515245 + 12345) % 2147483648;
+  return lcg / 2147483648;
+};
+// xT bounds are XT_MIN = 0.004 / XT_MAX = 0.35 (module-private constants).
+let xtBounded = true;
+for (let i = 0; i < 600; i += 1) {
+  const fx = -60 + rand() * 225;
+  const fy = -40 + rand() * 148;
+  const v = calculateXTAtCoord(i % 2 === 0 ? "NLA" : "MCS", fx, fy);
+  if (!(v >= 0.004 - 1e-9 && v <= 0.35 + 1e-9)) xtBounded = false;
+}
+check(
+  "xT stays inside [0.004, 0.350] for any coordinate",
+  xtBounded
+    && calculateXTAtCoord("NLA", Number.NaN, 34) === 0.004
+    && calculateXTAtCoord("MCS", 50, Number.POSITIVE_INFINITY) === 0.004,
+  "600 fuzzed points; corrupt telemetry reads as minimum threat",
+);
+let xtMirror = true;
+for (let i = 0; i < 421 && xtMirror; i += 1) {
+  const fx = i * 0.25; // 0.25 m grid: 105 - (105 - x) is bit-exact
+  for (let j = 0; j < 12; j += 1) {
+    const fy = rand() * 68;
+    const a = calculateXTAtCoord("NLA", fx, fy);
+    const b = calculateXTAtCoord("MCS", 105 - fx, fy);
+    if (Math.abs(a - b) > 5e-4) { // 4dp rounding + 1 ulp; a real bug is O(0.01)
+      xtMirror = false;
+      break;
+    }
+  }
+}
+check(
+  "xT is mirror-symmetric about the halfway line",
+  xtMirror,
+  "xt(NLA, x, y) == xt(MCS, 105-x, y), 5052 samples",
+);
+let xtMono = true;
+for (const fy of [2, 17, 34, 51, 66]) {
+  let prev = -1;
+  for (let i = 0; i <= 210 && xtMono; i += 1) {
+    const v = calculateXTAtCoord("NLA", (i * 104.9) / 210, fy);
+    if (v < prev) xtMono = false;
+    prev = v;
+  }
+}
+check(
+  "xT never decreases toward the attacking goal",
+  xtMono,
+  "5 horizontal sweeps x 211 samples",
+);
+
+const NEUTRAL_SPLIT = JSON.stringify({
+  nla_territory_pct: 50,
+  mcs_territory_pct: 50,
+  neutral_pct: 0,
+});
+check(
+  "pitch control degrades gracefully for an empty squad",
+  JSON.stringify(computePitchControlSplit({ ...tick, players: [] })) === NEUTRAL_SPLIT
+    && JSON.stringify(computePitchControlSplit({
+      ...tick,
+      players: tick.players.filter((p) => p.role === "GK"),
+    })) === NEUTRAL_SPLIT,
+  "empty and keeper-only squads both yield 50-50",
+);
+const donor = tick.players.find((p) => p.role !== "GK")!;
+const corruptTick = {
+  ...tick,
+  players: [
+    ...tick.players,
+    { ...donor, id: "NLA_NAN", x: Number.NaN },
+    { ...donor, id: "NLA_NANV", vx: Number.NaN },
+  ],
+};
+check(
+  "a corrupt player is absent from the territory surface",
+  JSON.stringify(computePitchControlSplit(corruptTick))
+    === JSON.stringify(computePitchControlSplit(tick)),
+  "NaN position / velocity cannot neutralise a team's grid",
+);
+const mirrorY = (t: MatchTick): MatchTick => ({
+  ...t,
+  players: t.players.map((p) => ({ ...p, y: 68 - p.y, vy: -p.vy })),
+});
+const mirrorXSwap = (t: MatchTick): MatchTick => ({
+  ...t,
+  players: t.players.map((p) => ({
+    ...p,
+    x: 105 - p.x,
+    vx: -p.vx,
+    team: (p.team === "NLA" ? "MCS" : "NLA") as Team,
+  })),
+});
+let partitionOk = true;
+let mirrorOk = true;
+let swapOk = true;
+let cursor = tick;
+for (let i = 0; i < 12; i += 1) {
+  const base = computePitchControlSplit(cursor);
+  const total = base.nla_territory_pct + base.mcs_territory_pct + (base.neutral_pct ?? 0);
+  if (
+    base.nla_territory_pct < 0 || base.nla_territory_pct > 100
+    || base.mcs_territory_pct < 0 || base.mcs_territory_pct > 100
+    || Math.abs(total - 100) > 0.3
+  ) {
+    partitionOk = false;
+  }
+  if (JSON.stringify(computePitchControlSplit(mirrorY(cursor))) !== JSON.stringify(base)) {
+    mirrorOk = false;
+  }
+  const swapped = computePitchControlSplit(mirrorXSwap(cursor));
+  if (
+    swapped.nla_territory_pct !== base.mcs_territory_pct
+    || swapped.mcs_territory_pct !== base.nla_territory_pct
+    || swapped.neutral_pct !== base.neutral_pct
+  ) {
+    swapOk = false;
+  }
+  cursor = engine.step(0.1).tick as MatchTick;
+}
+check(
+  "territory is always a [0,100] partition of ~100%",
+  partitionOk,
+  "12 simulated ticks",
+);
+check(
+  "a width-axis mirror leaves the split identical",
+  mirrorOk,
+  "y -> 68-y, vy -> -vy",
+);
+check(
+  "a length-axis mirror swaps the two teams' shares",
+  swapOk,
+  "x -> 105-x with the team labels exchanged",
 );
 
 // --- defensive line scrubber ------------------------------------------------

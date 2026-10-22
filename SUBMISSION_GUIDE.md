@@ -580,7 +580,7 @@ page renders with the runtime configuration injected and no SSR error, then
 shuts down — it leaves no background process behind. `npm run check:logic` and
 `npm run smoke:ui` are pure Node: no server, no browser, no network.
 
-Together the four suites make **201 automated assertions** with zero dependencies
+Together the four suites make **220 automated assertions** with zero dependencies
 beyond what the project already ships.
 
 Expected results:

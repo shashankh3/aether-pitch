@@ -254,6 +254,9 @@ const XT_GRID: number[][] = (() => {
 
 function xtValue(team: Team, x: number, y: number): number {
   const xs = team === "NLA" ? x : PITCH_L - x;
+  // Corrupt telemetry is out of play: it reads as the minimum-threat cell,
+  // identical to the Stage B engine, instead of poisoning a sandbox delta.
+  if (!Number.isFinite(xs) || !Number.isFinite(y)) return XT_MIN;
   const fx = clamp(xs / PITCH_L * XT_COLS - 0.5, 0, XT_COLS - 1.001);
   const fy = clamp(y / PITCH_W * XT_ROWS - 0.5, 0, XT_ROWS - 1.001);
   const x0 = Math.floor(fx);
@@ -1381,6 +1384,9 @@ function influenceSurface(
     const isMoved = moved !== undefined && p.id === moved.playerId;
     const px = (isMoved ? moved.x : p.x) + p.vx * 0.45;
     const py = (isMoved ? moved.y : p.y) + p.vy * 0.45;
+    // Corrupt telemetry: the player is absent from the surface, exactly like
+    // the Stage B engine — one NaN must not neutralise a team's whole grid.
+    if (!Number.isFinite(px) || !Number.isFinite(py)) continue;
     const factor = 0.55 + Math.min(0.75, p.speed_kmh / 45);
     const target = p.team === "NLA" ? nla : mcs;
     for (let i = 0; i < cells; i += 1) {

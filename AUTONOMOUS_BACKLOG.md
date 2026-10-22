@@ -18,9 +18,9 @@ Verification gate (all must pass before a commit):
   - files: CONTRIBUTING.md
   - note: DONE - written in the docs commit; `docs/ARCHITECTURE.md` and `docs/RUNTIME_CONFIG.md` landed in the same batch
 
-- [ ] [Track B] Add property-based invariant tests for the Stage B xT grid and pitch control: values stay in [0,1], translational/rotational symmetry holds, the grid degrades gracefully for an empty squad, and the vectorised path still matches the scalar reference
-  - files: backend/test_pipeline.py, frontend/scripts/logic-check.ts
-  - note: The vectorised territory attribution is the single highest-blast-radius numeric code in the repo. A silent off-by-one in the grid index would corrupt every number a judge sees. Invariants catch what exact-value tests cannot.
+- [x] [Track B] Add property-based invariant tests for the Stage B xT grid and pitch control: values stay in [0,1], translational/rotational symmetry holds, the grid degrades gracefully for an empty squad, and the vectorised path still matches the scalar reference
+  - files: backend/test_pipeline.py, frontend/scripts/logic-check.ts, backend/stage_b_math_engine.py, frontend/src/lib/edgeEngine.ts
+  - note: DONE — 19 new invariant assertions (11 Python + 8 TS): xT boundedness fuzz incl. NaN/inf, mirror symmetry, monotonicity, empty/all-GK degradation, partition-of-100, both reflection symmetries, kernel translation invariance, overrides parity. FOUND + FIXED a real cross-engine drift: a NaN coordinate mapped to the max-threat column in Python and to NaN in TS; a NaN player neutralised a team's whole grid in TS but was skipped in Python. Both engines now treat corrupt telemetry identically (xT -> XT_MIN; player absent from the surface).
 - [ ] [Track B] Lock the i18n atlas coverage as a permanent assertion: every archetype `pick_archetype` can return must have an `es`/`ar`/`hi` translation, and the recap intros must exist for all three
   - files: backend/test_pipeline.py
   - note: Verified manually on 2026-10-22 (6 archetypes x 3 languages, all covered) but NOT locked by a test. A new archetype without translations would silently fall back to English and undercut the multi-language rubric line.
