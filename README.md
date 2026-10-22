@@ -14,7 +14,7 @@
 [![Synthetic Data](https://img.shields.io/badge/data-100%25%20synthetic-6f42c1)](#synthetic-data)
 
 **Repository:** `github.com/shashankh3/aether-pitch` · **Branch:** `main`
-**Scale:** 115 tracked files · ~27,640 LOC of Python + TypeScript (80 source files) · **332 automated assertions** (233 backend · 69 headless logic · 30 headless UI render) · 16-resource Azure ARM template
+**Scale:** 115 tracked files · ~27,889 LOC of Python + TypeScript (80 source files) · **342 automated assertions** (236 backend · 76 headless logic · 30 headless UI render) · 16-resource Azure ARM template
 
 > **The hook:** *AETHER PITCH is a live 3D football broadcast where every number on screen is computed by transparent football mathematics, every AI claim is graded by a deterministic numeric critic, and the cloud can die mid-match without the picture ever dropping a frame.*
 
@@ -271,7 +271,7 @@ CounterfactualEvaluation
   - Synthetic metadata is strictly NLA vs MCS in the `AETHER Synthetic League`.
   - `seed=42` replays frame-for-frame identically.
   - `bio_load_profile` and every Stage A–E payload key are present.
-  - **0** third-party sponsor / league / kit-brand / broadcaster / social strings across all shipped `frontend/src` + `backend` sources (70 files scanned).
+  - **0** third-party sponsor / league / kit-brand / broadcaster / social strings across all shipped `frontend/src` + `backend` sources (71 files scanned).
   - **0** external media asset references.
 - **`SUBMISSION_GUIDE.md` §14** ships paste-ready answers for the submission portal: project summary & tagline, Foundry + multi-agent orchestration, cloud-native architecture & edge resilience, the synthetic-data compliance attestation, and prize-track one-liners.
 
@@ -282,7 +282,7 @@ BROWSER CLIENT (Next.js 14 / React 18 / React Three Fiber)
  ├─ 3D Volumetric Stage: Procedural Stadium · 22 Articulated Avatars (14-part rigs) · Broadcast Camera Rig
  ├─ Broadcast HUD: TopBar · ScoreBug · LeftRail · BottomDock (DVR) · RightDock (8-Tab Control Center)
  ├─ Telemetry Store: 10 Hz WebSocket Ingest ──► 60 FPS interpolation (linear + velocity extrapolation)
-  └─ EdgeEngine (1,707 LOC browser-native twin) ◄── active hot-standby, 0 ms reload on cloud drop
+  └─ EdgeEngine (1,727 LOC browser-native twin) ◄── active hot-standby, 0 ms reload on cloud drop
         │
         │ WebSocket (/ws @ 10 Hz) + REST control plane
         ▼

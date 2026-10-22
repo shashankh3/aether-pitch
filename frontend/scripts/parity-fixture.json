@@ -1,0 +1,2383 @@
+{
+ "expected": {
+  "bio_load": [
+   {
+    "id": "NLA_1",
+    "profile": {
+     "fatigue_pdr_penalty": 5.6,
+     "high_intensity_seconds": 60.5,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 77.4,
+     "relief_required": false,
+     "sprint_load_index": 23.2,
+     "stamina_now": 93.2,
+     "tactical_relief_directive": "#1 is within the sustainable band; no relief required."
+    }
+   },
+   {
+    "id": "NLA_2",
+    "profile": {
+     "fatigue_pdr_penalty": 12.3,
+     "high_intensity_seconds": 126.5,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 64.9,
+     "relief_required": true,
+     "sprint_load_index": 47.5,
+     "stamina_now": 85.3,
+     "tactical_relief_directive": "Shift #2 to a compact mid-block; delegate the wide pressing trigger to the inverted fullback and preserve the cover shadow."
+    }
+   },
+   {
+    "id": "NLA_5",
+    "profile": {
+     "fatigue_pdr_penalty": 13.0,
+     "high_intensity_seconds": 132.3,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 64.4,
+     "relief_required": true,
+     "sprint_load_index": 49.8,
+     "stamina_now": 85.3,
+     "tactical_relief_directive": "Shift #5 to a compact mid-block; delegate the wide pressing trigger to the inverted fullback and preserve the cover shadow."
+    }
+   },
+   {
+    "id": "NLA_6",
+    "profile": {
+     "fatigue_pdr_penalty": 13.2,
+     "high_intensity_seconds": 134.4,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 64.3,
+     "relief_required": true,
+     "sprint_load_index": 50.6,
+     "stamina_now": 85.3,
+     "tactical_relief_directive": "Shift #6 to a compact mid-block; delegate the wide pressing trigger to the inverted fullback and preserve the cover shadow."
+    }
+   },
+   {
+    "id": "NLA_3",
+    "profile": {
+     "fatigue_pdr_penalty": 12.5,
+     "high_intensity_seconds": 128.3,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 64.7,
+     "relief_required": true,
+     "sprint_load_index": 48.3,
+     "stamina_now": 85.3,
+     "tactical_relief_directive": "Shift #3 to a compact mid-block; delegate the wide pressing trigger to the inverted fullback and preserve the cover shadow."
+    }
+   },
+   {
+    "id": "NLA_8",
+    "profile": {
+     "fatigue_pdr_penalty": 14.7,
+     "high_intensity_seconds": 145.1,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 61.0,
+     "relief_required": true,
+     "sprint_load_index": 54.6,
+     "stamina_now": 82.8,
+     "tactical_relief_directive": "Pull #8 into a lower tempo; let the 8 hold the wide half-space and keep the counter-press outlet short."
+    }
+   },
+   {
+    "id": "NLA_4",
+    "profile": {
+     "fatigue_pdr_penalty": 14.7,
+     "high_intensity_seconds": 143.7,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 61.0,
+     "relief_required": true,
+     "sprint_load_index": 54.6,
+     "stamina_now": 82.8,
+     "tactical_relief_directive": "Pull #4 into a lower tempo; let the 8 hold the wide half-space and keep the counter-press outlet short."
+    }
+   },
+   {
+    "id": "NLA_10",
+    "profile": {
+     "fatigue_pdr_penalty": 15.3,
+     "high_intensity_seconds": 151.2,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 60.6,
+     "relief_required": true,
+     "sprint_load_index": 56.8,
+     "stamina_now": 82.8,
+     "tactical_relief_directive": "Pull #10 into a lower tempo; let the 8 hold the wide half-space and keep the counter-press outlet short."
+    }
+   },
+   {
+    "id": "NLA_7",
+    "profile": {
+     "fatigue_pdr_penalty": 13.4,
+     "high_intensity_seconds": 133.9,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 63.2,
+     "relief_required": true,
+     "sprint_load_index": 50.7,
+     "stamina_now": 84.2,
+     "tactical_relief_directive": "Rotate #7 off the press line; keep the far post runner isolated and reduce the recovery sprint to one transition."
+    }
+   },
+   {
+    "id": "NLA_9",
+    "profile": {
+     "fatigue_pdr_penalty": 14.3,
+     "high_intensity_seconds": 142.3,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 62.6,
+     "relief_required": true,
+     "sprint_load_index": 53.9,
+     "stamina_now": 84.2,
+     "tactical_relief_directive": "Rotate #9 off the press line; keep the far post runner isolated and reduce the recovery sprint to one transition."
+    }
+   },
+   {
+    "id": "NLA_11",
+    "profile": {
+     "fatigue_pdr_penalty": 14.2,
+     "high_intensity_seconds": 141.8,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 62.6,
+     "relief_required": true,
+     "sprint_load_index": 53.6,
+     "stamina_now": 84.2,
+     "tactical_relief_directive": "Rotate #11 off the press line; keep the far post runner isolated and reduce the recovery sprint to one transition."
+    }
+   },
+   {
+    "id": "MCS_31",
+    "profile": {
+     "fatigue_pdr_penalty": 5.2,
+     "high_intensity_seconds": 56.5,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 77.7,
+     "relief_required": false,
+     "sprint_load_index": 21.8,
+     "stamina_now": 93.2,
+     "tactical_relief_directive": "#31 is within the sustainable band; no relief required."
+    }
+   },
+   {
+    "id": "MCS_2",
+    "profile": {
+     "fatigue_pdr_penalty": 13.2,
+     "high_intensity_seconds": 132.8,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 64.3,
+     "relief_required": true,
+     "sprint_load_index": 50.7,
+     "stamina_now": 85.3,
+     "tactical_relief_directive": "Shift #2 to a compact mid-block; delegate the wide pressing trigger to the inverted fullback and preserve the cover shadow."
+    }
+   },
+   {
+    "id": "MCS_4",
+    "profile": {
+     "fatigue_pdr_penalty": 12.0,
+     "high_intensity_seconds": 121.4,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 65.1,
+     "relief_required": false,
+     "sprint_load_index": 46.2,
+     "stamina_now": 85.3,
+     "tactical_relief_directive": "#4 is within the sustainable band; no relief required."
+    }
+   },
+   {
+    "id": "MCS_5",
+    "profile": {
+     "fatigue_pdr_penalty": 13.0,
+     "high_intensity_seconds": 131.4,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 64.4,
+     "relief_required": true,
+     "sprint_load_index": 50.0,
+     "stamina_now": 85.3,
+     "tactical_relief_directive": "Shift #5 to a compact mid-block; delegate the wide pressing trigger to the inverted fullback and preserve the cover shadow."
+    }
+   },
+   {
+    "id": "MCS_24",
+    "profile": {
+     "fatigue_pdr_penalty": 13.0,
+     "high_intensity_seconds": 130.8,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 64.4,
+     "relief_required": true,
+     "sprint_load_index": 49.8,
+     "stamina_now": 85.3,
+     "tactical_relief_directive": "Shift #24 to a compact mid-block; delegate the wide pressing trigger to the inverted fullback and preserve the cover shadow."
+    }
+   },
+   {
+    "id": "MCS_16",
+    "profile": {
+     "fatigue_pdr_penalty": 15.4,
+     "high_intensity_seconds": 150.3,
+     "press_seconds": 0.1,
+     "projected_stamina_10m": 60.5,
+     "relief_required": true,
+     "sprint_load_index": 57.2,
+     "stamina_now": 82.8,
+     "tactical_relief_directive": "Pull #16 into a lower tempo; let the 8 hold the wide half-space and keep the counter-press outlet short."
+    }
+   },
+   {
+    "id": "MCS_22",
+    "profile": {
+     "fatigue_pdr_penalty": 15.2,
+     "high_intensity_seconds": 146.9,
+     "press_seconds": 0.4,
+     "projected_stamina_10m": 60.6,
+     "relief_required": true,
+     "sprint_load_index": 56.3,
+     "stamina_now": 82.8,
+     "tactical_relief_directive": "Pull #22 into a lower tempo; let the 8 hold the wide half-space and keep the counter-press outlet short."
+    }
+   },
+   {
+    "id": "MCS_7",
+    "profile": {
+     "fatigue_pdr_penalty": 15.6,
+     "high_intensity_seconds": 151.9,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 60.4,
+     "relief_required": true,
+     "sprint_load_index": 57.8,
+     "stamina_now": 82.8,
+     "tactical_relief_directive": "Pull #7 into a lower tempo; let the 8 hold the wide half-space and keep the counter-press outlet short."
+    }
+   },
+   {
+    "id": "MCS_20",
+    "profile": {
+     "fatigue_pdr_penalty": 16.0,
+     "high_intensity_seconds": 153.5,
+     "press_seconds": 1.9,
+     "projected_stamina_10m": 59.6,
+     "relief_required": true,
+     "sprint_load_index": 58.7,
+     "stamina_now": 82.8,
+     "tactical_relief_directive": "Pull #20 into a lower tempo; let the 8 hold the wide half-space and keep the counter-press outlet short."
+    }
+   },
+   {
+    "id": "MCS_11",
+    "profile": {
+     "fatigue_pdr_penalty": 15.9,
+     "high_intensity_seconds": 151.5,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 60.2,
+     "relief_required": true,
+     "sprint_load_index": 58.7,
+     "stamina_now": 82.8,
+     "tactical_relief_directive": "Pull #11 into a lower tempo; let the 8 hold the wide half-space and keep the counter-press outlet short."
+    }
+   },
+   {
+    "id": "MCS_19",
+    "profile": {
+     "fatigue_pdr_penalty": 13.3,
+     "high_intensity_seconds": 132.6,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 63.2,
+     "relief_required": true,
+     "sprint_load_index": 50.5,
+     "stamina_now": 84.2,
+     "tactical_relief_directive": "Rotate #19 off the press line; keep the far post runner isolated and reduce the recovery sprint to one transition."
+    }
+   }
+  ],
+  "bio_load_summary": {
+   "at_risk_count": 19,
+   "max_fatigue_pdr_penalty": 16.0,
+   "mean_projected_stamina_10m": 64.0,
+   "mean_sprint_load_index": 50.1,
+   "most_at_risk": [
+    {
+     "fatigue_pdr_penalty": 16.0,
+     "player_id": "MCS_20",
+     "player_name": "F. Delacroix",
+     "projected_stamina_10m": 59.6,
+     "relief_required": true,
+     "role": "MID",
+     "sprint_load_index": 58.7,
+     "team": "MCS"
+    },
+    {
+     "fatigue_pdr_penalty": 15.9,
+     "player_id": "MCS_11",
+     "player_name": "S. Ibarra",
+     "projected_stamina_10m": 60.2,
+     "relief_required": true,
+     "role": "MID",
+     "sprint_load_index": 58.7,
+     "team": "MCS"
+    },
+    {
+     "fatigue_pdr_penalty": 15.6,
+     "player_id": "MCS_7",
+     "player_name": "C. Ambrose",
+     "projected_stamina_10m": 60.4,
+     "relief_required": true,
+     "role": "MID",
+     "sprint_load_index": 57.8,
+     "team": "MCS"
+    }
+   ]
+  },
+  "line_shift": {
+   "MCS@28": {
+    "compactness_area_after_m2": 700.3,
+    "compactness_area_m2": 1053.4,
+    "current_line_height_m": 14.5,
+    "delta_m": 13.5,
+    "line_cohesion": 0.711,
+    "offside_trap_catch_prob_pct": 64.0,
+    "press_compression_gain_pct": 18.9,
+    "target_line_height_m": 28.0,
+    "through_ball_exposure_xt": 0.02
+   },
+   "MCS@40": {
+    "compactness_area_after_m2": 386.4,
+    "compactness_area_m2": 1053.4,
+    "current_line_height_m": 14.5,
+    "delta_m": 25.5,
+    "line_cohesion": 0.711,
+    "offside_trap_catch_prob_pct": 49.5,
+    "press_compression_gain_pct": 43.2,
+    "target_line_height_m": 40.0,
+    "through_ball_exposure_xt": 0.0449
+   },
+   "MCS@51": {
+    "compactness_area_after_m2": 273.4,
+    "compactness_area_m2": 1053.4,
+    "current_line_height_m": 14.5,
+    "delta_m": 36.5,
+    "line_cohesion": 0.711,
+    "offside_trap_catch_prob_pct": 69.7,
+    "press_compression_gain_pct": 43.2,
+    "target_line_height_m": 51.0,
+    "through_ball_exposure_xt": 0.0449
+   },
+   "NLA@28": {
+    "compactness_area_after_m2": 1330.1,
+    "compactness_area_m2": 1171.6,
+    "current_line_height_m": 34.5,
+    "delta_m": -6.5,
+    "line_cohesion": 0.724,
+    "offside_trap_catch_prob_pct": 42.1,
+    "press_compression_gain_pct": -3.1,
+    "target_line_height_m": 28.0,
+    "through_ball_exposure_xt": 0.0
+   },
+   "NLA@40": {
+    "compactness_area_after_m2": 1037.3,
+    "compactness_area_m2": 1171.6,
+    "current_line_height_m": 34.5,
+    "delta_m": 5.5,
+    "line_cohesion": 0.724,
+    "offside_trap_catch_prob_pct": 43.2,
+    "press_compression_gain_pct": 15.6,
+    "target_line_height_m": 40.0,
+    "through_ball_exposure_xt": 0.0
+   },
+   "NLA@51": {
+    "compactness_area_after_m2": 768.8,
+    "compactness_area_m2": 1171.6,
+    "current_line_height_m": 34.5,
+    "delta_m": 16.5,
+    "line_cohesion": 0.724,
+    "offside_trap_catch_prob_pct": 63.9,
+    "press_compression_gain_pct": 40.6,
+    "target_line_height_m": 51.0,
+    "through_ball_exposure_xt": 0.0
+   }
+  },
+  "passing_network": [
+   {
+    "distance_m": 26.9,
+    "from_id": "NLA_10",
+    "from_xy": {
+     "x": 53.72,
+     "y": 21.08
+    },
+    "team": "NLA",
+    "to_id": "NLA_9",
+    "to_xy": {
+     "x": 79.27,
+     "y": 29.47
+    },
+    "xt_weight": 0.1071
+   },
+   {
+    "distance_m": 27.6,
+    "from_id": "NLA_8",
+    "from_xy": {
+     "x": 53.41,
+     "y": 38.99
+    },
+    "team": "NLA",
+    "to_id": "NLA_9",
+    "to_xy": {
+     "x": 79.27,
+     "y": 29.47
+    },
+    "xt_weight": 0.0903
+   },
+   {
+    "distance_m": 24.1,
+    "from_id": "NLA_4",
+    "from_xy": {
+     "x": 55.79,
+     "y": 34.8
+    },
+    "team": "NLA",
+    "to_id": "NLA_9",
+    "to_xy": {
+     "x": 79.27,
+     "y": 29.47
+    },
+    "xt_weight": 0.08
+   },
+   {
+    "distance_m": 26.4,
+    "from_id": "MCS_22",
+    "from_xy": {
+     "x": 73.49,
+     "y": 22.51
+    },
+    "team": "MCS",
+    "to_id": "MCS_19",
+    "to_xy": {
+     "x": 48.64,
+     "y": 31.5
+    },
+    "xt_weight": 0.059
+   },
+   {
+    "distance_m": 21.3,
+    "from_id": "MCS_11",
+    "from_xy": {
+     "x": 65.72,
+     "y": 18.78
+    },
+    "team": "MCS",
+    "to_id": "MCS_19",
+    "to_xy": {
+     "x": 48.64,
+     "y": 31.5
+    },
+    "xt_weight": 0.0563
+   }
+  ],
+  "pitch_control": {
+   "mcs_territory_pct": 43.2,
+   "neutral_pct": 20.8,
+   "nla_territory_pct": 35.9
+  },
+  "simulated_pitch_control": [
+   {
+    "player_id": "NLA_2",
+    "split": {
+     "mcs_territory_pct": 40.6,
+     "neutral_pct": 24.5,
+     "nla_territory_pct": 34.9
+    },
+    "x": 78.0,
+    "y": 34.0
+   },
+   {
+    "player_id": "MCS_5",
+    "split": {
+     "mcs_territory_pct": 46.9,
+     "neutral_pct": 19.8,
+     "nla_territory_pct": 33.3
+    },
+    "x": 30.0,
+    "y": 12.0
+   },
+   {
+    "player_id": "NLA_9",
+    "split": {
+     "mcs_territory_pct": 35.9,
+     "neutral_pct": 20.8,
+     "nla_territory_pct": 43.2
+    },
+    "x": 62.0,
+    "y": 50.0
+   }
+  ],
+  "xt_samples": [
+   [
+    3.2812,
+    2.8333,
+    0.004,
+    0.123725
+   ],
+   [
+    9.8438,
+    2.8333,
+    0.006478,
+    0.118011
+   ],
+   [
+    16.4062,
+    2.8333,
+    0.009509,
+    0.1079
+   ],
+   [
+    22.9688,
+    2.8333,
+    0.013203,
+    0.095299
+   ],
+   [
+    29.5312,
+    2.8333,
+    0.01769,
+    0.081918
+   ],
+   [
+    36.0938,
+    2.8333,
+    0.023111,
+    0.068937
+   ],
+   [
+    42.6562,
+    2.8333,
+    0.02962,
+    0.057026
+   ],
+   [
+    49.2188,
+    2.8333,
+    0.037368,
+    0.046481
+   ],
+   [
+    55.7812,
+    2.8333,
+    0.046481,
+    0.037368
+   ],
+   [
+    62.3438,
+    2.8333,
+    0.057026,
+    0.02962
+   ],
+   [
+    68.9062,
+    2.8333,
+    0.068937,
+    0.023111
+   ],
+   [
+    75.4688,
+    2.8333,
+    0.081918,
+    0.01769
+   ],
+   [
+    82.0312,
+    2.8333,
+    0.095299,
+    0.013203
+   ],
+   [
+    88.5938,
+    2.8333,
+    0.1079,
+    0.009509
+   ],
+   [
+    95.1562,
+    2.8333,
+    0.118011,
+    0.006478
+   ],
+   [
+    101.7188,
+    2.8333,
+    0.123725,
+    0.004
+   ],
+   [
+    3.2812,
+    8.5,
+    0.008024,
+    0.154107
+   ],
+   [
+    9.8438,
+    8.5,
+    0.010676,
+    0.145826
+   ],
+   [
+    16.4062,
+    8.5,
+    0.013936,
+    0.131697
+   ],
+   [
+    22.9688,
+    8.5,
+    0.017936,
+    0.114866
+   ],
+   [
+    29.5312,
+    8.5,
+    0.022831,
+    0.097749
+   ],
+   [
+    36.0938,
+    8.5,
+    0.028797,
+    0.081749
+   ],
+   [
+    42.6562,
+    8.5,
+    0.036038,
+    0.067506
+   ],
+   [
+    49.2188,
+    8.5,
+    0.044767,
+    0.055199
+   ],
+   [
+    55.7812,
+    8.5,
+    0.055199,
+    0.044767
+   ],
+   [
+    62.3438,
+    8.5,
+    0.067506,
+    0.036038
+   ],
+   [
+    68.9062,
+    8.5,
+    0.081749,
+    0.028797
+   ],
+   [
+    75.4688,
+    8.5,
+    0.097749,
+    0.022831
+   ],
+   [
+    82.0312,
+    8.5,
+    0.114866,
+    0.017936
+   ],
+   [
+    88.5938,
+    8.5,
+    0.131697,
+    0.013936
+   ],
+   [
+    95.1562,
+    8.5,
+    0.145826,
+    0.010676
+   ],
+   [
+    101.7188,
+    8.5,
+    0.154107,
+    0.008024
+   ],
+   [
+    3.2812,
+    14.1667,
+    0.013248,
+    0.19119
+   ],
+   [
+    9.8438,
+    14.1667,
+    0.016049,
+    0.17874
+   ],
+   [
+    16.4062,
+    14.1667,
+    0.01951,
+    0.158713
+   ],
+   [
+    22.9688,
+    14.1667,
+    0.023779,
+    0.136337
+   ],
+   [
+    29.5312,
+    14.1667,
+    0.029036,
+    0.114784
+   ],
+   [
+    36.0938,
+    14.1667,
+    0.035495,
+    0.095466
+   ],
+   [
+    42.6562,
+    14.1667,
+    0.043405,
+    0.078804
+   ],
+   [
+    49.2188,
+    14.1667,
+    0.053052,
+    0.064749
+   ],
+   [
+    55.7812,
+    14.1667,
+    0.064749,
+    0.053052
+   ],
+   [
+    62.3438,
+    14.1667,
+    0.078804,
+    0.043405
+   ],
+   [
+    68.9062,
+    14.1667,
+    0.095466,
+    0.035495
+   ],
+   [
+    75.4688,
+    14.1667,
+    0.114784,
+    0.029036
+   ],
+   [
+    82.0312,
+    14.1667,
+    0.136337,
+    0.023779
+   ],
+   [
+    88.5938,
+    14.1667,
+    0.158713,
+    0.01951
+   ],
+   [
+    95.1562,
+    14.1667,
+    0.17874,
+    0.016049
+   ],
+   [
+    101.7188,
+    14.1667,
+    0.19119,
+    0.013248
+   ],
+   [
+    3.2812,
+    19.8333,
+    0.020128,
+    0.236323
+   ],
+   [
+    9.8438,
+    19.8333,
+    0.02305,
+    0.216629
+   ],
+   [
+    16.4062,
+    19.8333,
+    0.026672,
+    0.188022
+   ],
+   [
+    22.9688,
+    19.8333,
+    0.031159,
+    0.158826
+   ],
+   [
+    29.5312,
+    19.8333,
+    0.036712,
+    0.132455
+   ],
+   [
+    36.0938,
+    19.8333,
+    0.043576,
+    0.109832
+   ],
+   [
+    42.6562,
+    19.8333,
+    0.052047,
+    0.090902
+   ],
+   [
+    49.2188,
+    19.8333,
+    0.062476,
+    0.075275
+   ],
+   [
+    55.7812,
+    19.8333,
+    0.075275,
+    0.062476
+   ],
+   [
+    62.3438,
+    19.8333,
+    0.090902,
+    0.052047
+   ],
+   [
+    68.9062,
+    19.8333,
+    0.109832,
+    0.043576
+   ],
+   [
+    75.4688,
+    19.8333,
+    0.132455,
+    0.036712
+   ],
+   [
+    82.0312,
+    19.8333,
+    0.158826,
+    0.031159
+   ],
+   [
+    88.5938,
+    19.8333,
+    0.188022,
+    0.026672
+   ],
+   [
+    95.1562,
+    19.8333,
+    0.216629,
+    0.02305
+   ],
+   [
+    101.7188,
+    19.8333,
+    0.236323,
+    0.020128
+   ],
+   [
+    3.2812,
+    25.5,
+    0.029303,
+    0.29053
+   ],
+   [
+    9.8438,
+    25.5,
+    0.032308,
+    0.257255
+   ],
+   [
+    16.4062,
+    25.5,
+    0.036043,
+    0.217193
+   ],
+   [
+    22.9688,
+    25.5,
+    0.040683,
+    0.180822
+   ],
+   [
+    29.5312,
+    25.5,
+    0.046446,
+    0.150054
+   ],
+   [
+    36.0938,
+    25.5,
+    0.0536,
+    0.124661
+   ],
+   [
+    42.6562,
+    25.5,
+    0.062476,
+    0.103931
+   ],
+   [
+    49.2188,
+    25.5,
+    0.073479,
+    0.0871
+   ],
+   [
+    55.7812,
+    25.5,
+    0.0871,
+    0.073479
+   ],
+   [
+    62.3438,
+    25.5,
+    0.103931,
+    0.062476
+   ],
+   [
+    68.9062,
+    25.5,
+    0.124661,
+    0.0536
+   ],
+   [
+    75.4688,
+    25.5,
+    0.150054,
+    0.046446
+   ],
+   [
+    82.0312,
+    25.5,
+    0.180822,
+    0.040683
+   ],
+   [
+    88.5938,
+    25.5,
+    0.217193,
+    0.036043
+   ],
+   [
+    95.1562,
+    25.5,
+    0.257255,
+    0.032308
+   ],
+   [
+    101.7188,
+    25.5,
+    0.29053,
+    0.029303
+   ],
+   [
+    3.2812,
+    31.1667,
+    0.041652,
+    0.349943
+   ],
+   [
+    9.8438,
+    31.1667,
+    0.0447,
+    0.292651
+   ],
+   [
+    16.4062,
+    31.1667,
+    0.048493,
+    0.241994
+   ],
+   [
+    22.9688,
+    31.1667,
+    0.053213,
+    0.200574
+   ],
+   [
+    29.5312,
+    31.1667,
+    0.059085,
+    0.167076
+   ],
+   [
+    36.0938,
+    31.1667,
+    0.066391,
+    0.140073
+   ],
+   [
+    42.6562,
+    31.1667,
+    0.07548,
+    0.118336
+   ],
+   [
+    49.2188,
+    31.1667,
+    0.086786,
+    0.100849
+   ],
+   [
+    55.7812,
+    31.1667,
+    0.100849,
+    0.086786
+   ],
+   [
+    62.3438,
+    31.1667,
+    0.118336,
+    0.07548
+   ],
+   [
+    68.9062,
+    31.1667,
+    0.140073,
+    0.066391
+   ],
+   [
+    75.4688,
+    31.1667,
+    0.167076,
+    0.059085
+   ],
+   [
+    82.0312,
+    31.1667,
+    0.200574,
+    0.053213
+   ],
+   [
+    88.5938,
+    31.1667,
+    0.241994,
+    0.048493
+   ],
+   [
+    95.1562,
+    31.1667,
+    0.292651,
+    0.0447
+   ],
+   [
+    101.7188,
+    31.1667,
+    0.349943,
+    0.041652
+   ],
+   [
+    3.2812,
+    36.8333,
+    0.041652,
+    0.349943
+   ],
+   [
+    9.8438,
+    36.8333,
+    0.0447,
+    0.292651
+   ],
+   [
+    16.4062,
+    36.8333,
+    0.048493,
+    0.241994
+   ],
+   [
+    22.9688,
+    36.8333,
+    0.053213,
+    0.200574
+   ],
+   [
+    29.5312,
+    36.8333,
+    0.059085,
+    0.167076
+   ],
+   [
+    36.0938,
+    36.8333,
+    0.066391,
+    0.140073
+   ],
+   [
+    42.6562,
+    36.8333,
+    0.07548,
+    0.118336
+   ],
+   [
+    49.2188,
+    36.8333,
+    0.086786,
+    0.100849
+   ],
+   [
+    55.7812,
+    36.8333,
+    0.100849,
+    0.086786
+   ],
+   [
+    62.3438,
+    36.8333,
+    0.118336,
+    0.07548
+   ],
+   [
+    68.9062,
+    36.8333,
+    0.140073,
+    0.066391
+   ],
+   [
+    75.4688,
+    36.8333,
+    0.167076,
+    0.059085
+   ],
+   [
+    82.0312,
+    36.8333,
+    0.200574,
+    0.053213
+   ],
+   [
+    88.5938,
+    36.8333,
+    0.241994,
+    0.048493
+   ],
+   [
+    95.1562,
+    36.8333,
+    0.292651,
+    0.0447
+   ],
+   [
+    101.7188,
+    36.8333,
+    0.349943,
+    0.041652
+   ],
+   [
+    3.2812,
+    42.5,
+    0.029303,
+    0.29053
+   ],
+   [
+    9.8438,
+    42.5,
+    0.032308,
+    0.257255
+   ],
+   [
+    16.4062,
+    42.5,
+    0.036043,
+    0.217193
+   ],
+   [
+    22.9688,
+    42.5,
+    0.040683,
+    0.180822
+   ],
+   [
+    29.5312,
+    42.5,
+    0.046446,
+    0.150054
+   ],
+   [
+    36.0938,
+    42.5,
+    0.0536,
+    0.124661
+   ],
+   [
+    42.6562,
+    42.5,
+    0.062476,
+    0.103931
+   ],
+   [
+    49.2188,
+    42.5,
+    0.073479,
+    0.0871
+   ],
+   [
+    55.7812,
+    42.5,
+    0.0871,
+    0.073479
+   ],
+   [
+    62.3438,
+    42.5,
+    0.103931,
+    0.062476
+   ],
+   [
+    68.9062,
+    42.5,
+    0.124661,
+    0.0536
+   ],
+   [
+    75.4688,
+    42.5,
+    0.150054,
+    0.046446
+   ],
+   [
+    82.0312,
+    42.5,
+    0.180822,
+    0.040683
+   ],
+   [
+    88.5938,
+    42.5,
+    0.217193,
+    0.036043
+   ],
+   [
+    95.1562,
+    42.5,
+    0.257255,
+    0.032308
+   ],
+   [
+    101.7188,
+    42.5,
+    0.29053,
+    0.029303
+   ],
+   [
+    3.2812,
+    48.1667,
+    0.020128,
+    0.236323
+   ],
+   [
+    9.8438,
+    48.1667,
+    0.02305,
+    0.216629
+   ],
+   [
+    16.4062,
+    48.1667,
+    0.026672,
+    0.188022
+   ],
+   [
+    22.9688,
+    48.1667,
+    0.031159,
+    0.158826
+   ],
+   [
+    29.5312,
+    48.1667,
+    0.036712,
+    0.132455
+   ],
+   [
+    36.0938,
+    48.1667,
+    0.043576,
+    0.109832
+   ],
+   [
+    42.6562,
+    48.1667,
+    0.052047,
+    0.090902
+   ],
+   [
+    49.2188,
+    48.1667,
+    0.062476,
+    0.075275
+   ],
+   [
+    55.7812,
+    48.1667,
+    0.075275,
+    0.062476
+   ],
+   [
+    62.3438,
+    48.1667,
+    0.090902,
+    0.052047
+   ],
+   [
+    68.9062,
+    48.1667,
+    0.109832,
+    0.043576
+   ],
+   [
+    75.4688,
+    48.1667,
+    0.132455,
+    0.036712
+   ],
+   [
+    82.0312,
+    48.1667,
+    0.158826,
+    0.031159
+   ],
+   [
+    88.5938,
+    48.1667,
+    0.188022,
+    0.026672
+   ],
+   [
+    95.1562,
+    48.1667,
+    0.216629,
+    0.02305
+   ],
+   [
+    101.7188,
+    48.1667,
+    0.236323,
+    0.020128
+   ],
+   [
+    3.2812,
+    53.8333,
+    0.013248,
+    0.19119
+   ],
+   [
+    9.8438,
+    53.8333,
+    0.016049,
+    0.17874
+   ],
+   [
+    16.4062,
+    53.8333,
+    0.01951,
+    0.158713
+   ],
+   [
+    22.9688,
+    53.8333,
+    0.023779,
+    0.136337
+   ],
+   [
+    29.5312,
+    53.8333,
+    0.029036,
+    0.114784
+   ],
+   [
+    36.0938,
+    53.8333,
+    0.035495,
+    0.095466
+   ],
+   [
+    42.6562,
+    53.8333,
+    0.043405,
+    0.078804
+   ],
+   [
+    49.2188,
+    53.8333,
+    0.053052,
+    0.064749
+   ],
+   [
+    55.7812,
+    53.8333,
+    0.064749,
+    0.053052
+   ],
+   [
+    62.3438,
+    53.8333,
+    0.078804,
+    0.043405
+   ],
+   [
+    68.9062,
+    53.8333,
+    0.095466,
+    0.035495
+   ],
+   [
+    75.4688,
+    53.8333,
+    0.114784,
+    0.029036
+   ],
+   [
+    82.0312,
+    53.8333,
+    0.136337,
+    0.023779
+   ],
+   [
+    88.5938,
+    53.8333,
+    0.158713,
+    0.01951
+   ],
+   [
+    95.1562,
+    53.8333,
+    0.17874,
+    0.016049
+   ],
+   [
+    101.7188,
+    53.8333,
+    0.19119,
+    0.013248
+   ],
+   [
+    3.2812,
+    59.5,
+    0.008024,
+    0.154107
+   ],
+   [
+    9.8438,
+    59.5,
+    0.010676,
+    0.145826
+   ],
+   [
+    16.4062,
+    59.5,
+    0.013936,
+    0.131697
+   ],
+   [
+    22.9688,
+    59.5,
+    0.017936,
+    0.114866
+   ],
+   [
+    29.5312,
+    59.5,
+    0.022831,
+    0.097749
+   ],
+   [
+    36.0938,
+    59.5,
+    0.028797,
+    0.081749
+   ],
+   [
+    42.6562,
+    59.5,
+    0.036038,
+    0.067506
+   ],
+   [
+    49.2188,
+    59.5,
+    0.044767,
+    0.055199
+   ],
+   [
+    55.7812,
+    59.5,
+    0.055199,
+    0.044767
+   ],
+   [
+    62.3438,
+    59.5,
+    0.067506,
+    0.036038
+   ],
+   [
+    68.9062,
+    59.5,
+    0.081749,
+    0.028797
+   ],
+   [
+    75.4688,
+    59.5,
+    0.097749,
+    0.022831
+   ],
+   [
+    82.0312,
+    59.5,
+    0.114866,
+    0.017936
+   ],
+   [
+    88.5938,
+    59.5,
+    0.131697,
+    0.013936
+   ],
+   [
+    95.1562,
+    59.5,
+    0.145826,
+    0.010676
+   ],
+   [
+    101.7188,
+    59.5,
+    0.154107,
+    0.008024
+   ],
+   [
+    3.2812,
+    65.1667,
+    0.004004,
+    0.123755
+   ],
+   [
+    9.8438,
+    65.1667,
+    0.006483,
+    0.118039
+   ],
+   [
+    16.4062,
+    65.1667,
+    0.009513,
+    0.107924
+   ],
+   [
+    22.9688,
+    65.1667,
+    0.013208,
+    0.095319
+   ],
+   [
+    29.5312,
+    65.1667,
+    0.017695,
+    0.081934
+   ],
+   [
+    36.0938,
+    65.1667,
+    0.023117,
+    0.06895
+   ],
+   [
+    42.6562,
+    65.1667,
+    0.029626,
+    0.057037
+   ],
+   [
+    49.2188,
+    65.1667,
+    0.037375,
+    0.04649
+   ],
+   [
+    55.7812,
+    65.1667,
+    0.04649,
+    0.037375
+   ],
+   [
+    62.3438,
+    65.1667,
+    0.057037,
+    0.029626
+   ],
+   [
+    68.9062,
+    65.1667,
+    0.06895,
+    0.023117
+   ],
+   [
+    75.4688,
+    65.1667,
+    0.081934,
+    0.017695
+   ],
+   [
+    82.0312,
+    65.1667,
+    0.095319,
+    0.013208
+   ],
+   [
+    88.5938,
+    65.1667,
+    0.107924,
+    0.009513
+   ],
+   [
+    95.1562,
+    65.1667,
+    0.118039,
+    0.006483
+   ],
+   [
+    101.7188,
+    65.1667,
+    0.123755,
+    0.004004
+   ]
+  ]
+ },
+ "scenario": {
+  "seed": 42,
+  "start_minute": 70.0,
+  "ticks": 40,
+  "window_s": 30.0
+ },
+ "state": {
+  "ball": {
+   "is_lofted": false,
+   "pass_end": null,
+   "pass_start": null,
+   "speed_kmh": 20.2,
+   "vx": 2.93,
+   "vy": 4.78,
+   "vz": 0.0,
+   "x": 73.19,
+   "y": 22.13,
+   "z": 0.0
+  },
+  "carrier": "NLA_11",
+  "clock": "70:04",
+  "match_metadata": {
+   "away_team": {
+    "id": "MCS",
+    "kit": "cyan/navy",
+    "name": "Meridian City SC",
+    "short_name": "MCS"
+   },
+   "city": "Synthetic City",
+   "competition": "AETHER Synthetic League",
+   "data_source": "PitchForge synthetic 10Hz engine",
+   "disclaimer": "All clubs, players, crests and tracking samples are fictional.",
+   "home_team": {
+    "id": "NLA",
+    "kit": "crimson/gold",
+    "name": "North Larchmont Athletic",
+    "short_name": "NLA"
+   },
+   "kickoff_utc": "2026-10-19T19:45:00Z",
+   "match_id": "SYN-PL-2026-1019-NLA-MCS",
+   "matchday": 9,
+   "season": "2026/27",
+   "synthetic": true,
+   "venue": "Aether Arena"
+  },
+  "players": [
+   {
+    "bio_load_profile": {
+     "fatigue_pdr_penalty": 5.6,
+     "high_intensity_seconds": 60.5,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 77.4,
+     "relief_required": false,
+     "sprint_load_index": 23.2,
+     "stamina_now": 93.2,
+     "tactical_relief_directive": "#1 is within the sustainable band; no relief required."
+    },
+    "distance_m": 3206.6,
+    "heading_rad": -7.785,
+    "id": "NLA_1",
+    "name": "T. Marlowe",
+    "number": 1,
+    "playstyle_badge": null,
+    "pose_state": "JOG",
+    "role": "GK",
+    "shirt_number": 1,
+    "speed_kmh": 8.3,
+    "sprint_distance_m": 447.7,
+    "stamina": 93.2,
+    "team": "NLA",
+    "top_speed_kmh": 28.7,
+    "vx": -0.01,
+    "vy": -2.3,
+    "x": 2.5,
+    "y": 29.9
+   },
+   {
+    "bio_load_profile": {
+     "fatigue_pdr_penalty": 12.3,
+     "high_intensity_seconds": 126.5,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 64.9,
+     "relief_required": true,
+     "sprint_load_index": 47.5,
+     "stamina_now": 85.3,
+     "tactical_relief_directive": "Shift #2 to a compact mid-block; delegate the wide pressing trigger to the inverted fullback and preserve the cover shadow."
+    },
+    "distance_m": 6558.5,
+    "heading_rad": -1.354,
+    "id": "NLA_2",
+    "name": "D. Keswick",
+    "number": 2,
+    "playstyle_badge": null,
+    "pose_state": "IDLE",
+    "role": "DEF",
+    "shirt_number": 2,
+    "speed_kmh": 2.4,
+    "sprint_distance_m": 916.0,
+    "stamina": 85.3,
+    "team": "NLA",
+    "top_speed_kmh": 29.8,
+    "vx": -0.65,
+    "vy": 0.14,
+    "x": 35.9,
+    "y": 45.83
+   },
+   {
+    "bio_load_profile": {
+     "fatigue_pdr_penalty": 13.0,
+     "high_intensity_seconds": 132.3,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 64.4,
+     "relief_required": true,
+     "sprint_load_index": 49.8,
+     "stamina_now": 85.3,
+     "tactical_relief_directive": "Shift #5 to a compact mid-block; delegate the wide pressing trigger to the inverted fullback and preserve the cover shadow."
+    },
+    "distance_m": 6881.1,
+    "heading_rad": -0.798,
+    "id": "NLA_5",
+    "name": "S. Okonkwo",
+    "number": 5,
+    "playstyle_badge": null,
+    "pose_state": "IDLE",
+    "role": "DEF",
+    "shirt_number": 5,
+    "speed_kmh": 1.9,
+    "sprint_distance_m": 961.2,
+    "stamina": 85.3,
+    "team": "NLA",
+    "top_speed_kmh": 32.6,
+    "vx": 0.37,
+    "vy": -0.38,
+    "x": 32.96,
+    "y": 36.13
+   },
+   {
+    "bio_load_profile": {
+     "fatigue_pdr_penalty": 13.2,
+     "high_intensity_seconds": 134.4,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 64.3,
+     "relief_required": true,
+     "sprint_load_index": 50.6,
+     "stamina_now": 85.3,
+     "tactical_relief_directive": "Shift #6 to a compact mid-block; delegate the wide pressing trigger to the inverted fullback and preserve the cover shadow."
+    },
+    "distance_m": 6990.3,
+    "heading_rad": -0.874,
+    "id": "NLA_6",
+    "name": "A. Brandt",
+    "number": 6,
+    "playstyle_badge": null,
+    "pose_state": "JOG",
+    "role": "DEF",
+    "shirt_number": 6,
+    "speed_kmh": 5.5,
+    "sprint_distance_m": 976.4,
+    "stamina": 85.3,
+    "team": "NLA",
+    "top_speed_kmh": 29.0,
+    "vx": 1.1,
+    "vy": -1.06,
+    "x": 32.91,
+    "y": 22.68
+   },
+   {
+    "bio_load_profile": {
+     "fatigue_pdr_penalty": 12.5,
+     "high_intensity_seconds": 128.3,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 64.7,
+     "relief_required": true,
+     "sprint_load_index": 48.3,
+     "stamina_now": 85.3,
+     "tactical_relief_directive": "Shift #3 to a compact mid-block; delegate the wide pressing trigger to the inverted fullback and preserve the cover shadow."
+    },
+    "distance_m": 6661.5,
+    "heading_rad": -0.798,
+    "id": "NLA_3",
+    "name": "L. Ferreira",
+    "number": 3,
+    "playstyle_badge": null,
+    "pose_state": "JOG",
+    "role": "DEF",
+    "shirt_number": 3,
+    "speed_kmh": 5.6,
+    "sprint_distance_m": 930.3,
+    "stamina": 85.3,
+    "team": "NLA",
+    "top_speed_kmh": 28.7,
+    "vx": 1.2,
+    "vy": -0.99,
+    "x": 36.22,
+    "y": 12.98
+   },
+   {
+    "bio_load_profile": {
+     "fatigue_pdr_penalty": 14.7,
+     "high_intensity_seconds": 145.1,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 61.0,
+     "relief_required": true,
+     "sprint_load_index": 54.6,
+     "stamina_now": 82.8,
+     "tactical_relief_directive": "Pull #8 into a lower tempo; let the 8 hold the wide half-space and keep the counter-press outlet short."
+    },
+    "distance_m": 7615.2,
+    "heading_rad": -1.072,
+    "id": "NLA_8",
+    "name": "R. Callahan",
+    "number": 8,
+    "playstyle_badge": null,
+    "pose_state": "JOG",
+    "role": "MID",
+    "shirt_number": 8,
+    "speed_kmh": 16.6,
+    "sprint_distance_m": 1064.4,
+    "stamina": 82.8,
+    "team": "NLA",
+    "top_speed_kmh": 31.5,
+    "vx": 2.31,
+    "vy": -3.98,
+    "x": 53.41,
+    "y": 38.99
+   },
+   {
+    "bio_load_profile": {
+     "fatigue_pdr_penalty": 14.7,
+     "high_intensity_seconds": 143.7,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 61.0,
+     "relief_required": true,
+     "sprint_load_index": 54.6,
+     "stamina_now": 82.8,
+     "tactical_relief_directive": "Pull #4 into a lower tempo; let the 8 hold the wide half-space and keep the counter-press outlet short."
+    },
+    "distance_m": 7485.2,
+    "heading_rad": -2.486,
+    "id": "NLA_4",
+    "name": "M. Diop",
+    "number": 4,
+    "playstyle_badge": null,
+    "pose_state": "JOG",
+    "role": "MID",
+    "shirt_number": 4,
+    "speed_kmh": 16.6,
+    "sprint_distance_m": 1045.6,
+    "stamina": 82.8,
+    "team": "NLA",
+    "top_speed_kmh": 29.7,
+    "vx": -4.12,
+    "vy": -2.04,
+    "x": 55.79,
+    "y": 34.8
+   },
+   {
+    "bio_load_profile": {
+     "fatigue_pdr_penalty": 15.3,
+     "high_intensity_seconds": 151.2,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 60.6,
+     "relief_required": true,
+     "sprint_load_index": 56.8,
+     "stamina_now": 82.8,
+     "tactical_relief_directive": "Pull #10 into a lower tempo; let the 8 hold the wide half-space and keep the counter-press outlet short."
+    },
+    "distance_m": 7917.5,
+    "heading_rad": -0.811,
+    "id": "NLA_10",
+    "name": "K. Nakamura",
+    "number": 10,
+    "playstyle_badge": null,
+    "pose_state": "IDLE",
+    "role": "MID",
+    "shirt_number": 10,
+    "speed_kmh": 0.8,
+    "sprint_distance_m": 1106.7,
+    "stamina": 82.8,
+    "team": "NLA",
+    "top_speed_kmh": 31.8,
+    "vx": -0.02,
+    "vy": 0.22,
+    "x": 53.72,
+    "y": 21.08
+   },
+   {
+    "bio_load_profile": {
+     "fatigue_pdr_penalty": 13.4,
+     "high_intensity_seconds": 133.9,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 63.2,
+     "relief_required": true,
+     "sprint_load_index": 50.7,
+     "stamina_now": 84.2,
+     "tactical_relief_directive": "Rotate #7 off the press line; keep the far post runner isolated and reduce the recovery sprint to one transition."
+    },
+    "distance_m": 7020.1,
+    "heading_rad": -1.344,
+    "id": "NLA_7",
+    "name": "J. Ardaiz",
+    "number": 7,
+    "playstyle_badge": null,
+    "pose_state": "JOG",
+    "role": "FWD",
+    "shirt_number": 7,
+    "speed_kmh": 7.1,
+    "sprint_distance_m": 980.6,
+    "stamina": 84.2,
+    "team": "NLA",
+    "top_speed_kmh": 32.0,
+    "vx": 0.11,
+    "vy": -1.96,
+    "x": 71.71,
+    "y": 44.85
+   },
+   {
+    "bio_load_profile": {
+     "fatigue_pdr_penalty": 14.3,
+     "high_intensity_seconds": 142.3,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 62.6,
+     "relief_required": true,
+     "sprint_load_index": 53.9,
+     "stamina_now": 84.2,
+     "tactical_relief_directive": "Rotate #9 off the press line; keep the far post runner isolated and reduce the recovery sprint to one transition."
+    },
+    "distance_m": 7432.8,
+    "heading_rad": -0.63,
+    "id": "NLA_9",
+    "name": "V. Sorensen",
+    "number": 9,
+    "playstyle_badge": null,
+    "pose_state": "JOG",
+    "role": "FWD",
+    "shirt_number": 9,
+    "speed_kmh": 7.2,
+    "sprint_distance_m": 1038.3,
+    "stamina": 84.2,
+    "team": "NLA",
+    "top_speed_kmh": 28.5,
+    "vx": 1.93,
+    "vy": -0.55,
+    "x": 79.27,
+    "y": 29.47
+   },
+   {
+    "bio_load_profile": {
+     "fatigue_pdr_penalty": 14.2,
+     "high_intensity_seconds": 141.8,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 62.6,
+     "relief_required": true,
+     "sprint_load_index": 53.6,
+     "stamina_now": 84.2,
+     "tactical_relief_directive": "Rotate #11 off the press line; keep the far post runner isolated and reduce the recovery sprint to one transition."
+    },
+    "distance_m": 7429.7,
+    "heading_rad": 0.586,
+    "id": "NLA_11",
+    "name": "E. Toussaint",
+    "number": 11,
+    "playstyle_badge": null,
+    "pose_state": "JOG",
+    "role": "FWD",
+    "shirt_number": 11,
+    "speed_kmh": 20.2,
+    "sprint_distance_m": 1038.0,
+    "stamina": 84.2,
+    "team": "NLA",
+    "top_speed_kmh": 32.7,
+    "vx": 2.93,
+    "vy": 4.78,
+    "x": 72.83,
+    "y": 21.53
+   },
+   {
+    "bio_load_profile": {
+     "fatigue_pdr_penalty": 5.2,
+     "high_intensity_seconds": 56.5,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 77.7,
+     "relief_required": false,
+     "sprint_load_index": 21.8,
+     "stamina_now": 93.2,
+     "tactical_relief_directive": "#31 is within the sustainable band; no relief required."
+    },
+    "distance_m": 2997.2,
+    "heading_rad": 4.646,
+    "id": "MCS_31",
+    "name": "P. Vantera",
+    "number": 31,
+    "playstyle_badge": null,
+    "pose_state": "JOG",
+    "role": "GK",
+    "shirt_number": 31,
+    "speed_kmh": 8.3,
+    "sprint_distance_m": 418.3,
+    "stamina": 93.2,
+    "team": "MCS",
+    "top_speed_kmh": 29.4,
+    "vx": 0.01,
+    "vy": -2.3,
+    "x": 102.5,
+    "y": 29.9
+   },
+   {
+    "bio_load_profile": {
+     "fatigue_pdr_penalty": 13.2,
+     "high_intensity_seconds": 132.8,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 64.3,
+     "relief_required": true,
+     "sprint_load_index": 50.7,
+     "stamina_now": 85.3,
+     "tactical_relief_directive": "Shift #2 to a compact mid-block; delegate the wide pressing trigger to the inverted fullback and preserve the cover shadow."
+    },
+    "distance_m": 7035.1,
+    "heading_rad": 4.999,
+    "id": "MCS_2",
+    "name": "K. Whitmore",
+    "number": 2,
+    "playstyle_badge": null,
+    "pose_state": "IDLE",
+    "role": "DEF",
+    "shirt_number": 2,
+    "speed_kmh": 2.1,
+    "sprint_distance_m": 982.8,
+    "stamina": 85.3,
+    "team": "MCS",
+    "top_speed_kmh": 30.5,
+    "vx": -0.24,
+    "vy": -0.53,
+    "x": 88.7,
+    "y": 45.26
+   },
+   {
+    "bio_load_profile": {
+     "fatigue_pdr_penalty": 12.0,
+     "high_intensity_seconds": 121.4,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 65.1,
+     "relief_required": false,
+     "sprint_load_index": 46.2,
+     "stamina_now": 85.3,
+     "tactical_relief_directive": "#4 is within the sustainable band; no relief required."
+    },
+    "distance_m": 6428.0,
+    "heading_rad": 5.199,
+    "id": "MCS_4",
+    "name": "R. Steiner",
+    "number": 4,
+    "playstyle_badge": null,
+    "pose_state": "JOG",
+    "role": "DEF",
+    "shirt_number": 4,
+    "speed_kmh": 3.9,
+    "sprint_distance_m": 898.1,
+    "stamina": 85.3,
+    "team": "MCS",
+    "top_speed_kmh": 29.1,
+    "vx": 0.48,
+    "vy": -0.99,
+    "x": 92.17,
+    "y": 35.96
+   },
+   {
+    "bio_load_profile": {
+     "fatigue_pdr_penalty": 13.0,
+     "high_intensity_seconds": 131.4,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 64.4,
+     "relief_required": true,
+     "sprint_load_index": 50.0,
+     "stamina_now": 85.3,
+     "tactical_relief_directive": "Shift #5 to a compact mid-block; delegate the wide pressing trigger to the inverted fullback and preserve the cover shadow."
+    },
+    "distance_m": 6957.2,
+    "heading_rad": -1.072,
+    "id": "MCS_5",
+    "name": "J. Mensah",
+    "number": 5,
+    "playstyle_badge": null,
+    "pose_state": "JOG",
+    "role": "DEF",
+    "shirt_number": 5,
+    "speed_kmh": 7.5,
+    "sprint_distance_m": 972.1,
+    "stamina": 85.3,
+    "team": "MCS",
+    "top_speed_kmh": 32.1,
+    "vx": 1.14,
+    "vy": -1.74,
+    "x": 92.14,
+    "y": 22.88
+   },
+   {
+    "bio_load_profile": {
+     "fatigue_pdr_penalty": 13.0,
+     "high_intensity_seconds": 130.8,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 64.4,
+     "relief_required": true,
+     "sprint_load_index": 49.8,
+     "stamina_now": 85.3,
+     "tactical_relief_directive": "Shift #24 to a compact mid-block; delegate the wide pressing trigger to the inverted fullback and preserve the cover shadow."
+    },
+    "distance_m": 6930.1,
+    "heading_rad": -0.839,
+    "id": "MCS_24",
+    "name": "T. Okafor",
+    "number": 24,
+    "playstyle_badge": null,
+    "pose_state": "JOG",
+    "role": "DEF",
+    "shirt_number": 24,
+    "speed_kmh": 7.8,
+    "sprint_distance_m": 968.1,
+    "stamina": 85.3,
+    "team": "MCS",
+    "top_speed_kmh": 32.9,
+    "vx": 1.68,
+    "vy": -1.36,
+    "x": 89.01,
+    "y": 13.33
+   },
+   {
+    "bio_load_profile": {
+     "fatigue_pdr_penalty": 15.4,
+     "high_intensity_seconds": 150.3,
+     "press_seconds": 0.1,
+     "projected_stamina_10m": 60.5,
+     "relief_required": true,
+     "sprint_load_index": 57.2,
+     "stamina_now": 82.8,
+     "tactical_relief_directive": "Pull #16 into a lower tempo; let the 8 hold the wide half-space and keep the counter-press outlet short."
+    },
+    "distance_m": 7842.4,
+    "heading_rad": 5.946,
+    "id": "MCS_16",
+    "name": "H. Alvarez",
+    "number": 16,
+    "playstyle_badge": null,
+    "pose_state": "JOG",
+    "role": "MID",
+    "shirt_number": 16,
+    "speed_kmh": 15.1,
+    "sprint_distance_m": 1095.6,
+    "stamina": 82.8,
+    "team": "MCS",
+    "top_speed_kmh": 34.3,
+    "vx": 4.13,
+    "vy": 0.75,
+    "x": 65.11,
+    "y": 33.46
+   },
+   {
+    "bio_load_profile": {
+     "fatigue_pdr_penalty": 15.2,
+     "high_intensity_seconds": 146.9,
+     "press_seconds": 0.4,
+     "projected_stamina_10m": 60.6,
+     "relief_required": true,
+     "sprint_load_index": 56.3,
+     "stamina_now": 82.8,
+     "tactical_relief_directive": "Pull #22 into a lower tempo; let the 8 hold the wide half-space and keep the counter-press outlet short."
+    },
+    "distance_m": 7731.4,
+    "heading_rad": -1.932,
+    "id": "MCS_22",
+    "name": "N. Petrov",
+    "number": 22,
+    "playstyle_badge": null,
+    "pose_state": "PRESS",
+    "role": "MID",
+    "shirt_number": 22,
+    "speed_kmh": 13.9,
+    "sprint_distance_m": 1080.1,
+    "stamina": 82.8,
+    "team": "MCS",
+    "top_speed_kmh": 31.8,
+    "vx": -2.1,
+    "vy": -3.23,
+    "x": 73.49,
+    "y": 22.51
+   },
+   {
+    "bio_load_profile": {
+     "fatigue_pdr_penalty": 15.6,
+     "high_intensity_seconds": 151.9,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 60.4,
+     "relief_required": true,
+     "sprint_load_index": 57.8,
+     "stamina_now": 82.8,
+     "tactical_relief_directive": "Pull #7 into a lower tempo; let the 8 hold the wide half-space and keep the counter-press outlet short."
+    },
+    "distance_m": 8046.6,
+    "heading_rad": 5.537,
+    "id": "MCS_7",
+    "name": "C. Ambrose",
+    "number": 7,
+    "playstyle_badge": null,
+    "pose_state": "JOG",
+    "role": "MID",
+    "shirt_number": 7,
+    "speed_kmh": 15.1,
+    "sprint_distance_m": 1124.3,
+    "stamina": 82.8,
+    "team": "MCS",
+    "top_speed_kmh": 32.2,
+    "vx": 3.27,
+    "vy": -2.63,
+    "x": 60.44,
+    "y": 47.33
+   },
+   {
+    "bio_load_profile": {
+     "fatigue_pdr_penalty": 16.0,
+     "high_intensity_seconds": 153.5,
+     "press_seconds": 1.9,
+     "projected_stamina_10m": 59.6,
+     "relief_required": true,
+     "sprint_load_index": 58.7,
+     "stamina_now": 82.8,
+     "tactical_relief_directive": "Pull #20 into a lower tempo; let the 8 hold the wide half-space and keep the counter-press outlet short."
+    },
+    "distance_m": 8069.7,
+    "heading_rad": -0.885,
+    "id": "MCS_20",
+    "name": "F. Delacroix",
+    "number": 20,
+    "playstyle_badge": null,
+    "pose_state": "JOG",
+    "role": "MID",
+    "shirt_number": 20,
+    "speed_kmh": 15.1,
+    "sprint_distance_m": 1127.4,
+    "stamina": 82.8,
+    "team": "MCS",
+    "top_speed_kmh": 32.0,
+    "vx": 2.72,
+    "vy": -3.2,
+    "x": 63.41,
+    "y": 32.15
+   },
+   {
+    "bio_load_profile": {
+     "fatigue_pdr_penalty": 15.9,
+     "high_intensity_seconds": 151.5,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 60.2,
+     "relief_required": true,
+     "sprint_load_index": 58.7,
+     "stamina_now": 82.8,
+     "tactical_relief_directive": "Pull #11 into a lower tempo; let the 8 hold the wide half-space and keep the counter-press outlet short."
+    },
+    "distance_m": 7963.3,
+    "heading_rad": 0.271,
+    "id": "MCS_11",
+    "name": "S. Ibarra",
+    "number": 11,
+    "playstyle_badge": null,
+    "pose_state": "SPRINT",
+    "role": "MID",
+    "shirt_number": 11,
+    "speed_kmh": 29.3,
+    "sprint_distance_m": 1117.1,
+    "stamina": 82.8,
+    "team": "MCS",
+    "top_speed_kmh": 30.3,
+    "vx": 7.57,
+    "vy": 3.0,
+    "x": 65.72,
+    "y": 18.78
+   },
+   {
+    "bio_load_profile": {
+     "fatigue_pdr_penalty": 13.3,
+     "high_intensity_seconds": 132.6,
+     "press_seconds": 0.0,
+     "projected_stamina_10m": 63.2,
+     "relief_required": true,
+     "sprint_load_index": 50.5,
+     "stamina_now": 84.2,
+     "tactical_relief_directive": "Rotate #19 off the press line; keep the far post runner isolated and reduce the recovery sprint to one transition."
+    },
+    "distance_m": 7025.3,
+    "heading_rad": -0.445,
+    "id": "MCS_19",
+    "name": "B. Kovac",
+    "number": 19,
+    "playstyle_badge": null,
+    "pose_state": "JOG",
+    "role": "FWD",
+    "shirt_number": 19,
+    "speed_kmh": 15.1,
+    "sprint_distance_m": 981.3,
+    "stamina": 84.2,
+    "team": "MCS",
+    "top_speed_kmh": 30.2,
+    "vx": 3.88,
+    "vy": -1.62,
+    "x": 48.64,
+    "y": 31.5
+   }
+  ],
+  "possession": "NLA",
+  "scenario": null,
+  "scenario_left": null,
+  "score": {
+   "MCS": 1,
+   "NLA": 1
+  },
+  "t_match": 4204.0,
+  "type": "tick"
+ }
+}

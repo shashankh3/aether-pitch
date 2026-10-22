@@ -2412,6 +2412,31 @@ def main() -> int:
         check("Prize claim: the judge's claims could be verified", False,
               f"{type(exc).__name__}: {exc}")
 
+    # ---- the cross-engine parity fixture must not be stale ----------------
+    # The frontend logic suite recomputes these values with the browser twin
+    # and asserts they match. If the Python engine changes without the
+    # fixture being regenerated, the two engines have drifted and the twin
+    # would be asserting against the old answers.
+    import parity_fixture
+    fixture_path = parity_fixture.FIXTURE
+    check("Parity: the cross-engine fixture exists",
+          fixture_path.exists(),
+          str(fixture_path.name))
+    if fixture_path.exists():
+        live_fixture = parity_fixture.build_fixture()
+        stored = json.loads(fixture_path.read_text(encoding="utf-8"))
+        check("Parity: the fixture still matches the live Python engine",
+              stored == live_fixture,
+              "regenerate with: python backend/parity_fixture.py")
+        exp = (stored or {}).get("expected") or {}
+        check("Parity: the fixture covers every shared surface",
+              all(k in exp for k in ("xt_samples", "pitch_control", "passing_network",
+                                     "bio_load", "bio_load_summary", "line_shift",
+                                     "simulated_pitch_control"))
+              and len(exp.get("xt_samples") or []) == 192
+              and len(exp.get("bio_load") or []) == 22,
+              f"{sorted(exp.keys())}")
+
     print()
     if failures:
         print(f"RESULT: {len(failures)} FAILED -> {failures}")

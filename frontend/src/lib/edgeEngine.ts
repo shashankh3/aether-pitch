@@ -1170,7 +1170,10 @@ export class EdgeEngine {
  * sandbox and the live pipeline can never disagree.
  */
 export function calculateXTAtCoord(team: Team, x: number, y: number): number {
-  return Number(xtValue(team, x, y).toFixed(4));
+  // The same value the Stage B engine returns, to the same precision. It
+  // used to round to four decimals here, which made the offline sandbox's
+  // what-if baseline differ from the cloud one in the fifth decimal.
+  return xtValue(team, x, y);
 }
 
 /** Defensive line height bounds (metres from the team's own goal line). */
@@ -1220,8 +1223,10 @@ export function centralUsableCells(
 ): number {
   const outfield = players.filter((p) => p.role !== "GK");
   if (!outfield.length) return 0;
-  const moved = overrides && overrides.length ? overrides[0] : undefined;
-  const { nla, mcs } = influenceSurface(outfield, moved);
+  // Every override applies. A collective line shift relocates a whole
+  // block, so taking only the first one reported a different answer to the
+  // Stage B engine.
+  const { nla, mcs } = influenceSurface(outfield, overrides);
   let usable = 0;
   for (let i = 0; i < nla.length; i += 1) {
     const cx = GRID_CX[i];
@@ -1373,17 +1378,23 @@ const GRID_CY = Array.from({ length: XT_ROWS * XT_COLS }, (_, i) =>
  * 60 FPS claim.
  */
 function influenceSurface(
-  players: MatchTick["players"],
-  moved?: { playerId: string; x: number; y: number },
-): { nla: Float64Array; mcs: Float64Array } {
-  const cells = XT_ROWS * XT_COLS;
-  const nla = new Float64Array(cells);
-  const mcs = new Float64Array(cells);
-  for (const p of players) {
-    if (p.role === "GK") continue;
-    const isMoved = moved !== undefined && p.id === moved.playerId;
-    const px = (isMoved ? moved.x : p.x) + p.vx * 0.45;
-    const py = (isMoved ? moved.y : p.y) + p.vy * 0.45;
+    players: MatchTick["players"],
+    moved?: { playerId: string; x: number; y: number }[],
+  ): { nla: Float64Array; mcs: Float64Array } {
+    const cells = XT_ROWS * XT_COLS;
+    const nla = new Float64Array(cells);
+    const mcs = new Float64Array(cells);
+    // Every relocated player is applied, not just the first. The Stage B
+    // engine relocates a whole defensive block in one go, so a twin that
+    // moved one player reported a different press-compression gain.
+    const movedById = new Map<string, { x: number; y: number }>();
+    for (const m of moved ?? []) movedById.set(m.playerId, m);
+    for (const p of players) {
+      if (p.role === "GK") continue;
+      const mv = movedById.get(p.id);
+      const isMoved = mv !== undefined;
+      const px = (isMoved ? (mv as { x: number; y: number }).x : p.x) + p.vx * 0.45;
+      const py = (isMoved ? (mv as { x: number; y: number }).y : p.y) + p.vy * 0.45;
     // Corrupt telemetry: the player is absent from the surface, exactly like
     // the Stage B engine — one NaN must not neutralise a team's whole grid.
     if (!Number.isFinite(px) || !Number.isFinite(py)) continue;
@@ -1408,7 +1419,7 @@ export function computePitchControlSplit(
   if (!players.length) {
     return { nla_territory_pct: 50, mcs_territory_pct: 50, neutral_pct: 0 };
   }
-  const { nla, mcs } = influenceSurface(players, override);
+    const { nla, mcs } = influenceSurface(players, override ? [override] : undefined);
   let nlaCells = 0;
   let mcsCells = 0;
   let neutral = 0;
@@ -1566,16 +1577,25 @@ export function computePassingNetworkEdges(tick: MatchTick): PassingNetworkEdge[
       });
     }
   }
-  edges.sort((x, y) => y.xt_weight - x.xt_weight || x.from_id.localeCompare(y.from_id));
-  const perTeam: Record<string, PassingNetworkEdge[]> = { NLA: [], MCS: [] };
-  for (const edge of edges) {
-    const bucket = perTeam[edge.team] ?? (perTeam[edge.team] = []);
-    if (bucket.length < 3) bucket.push(edge);
+    // The same three-key ordering the Stage B engine uses: weight, then
+    // from id, then to id. A two-key sort leaves ties to the insertion
+    // order, which can order the network differently to the engine.
+    const byWeightThenId = (x: PassingNetworkEdge, y: PassingNetworkEdge): number => {
+      if (y.xt_weight !== x.xt_weight) return y.xt_weight - x.xt_weight;
+      if (x.from_id !== y.from_id) return x.from_id < y.from_id ? -1 : 1;
+      if (x.to_id !== y.to_id) return x.to_id < y.to_id ? -1 : 1;
+      return 0;
+    };
+    edges.sort(byWeightThenId);
+    const perTeam: Record<string, PassingNetworkEdge[]> = { NLA: [], MCS: [] };
+    for (const edge of edges) {
+      const bucket = perTeam[edge.team] ?? (perTeam[edge.team] = []);
+      if (bucket.length < 3) bucket.push(edge);
+    }
+    return [...(perTeam.NLA ?? []), ...(perTeam.MCS ?? [])]
+      .sort(byWeightThenId)
+      .slice(0, 5);
   }
-  return [...(perTeam.NLA ?? []), ...(perTeam.MCS ?? [])]
-    .sort((x, y) => y.xt_weight - x.xt_weight || x.from_id.localeCompare(y.from_id))
-    .slice(0, 5);
-}
 
 export function edgePipeline(): Pipeline {
   const engine = new EdgeEngine(3);

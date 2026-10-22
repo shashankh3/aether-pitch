@@ -979,6 +979,198 @@ check(
     `phase=${drill3.snapshot.phase}`);
 }
 
+// ---------------------------------------------------------------------------
+// Cross-engine parity: the browser twin must equal the Python engine.
+//
+// The Stage B engine runs on the backend; the browser twin runs when the
+// backend is unreachable. If they ever disagree, a judge sees one product
+// online and a different one offline - and the "every number is grounded
+// and the twin agrees" claim becomes false.
+//
+// The Python engine's answers for a deterministic scenario live in
+// `parity-fixture.json` (regenerate with `python backend/parity_fixture.py`).
+// The backend suite asserts that fixture is still current, so it cannot go
+// stale silently.
+//
+// This is the method that caught the NaN drift: the two engines disagreed on
+// a non-finite coordinate and nothing else would have noticed.
+// ---------------------------------------------------------------------------
+{
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+
+  const fixturePath = path.resolve(process.cwd(), "scripts", "parity-fixture.json");
+  const fixture = JSON.parse(fs.readFileSync(fixturePath, "utf8"));
+  const tick = fixture.state as MatchTick;
+  const expected = fixture.expected;
+
+  // --- xT at 192 grid points, both attacking directions ------------------
+  let xtMismatches: string[] = [];
+  for (const [x, y, nla, mcs] of expected.xt_samples as number[][]) {
+    const tNla = calculateXTAtCoord("NLA", x, y);
+    const tMcs = calculateXTAtCoord("MCS", x, y);
+    if (Math.abs(tNla - nla) > 1e-6) {
+      xtMismatches.push(`NLA(${x},${y}) twin=${tNla} py=${nla}`);
+    }
+    if (Math.abs(tMcs - mcs) > 1e-6) {
+      xtMismatches.push(`MCS(${x},${y}) twin=${tMcs} py=${mcs}`);
+    }
+  }
+  check(
+    "Parity: the twin's xT surface equals the Python engine's at every grid point",
+    xtMismatches.length === 0,
+    xtMismatches.length === 0
+      ? `${(expected.xt_samples as number[][]).length} points x 2 directions`
+      : xtMismatches.slice(0, 4).join("; "),
+  );
+
+  // --- the pitch-control split -------------------------------------------
+  const pc = computePitchControlSplit(tick);
+  const pcExpected = expected.pitch_control;
+  check(
+    "Parity: the twin's pitch-control split equals the Python engine's",
+    Math.abs(pc.nla_territory_pct - pcExpected.nla_territory_pct) < 1e-6
+    && Math.abs(pc.mcs_territory_pct - pcExpected.mcs_territory_pct) < 1e-6
+    && Math.abs((pc.neutral_pct ?? 0) - (pcExpected.neutral_pct ?? 0)) < 1e-6,
+    `twin nla=${pc.nla_territory_pct} py=${pcExpected.nla_territory_pct}`,
+  );
+
+  // --- the passing network, in the same order -----------------------------
+  const net = computePassingNetworkEdges(tick);
+  const netExpected = expected.passing_network as {
+    from_id: string; to_id: string; team: string;
+    xt_weight: number; distance_m: number;
+    from_xy: { x: number; y: number }; to_xy: { x: number; y: number };
+  }[];
+  const netMismatch: string[] = [];
+  if (net.length !== netExpected.length) {
+    netMismatch.push(`count twin=${net.length} py=${netExpected.length}`);
+  }
+  for (let i = 0; i < Math.min(net.length, netExpected.length); i += 1) {
+    const a = net[i];
+    const b = netExpected[i];
+    if (a.from_id !== b.from_id || a.to_id !== b.to_id || a.team !== b.team
+      || Math.abs(a.xt_weight - b.xt_weight) > 1e-6
+      || Math.abs(a.distance_m - b.distance_m) > 1e-6
+      || Math.abs(a.from_xy.x - b.from_xy.x) > 1e-6
+      || Math.abs(a.to_xy.y - b.to_xy.y) > 1e-6) {
+      netMismatch.push(
+        `#${i} twin=${a.from_id}->${a.to_id}@${a.xt_weight} `
+        + `py=${b.from_id}->${b.to_id}@${b.xt_weight}`,
+      );
+    }
+  }
+  check(
+    "Parity: the twin's passing network equals the Python engine's, in the same order",
+    netMismatch.length === 0,
+    netMismatch.length === 0
+      ? `${net.length} edges`
+      : netMismatch.slice(0, 4).join("; "),
+  );
+
+  // --- the per-player bio-load profiles ----------------------------------
+  let bioMismatch: string[] = [];
+  for (const { id, profile } of expected.bio_load as {
+    id: string;
+    profile: {
+      sprint_load_index: number; projected_stamina_10m: number;
+      fatigue_pdr_penalty: number; high_intensity_seconds: number;
+      press_seconds: number; stamina_now: number; relief_required: boolean;
+      tactical_relief_directive: string;
+    };
+  }[]) {
+    const p = tick.players.find((pl) => pl.id === id);
+    if (!p) {
+      bioMismatch.push(`${id} missing from the tick`);
+      continue;
+    }
+    const twin = computeBioLoadProfile({
+      number: p.number,
+      role: p.role,
+      stamina: p.stamina,
+      bioLoad: profile.sprint_load_index,
+      highIntensitySeconds: profile.high_intensity_seconds,
+      pressSeconds: profile.press_seconds,
+    });
+    for (const field of [
+      "sprint_load_index", "projected_stamina_10m", "fatigue_pdr_penalty",
+      "high_intensity_seconds", "stamina_now",
+    ] as const) {
+      if (Math.abs(twin[field] - profile[field]) > 1e-6) {
+        bioMismatch.push(`${id}.${field} twin=${twin[field]} py=${profile[field]}`);
+      }
+    }
+    if (twin.relief_required !== profile.relief_required) {
+      bioMismatch.push(`${id}.relief_required twin=${twin.relief_required} py=${profile.relief_required}`);
+    }
+    if (twin.tactical_relief_directive !== profile.tactical_relief_directive) {
+      bioMismatch.push(`${id}.directive differs`);
+    }
+  }
+  check(
+    "Parity: the twin's bio-load profile equals the Python engine's, for every player",
+    bioMismatch.length === 0,
+    bioMismatch.length === 0
+      ? `${(expected.bio_load as unknown[]).length} players`
+      : bioMismatch.slice(0, 4).join("; "),
+  );
+
+  // --- the collective line shift -----------------------------------------
+  const shiftMismatch: string[] = [];
+  for (const [key, values] of Object.entries(
+    expected.line_shift as Record<string, Record<string, number>>,
+  )) {
+    const [team, heightText] = key.split("@");
+    const twin = evaluateDefensiveLineShift(tick, team as Team, Number(heightText));
+    for (const [field, pyValue] of Object.entries(values)) {
+      const twinValue = (twin as unknown as Record<string, number>)[field];
+      if (typeof twinValue !== "number" || Math.abs(twinValue - pyValue) > 1e-6) {
+        shiftMismatch.push(`${key}.${field} twin=${twinValue} py=${pyValue}`);
+      }
+    }
+  }
+  check(
+    "Parity: the twin's defensive line shift equals the Python engine's",
+    shiftMismatch.length === 0,
+    shiftMismatch.length === 0
+      ? `${Object.keys(expected.line_shift as object).length} shifts`
+      : shiftMismatch.slice(0, 4).join("; "),
+  );
+
+  // --- the simulated pitch control after a relocation --------------------
+  const simMismatch: string[] = [];
+  for (const s of expected.simulated_pitch_control as {
+    player_id: string; x: number; y: number;
+    split: { nla_territory_pct: number; mcs_territory_pct: number };
+  }[]) {
+    const twin = evaluateSimulatedPitchControl(tick, s.player_id, s.x, s.y);
+    if (Math.abs(twin.nla_territory_pct - s.split.nla_territory_pct) > 1e-6
+      || Math.abs(twin.mcs_territory_pct - s.split.mcs_territory_pct) > 1e-6) {
+      simMismatch.push(
+        `${s.player_id} twin=${twin.nla_territory_pct}/${twin.mcs_territory_pct} `
+        + `py=${s.split.nla_territory_pct}/${s.split.mcs_territory_pct}`,
+      );
+    }
+  }
+  check(
+    "Parity: the twin's simulated pitch control equals the Python engine's",
+    simMismatch.length === 0,
+    simMismatch.length === 0
+      ? `${(expected.simulated_pitch_control as unknown[]).length} relocations`
+      : simMismatch.slice(0, 3).join("; "),
+  );
+
+  // --- the fixture itself must be a real scenario, not an empty one ------
+  check(
+    "Parity: the fixture is a real scenario, not an empty one",
+    tick.players.length === 22
+    && (expected.xt_samples as unknown[]).length === 192
+    && (expected.passing_network as unknown[]).length > 0
+    && (expected.bio_load as unknown[]).length === 22,
+    `${tick.players.length} players, ${(expected.xt_samples as unknown[]).length} xt points`,
+  );
+}
+
 // --- cleanup ----------------------------------------------------------------
 clearSandbox();
 clearLedger();

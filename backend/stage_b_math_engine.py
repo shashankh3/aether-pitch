@@ -53,6 +53,24 @@ def _clip(v: float, lo: float = 0.0, hi: float = 1.0) -> float:
     return max(lo, min(hi, v))
 
 
+def _moved_players(overrides: Optional[List[dict]]) -> Dict[str, Tuple[float, float]]:
+    """Normalise a list of player relocations into an id -> (x, y) map.
+
+    Two call sites used two different key names for the same concept
+    ("id" and "player_id"). An override whose key did not match was
+    silently ignored, so a relocation could be dropped without any error.
+    Both spellings are accepted now, and an entry with no usable id is
+    rejected loudly rather than ignored.
+    """
+    moved: Dict[str, Tuple[float, float]] = {}
+    for o in (overrides or []):
+        pid = o.get("player_id") or o.get("id")
+        if not pid:
+            raise ValueError("a player relocation needs a 'player_id' or 'id'")
+        moved[str(pid)] = (float(o.get("x", 0.0)), float(o.get("y", 0.0)))
+    return moved
+
+
 #: Defensive line height bounds (metres from the team's own goal line).
 DEF_LINE_MIN_M = 18.0
 DEF_LINE_MAX_M = 52.0
@@ -148,10 +166,7 @@ def _central_usable_cells(
     A cell is usable when the opposition influence clearly exceeds the
     defending side's, measured on the same 16x12 grid the rest of Stage B uses.
     """
-    moved = {
-        o.get("id"): (float(o.get("x", 0.0)), float(o.get("y", 0.0)))
-        for o in (override_players or [])
-    }
+    moved = _moved_players(override_players)
     players = [p for p in state.get("players", []) if p.get("role") != "GK"]
     if not players:
         return 0
@@ -525,10 +540,7 @@ class TacticalMathEngine:
         interactive what-if sandbox evaluates a counterfactual against exactly
         the same surface the live pipeline uses.
         """
-        moved = {
-            o.get("player_id"): (float(o.get("x", 0.0)), float(o.get("y", 0.0)))
-            for o in (overrides or [])
-        }
+        moved = _moved_players(overrides)
         players = [p for p in state.get("players", []) if p.get("role") != "GK"]
         if not players:
             return {"nla_territory_pct": 50.0, "mcs_territory_pct": 50.0,
