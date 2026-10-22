@@ -36,7 +36,7 @@ backend/
   content_safety.py             132 LOC  Azure AI Content Safety (optional)
   counterfactual.py             336 LOC  what-if contract + evaluation (no globals)
   main.py                     1,075 LOC  HTTP/WS surface + match loop
-  test_pipeline.py            1,700 LOC  154 assertions
+  test_pipeline.py            1,800 LOC  163 assertions
 
 frontend/src/
   lib/edgeEngine.ts           1,623 LOC  the browser-native twin
@@ -153,12 +153,12 @@ The 3D stage is not an observer feed — it is a sandbox.
 
 | Suite | Command | Covers |
 |---|---|---|
-| Backend | `python backend/test_pipeline.py` | 154 assertions: all five stages, the gate, the trace, the war-room, the counterfactual arbiter, the line shift, the RAI shield, the hub, the retry policy, the xT/pitch-control invariants, the compliance audit |
+| Backend | `python backend/test_pipeline.py` | 163 assertions: all five stages, the gate, the trace, the war-room, the counterfactual arbiter, the line shift, the RAI shield, the hub, the retry policy, the xT/pitch-control invariants, the i18n atlas, the compliance audit |
 | ARM | `python infra/validate_template.py` | JSON validity, ARM symbol resolution, dependency integrity, secret handling |
 | Types | `cd frontend && npx tsc --noEmit` | The whole contract surface |
 | Build | `npm run build` | Production compile |
 | SSR | `npm run smoke` | In-process server render, runtime config injection, no SSR error |
-| Logic | `npm run check:logic` | 36 headless assertions over the browser twin, the sandbox, the ledger, the dossier and the DVR buffer |
+| Logic | `npm run check:logic` | 37 headless assertions over the browser twin, the sandbox, the ledger, the dossier and the DVR buffer |
 | UI render | `npm run smoke:ui` | 30 assertions — every judge-facing surface renders without throwing |
 
 The backend suite also runs the **Official Rules compliance audit** — synthetic

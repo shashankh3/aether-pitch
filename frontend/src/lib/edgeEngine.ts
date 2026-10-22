@@ -44,7 +44,7 @@ function buildEdgeTrace(
         role: "Deterministic gate",
         status: "completed",
         latency_ms: 0,
-        summary: `PDR ${pdr.toFixed(0)}% Â· Î”xT ${dxt >= 0 ? "+" : ""}${dxt.toFixed(2)} Â· Î”Chaos ${deltaChaos >= 0 ? "+" : ""}${deltaChaos.toFixed(2)}`,
+        summary: `PDR ${pdr.toFixed(0)}% · ΔxT ${dxt >= 0 ? "+" : ""}${dxt.toFixed(2)} · ΔChaos ${deltaChaos >= 0 ? "+" : ""}${deltaChaos.toFixed(2)}`,
         detail: gate.reasons?.join("; ") || "Edge threshold gate",
       },
       {
@@ -62,7 +62,7 @@ function buildEdgeTrace(
         role: "Narrative + numeric critic",
         status: "fallback",
         latency_ms: 0,
-        summary: "Deterministic edge template Â· 100% grounded",
+        summary: "Deterministic edge template · 100% grounded",
         detail: ghostDelta != null
           ? `Ghost lane ${ghostDelta >= 0 ? "+" : ""}${ghostDelta.toFixed(2)} xT vs actual ${dxt >= 0 ? "+" : ""}${dxt.toFixed(2)} xT.`
           : "No higher-value ghost lane in the edge scan.",
@@ -73,7 +73,7 @@ function buildEdgeTrace(
         role: "Overlay + camera + i18n",
         status: "completed",
         latency_ms: 0,
-        summary: "Tactical pulse Â· auto camera Â· 4 languages",
+        summary: "Tactical pulse · auto camera · 4 languages",
         detail: "Edge render contract active while the backend reconnects.",
       },
     ],
@@ -471,7 +471,7 @@ export class EdgeEngine {
             player_id: event.player_id,
             player_name: event.player_name,
             headline: "5th Consecutive Line-Breaking Pass",
-            detail: `Cumulative PDR streak live Â· ${pdr.toFixed(0)}% latest`,
+            detail: `Cumulative PDR streak live · ${pdr.toFixed(0)}% latest`,
             value: pdr,
           });
         }
@@ -522,19 +522,19 @@ export class EdgeEngine {
             ? `The ball moved into a zone worth ${dxt.toFixed(2)} more xT, dragging the ${opponent} block ${metrics.stretch_m.toFixed(0)}m out of shape.`
             : `Turnover rate is ${metrics.turnover_rate.toFixed(1)} per minute and ball-speed variance is low, so ${team} are circulating without fracturing.`;
     const story = archetype === "counter_overload"
-      ? `Lightning break! ${team} stole it and exploded forward at ${(event.speed_kmh ?? 31.6).toFixed(0)} km/h â€” the defence was caught square.`
+      ? `Lightning break! ${team} stole it and exploded forward at ${(event.speed_kmh ?? 31.6).toFixed(0)} km/h — the defence was caught square.`
       : archetype === "pressing_trap"
-        ? `${opponent} sprang a perfect pressing trap â€” three defenders swarmed the ball and won it high. The crowd can smell a chance!`
+        ? `${opponent} sprang a perfect pressing trap — three defenders swarmed the ball and won it high. The crowd can smell a chance!`
         : archetype === "difficult_progression"
-          ? `What a pass from ${player} â€” threaded through a forest of defenders! One mistake there and it is a counter.`
+          ? `What a pass from ${player} — threaded through a forest of defenders! One mistake there and it is a counter.`
           : archetype === "threat_surge"
-            ? `${team} are slicing through the pitch â€” every pass is pulling defenders out of position.`
+            ? `${team} are slicing through the pitch — every pass is pulling defenders out of position.`
             : `Calm, controlled possession from ${team}. They are passing the opponent into submission.`;
     const translations = {
       en: story,
-      es: `Â¡Momento tÃ¡ctico! ${story}`,
-      ar: `Ù„Ø­Ø¸Ø© ØªÙƒØªÙŠÙƒÙŠØ©! ${story}`,
-      hi: `à¤°à¤£à¤¨à¥€à¤¤à¤¿à¤• à¤ªà¤²! ${story}`,
+      es: `¡Momento táctico! ${story}`,
+      ar: `لحظة تكتيكية! ${story}`,
+      hi: `रणनीतिक पल! ${story}`,
     };
     const eventId = event.id;
     const trace = buildEdgeTrace(event, tick, metrics, archetype, pdr, dxt, ghost, this.insightSeq);
@@ -555,10 +555,10 @@ export class EdgeEngine {
       stage_c_explainability: {
         moment_headline: headline,
         why_it_matters_causal: causal,
-        tactical_catalyst: `PDR ${pdr.toFixed(0)}% â€¢ Î”xT ${dxt.toFixed(2)} â€¢ Chaos ${metrics.chaos_index.toFixed(2)}`,
+        tactical_catalyst: `PDR ${pdr.toFixed(0)}% • ΔxT ${dxt.toFixed(2)} • Chaos ${metrics.chaos_index.toFixed(2)}`,
         commentator_talking_point: archetype === "difficult_progression"
-          ? `That is an 80-plus difficulty ball â€” one misjudged touch and it is a counter the other way. ${player} took the gamble and it stuck.`
-          : `Watch the shape â€” ${team} turned a single moment into a structural problem in under three seconds.`,
+          ? `That is an 80-plus difficulty ball — one misjudged touch and it is a counter the other way. ${player} took the gamble and it stuck.`
+          : `Watch the shape — ${team} turned a single moment into a structural problem in under three seconds.`,
       },
       stage_d_broadcast_overlay: {
         timecode: event.clock,
@@ -566,14 +566,14 @@ export class EdgeEngine {
         highlight_players: [event.player_id, ghost?.target_id].filter(Boolean) as string[],
         draw_ghost_pass: !!ghost,
         lower_third_title: headline.toUpperCase(),
-        lower_third_subtitle: `Pass Difficulty ${pdr.toFixed(1)}% â€¢ Î”xT ${dxt.toFixed(2)} â€¢ Chaos ${metrics.chaos_index.toFixed(2)}`,
+        lower_third_subtitle: `Pass Difficulty ${pdr.toFixed(1)}% • ΔxT ${dxt.toFixed(2)} • Chaos ${metrics.chaos_index.toFixed(2)}`,
       },
       stage_e_personalization: {
         analyst_mode: {
-          metrics_summary: `PPDA ${metrics.ppda.NLA.toFixed(1)}/${metrics.ppda.MCS.toFixed(1)} | Î”xT ${dxt.toFixed(3)} | Pass Diff ${pdr.toFixed(1)}% | Pass Acc ${(teamRow?.pass_accuracy ?? 0).toFixed(1)}% | Shots ${teamRow?.shots ?? 0} | Chaos ${metrics.chaos_index.toFixed(2)}`,
+          metrics_summary: `PPDA ${metrics.ppda.NLA.toFixed(1)}/${metrics.ppda.MCS.toFixed(1)} | ΔxT ${dxt.toFixed(3)} | Pass Diff ${pdr.toFixed(1)}% | Pass Acc ${(teamRow?.pass_accuracy ?? 0).toFixed(1)}% | Shots ${teamRow?.shots ?? 0} | Chaos ${metrics.chaos_index.toFixed(2)}`,
           tactical_note: ghost
             ? `Optimal alternative was ${ghost.target_id ?? "a free man"} (+${ghost.delta_xt.toFixed(2)} xT, ${(ghost.openness_m ?? 0).toFixed(0)}m of space) vs ${dxt.toFixed(2)} on the actual ball.`
-            : `No higher-value option available â€” the executed ball was already the spatial optimum.`,
+            : `No higher-value option available — the executed ball was already the spatial optimum.`,
           metric_focus_note: "EDGE AUTONOMOUS ENGINE: full metric set unavailable while the backend reconnects.",
         },
         casual_fan_mode: { story_card: story, excitement_rating: Math.round(clamp(52 + metrics.chaos_index * 40 + pdr * 0.08, 44, 99)) },
@@ -907,7 +907,7 @@ export class EdgeEngine {
         should_explain: pdr > 80 || dxt > 0.08 || !!this.scenarioName,
         reasons: [
           ...(pdr > 80 ? ["PDR > 80"] : []),
-          ...(dxt > 0.08 ? ["Î”xT > 0.08"] : []),
+          ...(dxt > 0.08 ? ["ΔxT > 0.08"] : []),
           ...(this.scenarioName ? ["Scenario"] : []),
         ],
       },
@@ -1627,9 +1627,9 @@ export function edgeWarRoom(
         `Verdict: ACCEPT the ${team} overload. Against the ${opp} counter-press the arbiter weights territory (${territory.nla_territory_pct.toFixed(0)}% to ${territory.mcs_territory_pct.toFixed(0)}%), xT at the target zone (${xtAtGap.toFixed(3)}) and the ${gap.toFixed(1)}m seam. Net projected gain is +${overload.toFixed(2)} xT over the next 30 seconds, with the ${opp} counter priced in as a ${Math.max(0, 1.8 - overload * 6).toFixed(1)}% win-probability drag.`,
     },
     recommended_adjustment: {
-      title: `Invert Right Fullback â€” ${zx},${zy} Overload`,
+      title: `Invert Right Fullback — ${zx},${zy} Overload`,
       directive:
-        `Drop the right fullback into the ${zx},${zy} half-space, overload the ${defender.id ?? "â€”"} seam 3v2 and release the inside-left channel into the ${opp} pivot trap.`,
+        `Drop the right fullback into the ${zx},${zy} half-space, overload the ${defender.id ?? "—"} seam 3v2 and release the inside-left channel into the ${opp} pivot trap.`,
       team,
       opponent: opp,
     },

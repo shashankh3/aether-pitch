@@ -80,6 +80,21 @@ MEDIA_ASSET_RE = re.compile(
     re.IGNORECASE,
 )
 
+#: cp1252 double-encoding signatures, written as escape sequences so this
+#: file does not trip its own rule. A UTF-8 file re-saved through a cp1252
+#: decode turns an em-dash into the 3-character sequence U+00E2 U+20AC U+201D
+#: and the Arabic/Hindi atlas into Latin-1 garbage the fan sees verbatim.
+#: Legitimate source never contains these byte sequences.
+MOJIBAKE_MARKERS = (
+    b"\xc3\x82",              # U+00C2 lead (double-encoded C2 xx originals)
+    b"\xc3\x83",              # U+00C3 lead (double-encoded C3 xx originals)
+    b"\xc3\x8e\xe2\x80\x9d",  # was U+0394 GREEK CAPITAL LETTER DELTA
+    b"\xc3\x99",              # U+00D9 (Arabic mojibake lead)
+    b"\xc3\x98",              # U+00D8 (Arabic mojibake lead)
+    b"\xc3\xa0\xc2",          # U+00E0 + C2 (Devanagari mojibake lead)
+    b"\xc3\xa2\xe2\x82\xac",  # was an E2 80 xx punctuation char
+)
+
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
@@ -229,6 +244,25 @@ def test_rules_and_trademark_compliance(
         not media_files,
         f"{len(media_files)} media references"
         + (f" -> {media_files[:5]}" if media_files else ""),
+    ))
+
+    # -- clean UTF-8: no cp1252 double-encoding reaches the fan -----------
+    mojibake: list = []
+    for path in _iter_source_files():
+        rel = str(path.relative_to(_repo_root())).replace("\\", "/")
+        try:
+            raw = path.read_bytes()
+        except OSError:
+            continue
+        for marker in MOJIBAKE_MARKERS:
+            if marker in raw:
+                mojibake.append(f"{rel}:{marker.hex()}")
+                break
+    results.append((
+        "Source files are clean UTF-8 (no cp1252 double-encoding of the UI text)",
+        not mojibake,
+        f"{len(mojibake)} files with mojibake"
+        + (f" -> {mojibake[:5]}" if mojibake else ""),
     ))
 
     # -- §4.4 only synthetic competitions are ever named -----------------
@@ -487,6 +521,63 @@ def main() -> int:
           all(k in packet["stage_e_personalization"] for k in
               ("analyst_mode", "casual_fan_mode", "player_lock_insight", "translations"))
           and all(l in packet["stage_e_personalization"]["translations"] for l in ("en", "es", "ar", "hi")))
+
+    # ---- i18n atlas coverage is locked ------------------------------------
+    # A new archetype without a full es/ar/hi entry used to fall back to the
+    # rhythm_shift atlas silently. These assertions make that drift a failure.
+    from stage_c_foundry_agents import ARCHETYPES, pick_archetype
+    from stage_d_e_personalizer import (
+        CLUB_BIAS_OPTIONS, CLUB_FRAMES, LOWER_TITLES, METRIC_FOCUS_OPTIONS,
+        METRIC_FOCUS_TEXT, RECAP_INTROS, STORIES, TRANSLATIONS,
+    )
+    atlas_langs = ("es", "ar", "hi")
+    arch_matrix = [
+        ({"scenario": "chaos_counter"}, {}),
+        ({"scenario": "high_press_turnover"}, {}),
+        ({"type": "PRESSURE_TRAP"}, {}),
+        ({"scenario": "tactical_inversion"}, {}),
+        ({"type": "TACTICAL_INVERSION"}, {}),
+        ({"type": "PASS", "pdr": 90.0}, {}),
+        ({"type": "SHOT", "pdr": 95.0}, {}),
+        ({"type": "PASS", "delta_xt": 0.10}, {}),
+        ({}, {"chaos_state": "HIGH CHAOS TRANSITION"}),
+        (None, {}),
+        ({}, {}),
+    ]
+    arch_outputs = {pick_archetype(ev, m) for ev, m in arch_matrix}
+    check("i18n: pick_archetype stays inside the archetype registry",
+          arch_outputs <= set(ARCHETYPES),
+          f"outputs={sorted(arch_outputs)}")
+    check("i18n: the archetype matrix exercises every branch",
+          len(arch_outputs) == len(set(ARCHETYPES)),
+          f"{len(arch_outputs)} distinct of {len(ARCHETYPES)} registered")
+    check("i18n: every archetype has a full es/ar/hi atlas entry",
+          set(ARCHETYPES) <= set(TRANSLATIONS)
+          and all(set(TRANSLATIONS[a]) >= set(atlas_langs) for a in ARCHETYPES),
+          f"{len(ARCHETYPES)} archetypes x {len(atlas_langs)} languages")
+    check("i18n: every archetype has an EN story and a lower-third title",
+          set(ARCHETYPES) <= set(STORIES) and set(ARCHETYPES) <= set(LOWER_TITLES))
+    fmt_ok = True
+    for arch in ARCHETYPES:
+        for tmpl in list(TRANSLATIONS[arch].values()) + [STORIES[arch]]:
+            try:
+                if not tmpl.format(team="NLA", opp="MCS", player="D. Keswick",
+                                   speed=31.0).strip():
+                    fmt_ok = False
+            except (KeyError, IndexError, ValueError):
+                fmt_ok = False
+    check("i18n: every atlas template formats with the live placeholder set",
+          fmt_ok, "{team} {opp} {player} {speed}")
+    check("i18n: atlas entries are genuine translations, not English passthrough",
+          all(TRANSLATIONS[a][l] != STORIES[a]
+              for a in ARCHETYPES for l in atlas_langs))
+    check("i18n: the recap intro exists in all three market languages",
+          all(RECAP_INTROS.get(l) for l in atlas_langs))
+    check("i18n: metric-focus and club-bias frames cover all four languages",
+          set(METRIC_FOCUS_TEXT) == set(METRIC_FOCUS_OPTIONS) - {"ALL"}
+          and set(CLUB_FRAMES) == set(CLUB_BIAS_OPTIONS) - {"NEUTRAL"}
+          and all(set(t) >= {"en", "es", "ar", "hi"}
+                  for t in list(METRIC_FOCUS_TEXT.values()) + list(CLUB_FRAMES.values())))
 
     trace = build_agent_trace(
         enriched, math.snapshot(st), st, c_wrapped, packet,

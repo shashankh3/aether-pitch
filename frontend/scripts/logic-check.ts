@@ -383,6 +383,35 @@ check(
     && bioSummary.mean_sprint_load_index >= 0,
 );
 
+// --- edge-twin i18n: genuine scripts, no double-encoded UTF-8 --------------
+const insightFrame = engine.step(0.1);
+const insight = engine.buildInsight(
+  {
+    id: "evt_i18n",
+    type: "PASS",
+    clock: "63:05",
+    t_match: 3785,
+    team: "NLA",
+    player_id: "NLA_7",
+    player_name: "D. Keswick",
+    pdr: 84,
+    delta_xt: 0.11,
+  },
+  insightFrame.tick as MatchTick,
+  insightFrame.metrics,
+);
+const tr = insight.stage_e_personalization.translations as Record<string, string>;
+const MOJIBAKE = /[ÃÂÎØÙ]|â€|à¤/;
+check(
+  "the edge twin ships a genuine 4-language atlas",
+  typeof tr.en === "string" && tr.en.length > 20
+    && typeof tr.es === "string" && /[¡áéíóúñ]/i.test(tr.es)
+    && typeof tr.ar === "string" && /[؀-ۿ]/.test(tr.ar)
+    && typeof tr.hi === "string" && /[ऀ-ॿ]/.test(tr.hi)
+    && Object.values(tr).every((s) => !MOJIBAKE.test(s)),
+  "en/es/ar/hi present, correct scripts, zero mojibake",
+);
+
 // --- sandbox store ---------------------------------------------------------
 clearSandbox();
 clearLedger();
