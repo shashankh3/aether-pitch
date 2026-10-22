@@ -7,6 +7,7 @@ fallbacks), no Azure credentials required.
 """
 import asyncio
 import copy
+import dataclasses
 import json
 import re
 import subprocess
@@ -588,6 +589,71 @@ def main() -> int:
               ("analyst_mode", "casual_fan_mode", "player_lock_insight", "translations"))
           and all(l in packet["stage_e_personalization"]["translations"] for l in ("en", "es", "ar", "hi")))
 
+    # ---- Stage (e) translator posture is truthful -------------------------
+    # The health endpoint used to claim "azure-translator" from configuration
+    # alone, so a configured-but-failing Translator was reported as working.
+    ts = pers.translator_status()
+    check("Stage e: translator status reports configuration and runtime truth",
+          set(ts) >= {"configured", "last_attempted", "last_used", "last_error"}
+          and ts["configured"] == bool(settings.translator_enabled))
+    check("Stage e: translator mode never claims Azure without a successful call",
+          pers.translator_mode() != "azure-translator"
+          or ts["last_used"] is not None,
+          f"mode={pers.translator_mode()}")
+    check("Stage e: an unconfigured translator reports the local atlas",
+          (pers.translator_mode() == "local_atlas")
+          or ts["configured"],
+          f"mode={pers.translator_mode()}")
+
+    class _Boom(Exception):
+        pass
+
+    def _fail_translate(_self, _text):
+        raise _Boom("translator unreachable")
+
+    def _ok_translate(_self, _text):
+        return {"es": "hola", "ar": "marhaba", "hi": "namaste"}
+
+    orig_translate = Personalizer._azure_translate
+    try:
+        # configured + failing -> the mode must admit the fallback
+        pers_f = Personalizer(settings)
+        pers_f.s = dataclasses.replace(settings, translator_key="fake-key")
+        Personalizer._azure_translate = _fail_translate
+        packet_f = pers_f.build(c_res, enriched, math.snapshot(st), st["score"])
+        check("Stage e: a failing translator is recorded, not swallowed",
+              pers_f.translator_status()["last_error"] is not None
+              and "translator unreachable" in pers_f.translator_status()["last_error"])
+        check("Stage e: a failing translator falls back to the full local atlas",
+              all(l in packet_f["stage_e_personalization"]["translations"]
+                  for l in ("en", "es", "ar", "hi")),
+              f"langs={sorted(packet_f['stage_e_personalization']['translations'])}")
+        check("Stage e: a failing translator does not report the plain Azure mode",
+              pers_f.translator_mode() != "azure_translator",
+              f"mode={pers_f.translator_mode()}")
+        check("Stage e: a failing translator reports the local fallback mode",
+              pers_f.translator_mode() == "local_fallback",
+              f"mode={pers_f.translator_mode()}")
+        check("Stage e: the detail string names the fallback cause",
+              "azure-translator-error" in pers_f.translator_detail(),
+              f"detail={pers_f.translator_detail()}")
+
+        # configured + working -> the mode may claim Azure
+        pers_o = Personalizer(settings)
+        pers_o.s = dataclasses.replace(settings, translator_key="fake-key")
+        Personalizer._azure_translate = _ok_translate
+        pers_o.build(c_res, enriched, math.snapshot(st), st["score"])
+        check("Stage e: a successful translator is recorded",
+              pers_o.translator_status()["last_used"] is not None)
+        check("Stage e: a successful translator reports the Azure mode",
+              pers_o.translator_mode() == "azure_translator",
+              f"mode={pers_o.translator_mode()}")
+        check("Stage e: a successful translator reports the Azure detail",
+              pers_o.translator_detail() == "azure-translator",
+              f"detail={pers_o.translator_detail()}")
+    finally:
+        Personalizer._azure_translate = orig_translate
+
     # ---- i18n atlas coverage is locked ------------------------------------
     # A new archetype without a full es/ar/hi entry used to fall back to the
     # rhythm_shift atlas silently. These assertions make that drift a failure.
@@ -868,8 +934,40 @@ def main() -> int:
           == "Invert the right fullback into the 78,12 space."
           and debate["agent_debate_transcript"]["arbiter_verdict"]
           == "Accept the overload: the seam is worth +0.14 xT.")
-    check("War room: agents use two different model deployments",
-          len({c["deployment"] for c in debate_calls}) == 2,
+    # ---- a malformed model turn must not reach the judge as raw JSON ------
+    def malformed_chat(deployment, messages, **kwargs):
+        turn = len([c for c in malformed_calls if c["deployment"] == deployment])
+        malformed_calls.append({"deployment": deployment})
+        if turn == 0:
+            return "```json\n{ this is not valid json\n```"
+        if turn == 1:
+            return json.dumps({"thinking": "no statement key here", "raw": {"nested": True}})
+        return "<<RAW MODEL OUTPUT THAT IS NOT A STATEMENT>>"
+
+    malformed_calls: list = []
+    malformed_router = FoundryRouter(settings)
+    malformed_router._chat = malformed_chat  # type: ignore[assignment]
+    malformed_router.s = _AzureEnabledSettings(settings)  # type: ignore[assignment]
+    malformed = asyncio.get_event_loop().run_until_complete(
+        malformed_router.tactical_war_room(debate_ctx))
+    m_transcript = malformed.get("agent_debate_transcript") or {}
+    check("War room: a malformed model turn never shows raw output to the judge",
+          all("{" not in str(m_transcript.get(k, ""))
+              and "```" not in str(m_transcript.get(k, ""))
+              and "<<RAW" not in str(m_transcript.get(k, ""))
+              for k in ("manager_proposal", "scout_counter", "arbiter_verdict")),
+          f"transcript={ {k: str(v)[:60] for k, v in m_transcript.items()} }")
+    check("War room: a malformed model turn is reported as degraded",
+          malformed.get("degraded") is True
+          and len(malformed.get("degraded_agents") or []) >= 1,
+          f"degraded={malformed.get('degraded')} agents={malformed.get('degraded_agents')}")
+    check("War room: a malformed model turn still yields the deterministic prescription",
+          isinstance(malformed.get("projected_30s_xt_delta"), (int, float))
+          and len(malformed.get("target_zones") or []) >= 1
+          and isinstance(malformed.get("recommended_adjustment"), dict),
+          "numbers stay grounded in Stage B")
+
+    check("War room: agents use two different model deployments",          len({c["deployment"] for c in debate_calls}) == 2,
           ", ".join(sorted({c["deployment"] for c in debate_calls})))
 
     # ---- the sandbox counterfactual must reach the arbiter's tools ------

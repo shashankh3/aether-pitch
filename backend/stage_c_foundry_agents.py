@@ -1097,6 +1097,7 @@ class FoundryRouter:
         calls: List[dict] = []
         turns: List[dict] = []
         statements: Dict[str, str] = {}
+        degraded_turns: List[str] = []
         arbiter_payload: dict = {}
 
         for spec in WAR_ROOM_AGENTS:
@@ -1138,11 +1139,20 @@ class FoundryRouter:
                 "completion_tokens": usage.get("completion_tokens"),
                 "total_tokens": usage.get("total_tokens"),
             })
+            # A model turn that does not parse must not reach the judge as raw
+            # JSON or a markdown fence. Fall back to a clean, honest line and
+            # record the degradation so the transcript is never a lie.
             turn_text = (
                 parsed.get("statement")
                 or parsed.get("arbiter_verdict")
-                or (raw or "").strip()[:700]
+                or ""
             )
+            if not turn_text:
+                degraded_turns.append(spec["agent"])
+                turn_text = (
+                    f"{spec['agent']} returned a response the studio could not parse; "
+                    f"the deterministic Stage B reading is being used instead."
+                )
             turns.append({"agent": spec["agent"], "turn": spec["turn"], "statement": turn_text})
             statements[spec["id"]] = turn_text
             if spec["id"] == "spatial_arbiter":
@@ -1175,6 +1185,8 @@ class FoundryRouter:
                 "arbiter_verdict": statements.get("spatial_arbiter", ""),
             },
             "agent_calls": calls,
+            "degraded": bool(degraded_turns),
+            "degraded_agents": degraded_turns,
             "orchestration": {
                 "mode": "sequential_debate",
                 "rounds": len(calls),

@@ -21,6 +21,7 @@ import asyncio
 import copy
 import hashlib
 import json
+import logging
 import time
 from collections import deque
 from datetime import datetime, timezone
@@ -51,6 +52,7 @@ SEND_TIMEOUT_S = 2.0
 QUEUE_MAX = 8
 
 app = FastAPI(title="AETHER PITCH — Studio Engine", version="3.0.0")
+log = logging.getLogger("aether.studio")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],           # hackathon demo: studio frontend on any origin
@@ -1017,15 +1019,16 @@ async def pipeline_audit() -> dict:
             "stage_d_render_ms": round(t_d / reps, 3),
             "stage_e_personalize_ms": round(max(0.01, t_e / reps), 3),
         },
-        "stage_modes": {
-            "a": "local_live",
-            "b": "local_live",
-            "c": "azure_ready" if settings.azure_enabled else "local_fallback",
-            "d": "local_live",
-            "e": "azure_translator" if settings.translator_enabled else "local_atlas",
-        },
-        "stage_c_audit_mode": "deterministic_fallback",
-        "azure": foundry.status(),
+          "stage_modes": {
+              "a": "local_live",
+              "b": "local_live",
+              "c": "azure_ready" if settings.azure_enabled else "local_fallback",
+              "d": "local_live",
+              "e": personalizer.translator_mode(),
+          },
+          "stage_c_audit_mode": "deterministic_fallback",
+          "azure": foundry.status(),
+          "translator": personalizer.translator_status(),
         "live_pipeline": {
             k: v.get("latency_ms") for k, v in pipeline["stages"].items()
         },
@@ -1064,10 +1067,11 @@ async def health() -> dict:
             "a": "local-pitchforge", "b": "local-numpy",
             "c": f"azure-openai:{settings.narrative_deployment}" if settings.azure_enabled
                  else "deterministic-fallback",
-            "d": "local-websocket",
-            "e": "azure-translator" if settings.translator_enabled else "deterministic-atlas",
-        },
-        "stage_c": foundry.status(),
+              "d": "local-websocket",
+              "e": personalizer.translator_detail(),
+          },
+          "stage_c": foundry.status(),
+          "translator": personalizer.translator_status(),
         "clients": len(hub.clients),
         "clock": LIVE[0].get("clock"), "score": LIVE[0].get("score"),
         "match": {
@@ -1171,8 +1175,11 @@ async def ws_endpoint(ws: WebSocket) -> None:
             await ws.receive_text()   # keepalive pings from the studio
     except WebSocketDisconnect:
         pass
-    except Exception:
-        pass
+    except Exception as exc:
+        # A malformed client frame (or a socket that dies mid-read) must not
+        # close the studio feed with no trace: log it so a judge reporting
+        # "the pitch froze" has something to look at.
+        log.warning("ws_endpoint closed on client error: %s: %s", type(exc).__name__, exc)
     finally:
         await hub.leave(ws)
 

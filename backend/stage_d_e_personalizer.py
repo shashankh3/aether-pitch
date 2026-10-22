@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from datetime import datetime, timezone
 from typing import Dict, Optional
 
 import requests
@@ -226,6 +227,51 @@ class Personalizer:
         self.s = cfg
         self.last_d_ms = 0.0
         self.last_e_ms = 0.0
+        # Runtime truth about the Azure Translator, mirroring
+        # FoundryRouter.status(): a configured key is not the same thing as a
+        # translator that has actually answered.
+        self.translator_last_attempted: Optional[str] = None
+        self.translator_last_used: Optional[str] = None
+        self.translator_last_error: Optional[str] = None
+
+    def translator_status(self) -> dict:
+        """Truthful Azure Translator posture for the health/audit endpoints.
+
+        ``configured`` only says a key is present. ``last_used`` says whether a
+        translation has ever actually come back from Azure. The health
+        endpoint must not claim "azure-translator" on configuration alone.
+        """
+        return {
+            "configured": bool(self.s.translator_enabled),
+            "last_attempted": self.translator_last_attempted,
+            "last_used": self.translator_last_used,
+            "last_error": self.translator_last_error,
+            "region": self.s.translator_region,
+        }
+
+    def translator_mode(self) -> str:
+        """Canonical Stage (e) mode token.
+
+        Vocabulary matches the other stage modes so the studio UI can map it
+        without guessing: ``local_atlas`` | ``azure_translator`` |
+        ``local_fallback``. A configured Translator is only ever
+        ``azure_translator`` once a translation has actually come back.
+        """
+        if not self.s.translator_enabled:
+            return "local_atlas"
+        if self.translator_last_used:
+            return "azure_translator"
+        return "local_fallback"
+
+    def translator_detail(self) -> str:
+        """Human-readable posture for the health endpoint."""
+        if not self.s.translator_enabled:
+            return "deterministic-atlas"
+        if self.translator_last_used:
+            return "azure-translator"
+        if self.translator_last_error:
+            return "deterministic-atlas(azure-translator-error)"
+        return "deterministic-atlas(azure-translator-unverified)"
 
     @staticmethod
     def normalize_preferences(pref: Optional[dict]) -> dict:
@@ -419,12 +465,17 @@ class Personalizer:
         for lang, tmpl in atlas.items():
             out[lang] = tmpl.format(team=team, opp=opp, player=player)
         if self.s.translator_enabled:
+            self.translator_last_attempted = datetime.now(timezone.utc).isoformat()
             try:
                 azure = self._azure_translate(story_en)
                 if azure:
                     out.update(azure)
-            except Exception:
-                pass  # fall back to the deterministic atlas silently
+                    self.translator_last_used = datetime.now(timezone.utc).isoformat()
+            except Exception as exc:
+                # Fall back to the deterministic atlas, but record why: a
+                # silent fallback would make the health endpoint claim
+                # "azure-translator" while Azure is actually failing.
+                self.translator_last_error = f"{type(exc).__name__}: {exc}"[:200]
         return out
 
     def _azure_translate(self, text: str) -> Optional[Dict[str, str]]:

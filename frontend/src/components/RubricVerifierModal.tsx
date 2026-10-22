@@ -154,6 +154,21 @@ export default function RubricVerifierModal({ open, onClose }: Props) {
               })}
             </div>
 
+            {audit.translator?.last_error && (
+              <div className="clip-chamfer mt-2 border border-gold/40 bg-gold/[0.07] px-3 py-2">
+                <div className="font-tech text-[10px] font-bold uppercase tracking-wider text-gold">
+                  Azure Translator configured but unreachable
+                </div>
+                <div className="mt-1 break-words font-tech text-[10px] text-slate-400">
+                  {audit.translator.last_error}
+                </div>
+                <div className="mt-1 font-tech text-[10px] text-slate-500">
+                  Stage (e) is serving the deterministic in-repo language atlas, so all four
+                  languages remain available. The mode chip above reports the real posture.
+                </div>
+              </div>
+            )}
+
             <div className="clip-chamfer mt-3 flex items-center gap-3 border border-cyan-300/30 bg-cyan-300/[0.06] px-3 py-2">
               <Crosshair size={16} className="shrink-0 text-cyan-300" />
               <div className="min-w-0 flex-1">

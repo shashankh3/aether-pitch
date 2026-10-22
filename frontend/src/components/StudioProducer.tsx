@@ -580,6 +580,18 @@ export function BenchWarRoomPanel({
         </p>
       )}
 
+      {warRoom?.degraded && (
+        <div className="clip-ea mb-2 border border-gold/40 bg-gold/[0.07] px-2.5 py-1.5">
+          <div className="font-tech text-[9.5px] font-bold uppercase tracking-wider text-gold">
+            Degraded · {warRoom.degraded_agents?.length ?? 0} agent turn(s) unparseable
+          </div>
+          <div className="mt-0.5 font-tech text-[9px] leading-relaxed text-slate-400">
+            The model response could not be read, so the deterministic Stage B reading is
+            being used. Every number below is still grounded in live telemetry.
+          </div>
+        </div>
+      )}
+
       {warRoom && transcript && (
         <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-1">

@@ -770,6 +770,8 @@ export interface WarRoomResponse {
   adjustment_vectors: WarRoomVector[];
   agents: WarRoomAgent[];
   agent_calls?: WarRoomAgentCall[];
+  degraded?: boolean;
+  degraded_agents?: string[];
   orchestration?: {
     mode: string;
     rounds: number;
@@ -876,8 +878,15 @@ export interface PipelineAudit {
     fallback: number;
     grounding_pass: number;
   };
-  stage_modes?: Record<string, string>;
-  stage_c_audit_mode?: string;
+    stage_modes?: Record<string, string>;
+    stage_c_audit_mode?: string;
+    translator?: {
+      configured: boolean;
+      last_attempted: string | null;
+      last_used: string | null;
+      last_error: string | null;
+      region: string;
+    };
   azure?: {
     configured: boolean;
     last_attempted: boolean;
