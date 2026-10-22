@@ -37,11 +37,11 @@ import {
 } from "../src/lib/sandboxStore";
 import {
   annotateWithEvaluation,
-  clearLedger,
-  counterfactualLedger,
+  clearLedger,  counterfactualLedger,
   logExperiment,
 } from "../src/lib/ledgerStore";
 import { buildDossier, dossierToMarkdown } from "../src/lib/dossier";
+import { FailoverDrill } from "../src/lib/failoverDrill";
 import type {
   MatchRecapStoryboard, MatchTick, PlayerTick, RecapAct, Team,
 } from "../src/lib/types";
@@ -850,6 +850,133 @@ check(
     /tickRef\.current\s*=\s*tick/.test(deltaHud)
     && /tickRef\.current/.test(deltaHud),
   );
+}
+
+// ---------------------------------------------------------------------------
+// The cloud-outage failover drill.
+//
+// The drill is the demo's headline resilience claim and it used to be
+// untestable: the state machine lived inside a React effect, so nothing
+// verified that the outage actually drops the cloud, that the edge engine
+// keeps running through it, or that the phases arrive in order. It is now
+// a standalone state machine with an injected clock, so a six-second drill
+// can be driven in milliseconds here.
+// ---------------------------------------------------------------------------
+{
+  class ManualClock {
+    private t = 0;
+    private readonly wall = 1_700_000_000_000;
+    private timers: { at: number; fn: () => void; id: number }[] = [];
+    private nextId = 1;
+
+    now = (): number => this.t;
+    wallNow = (): number => this.wall;
+    setTimeout = (fn: () => void, ms: number): unknown => {
+      const id = this.nextId++;
+      this.timers.push({ at: this.t + ms, fn, id });
+      return id;
+    };
+    clearTimeout = (handle: unknown): void => {
+      this.timers = this.timers.filter((x) => x.id !== handle);
+    };
+    advance(ms: number): void {
+      const target = this.t + ms;
+      for (;;) {
+        const due = this.timers
+          .filter((x) => x.at <= target)
+          .sort((a, b) => a.at - b.at)[0];
+        if (!due) break;
+        this.timers = this.timers.filter((x) => x.id !== due.id);
+        this.t = due.at;
+        due.fn();
+      }
+      this.t = target;
+    }
+  }
+
+  const phases: string[] = [];
+  let outages = 0;
+  let reconnects = 0;
+  const clock = new ManualClock();
+  const drill = new FailoverDrill(
+    clock,
+    (s) => phases.push(s.phase),
+    () => {
+      outages += 1;
+    },
+    () => {
+      reconnects += 1;
+    },
+  );
+
+  check("Drill: it starts idle", drill.snapshot.phase === "idle" && !drill.isActive);
+
+  const started = drill.trigger(6000);
+  check("Drill: triggering starts the outage", started && drill.isActive);
+  check("Drill: the drill drops the cloud exactly once", outages === 1);
+  check("Drill: the outage phase is entered", drill.snapshot.phase === "outage");
+  check("Drill: the drill reports zero dropped frames", drill.snapshot.framesDropped === 0);
+  check("Drill: the drill is active while the cloud is down", drill.snapshot.active);
+
+  // A second trigger must not restart the timers underneath the first drill.
+  const second = drill.trigger(6000);
+  check("Drill: a second trigger is refused", second === false && outages === 1);
+
+  // The edge engine keeps producing frames through the outage.
+  for (let i = 0; i < 40; i++) drill.frame();
+  check("Drill: every edge frame proves continuity", drill.snapshot.reconciledTicks === 40,
+    `${drill.snapshot.reconciledTicks} frames`);
+  check("Drill: the frame count is republished at 1 Hz, not 10 Hz",
+    phases.filter((p) => p === "outage").length <= 6,
+    `${phases.filter((p) => p === "outage").length} republishes for 40 frames`);
+
+  // The cloud comes back.
+  clock.advance(6000);
+  check("Drill: the cloud is reconnected", reconnects === 1);
+  check("Drill: the reconciling phase is entered", drill.snapshot.phase === "reconciling");
+  check("Drill: the swap latency is measured, not invented",
+    drill.snapshot.swapLatencyMs === 6000,
+    `${drill.snapshot.swapLatencyMs}ms`);
+
+  // The reconciled state is shown, then the drill is done.
+  clock.advance(700);
+  check("Drill: the verified phase is reached", drill.snapshot.phase === "verified");
+  check("Drill: the drill is no longer active", !drill.isActive && !drill.snapshot.active);
+  check("Drill: the reconciled frame count survives", drill.snapshot.reconciledTicks === 40);
+  check("Drill: the drill still reports zero dropped frames",
+    drill.snapshot.framesDropped === 0);
+  check("Drill: the phases arrived in order",
+    phases[0] === "outage" && phases.includes("reconciling")
+    && phases[phases.length - 1] === "verified",
+    phases.join(" -> "));
+
+  // Frames after the drill ends must not be counted against it.
+  drill.frame();
+  check("Drill: frames after the drill ends are not counted",
+    drill.snapshot.reconciledTicks === 40);
+
+  // A fresh drill must work after the previous one.
+  phases.length = 0;
+  const again = drill.trigger(1000);
+  check("Drill: the drill can run again after it finished", again && drill.snapshot.phase === "outage");
+
+  // The socket reopening is the clock cross-check.
+  const clock2 = new ManualClock();
+  const drill2 = new FailoverDrill(clock2, () => {}, () => {}, () => {});
+  drill2.trigger(6000);
+  drill2.reconnected();
+  check("Drill: a reopened socket moves the drill to reconciling",
+    drill2.snapshot.phase === "reconciling" && drill2.snapshot.reconciledTicks === 1,
+    `phase=${drill2.snapshot.phase} ticks=${drill2.snapshot.reconciledTicks}`);
+
+  // Disposal must release the timers.
+  const clock3 = new ManualClock();
+  const drill3 = new FailoverDrill(clock3, () => {}, () => {}, () => {});
+  drill3.trigger(6000);
+  drill3.dispose();
+  clock3.advance(10_000);
+  check("Drill: disposal cancels the pending timers", drill3.snapshot.phase === "outage",
+    `phase=${drill3.snapshot.phase}`);
 }
 
 // --- cleanup ----------------------------------------------------------------

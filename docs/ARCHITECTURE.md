@@ -42,18 +42,19 @@ backend/
 frontend/src/
   lib/edgeEngine.ts           1,707 LOC  the browser-native twin
   lib/telemetry.ts              284 LOC  10 Hz store â†’ 60 fps render
-  lib/types.ts                  893 LOC  the shared contract surface
+  lib/types.ts                  907 LOC  the shared contract surface
   lib/dossier.ts                359 LOC  audit dossier serialization
   lib/sandboxStore.ts           247 LOC  what-if sandbox state
   lib/ledgerStore.ts             88 LOC  counterfactual experiment ledger
   lib/runtimeConfig.ts           53 LOC  runtime backend coordinates
+  lib/failoverDrill.ts       199 LOC  the failoverDrill module
   lib/hudContext.tsx            137 LOC  control-center + palette state
   lib/useModalA11y.ts            72 LOC  focus trap + escape handling
   lib/utils.ts                   14 LOC  shared class-name helper
   lib/api.ts                      6 LOC  the REST client
   app/page.tsx                1,281 LOC  the orchestrator
   app/layout.tsx                108 LOC  runtime config injection + error boundary
-  hooks/useResilientMatchEngine.ts  379 LOC  WS + edge failover + drill
+  hooks/useResilientMatchEngine.ts  336 LOC  WS + edge failover + drill
   hooks/useSpeechController.ts      129 LOC  zero-overlap speech
   hooks/useRenderTelemetry.ts       55 LOC  measured frame rate
   components/                            HUD, drawers, modals (30 files)
@@ -163,7 +164,7 @@ The 3D stage is not an observer feed â€” it is a sandbox.
 | Types | `cd frontend && npx tsc --noEmit` | The whole contract surface |
 | Build | `npm run build` | Production compile |
 | SSR | `npm run smoke` | In-process server render, runtime config injection, no SSR error |
-| Logic | `npm run check:logic` | 48 headless assertions over the browser twin, the sandbox, the ledger, the dossier and the DVR buffer |
+| Logic | `npm run check:logic` | 69 headless assertions over the browser twin, the sandbox, the ledger, the dossier and the DVR buffer |
 | UI render | `npm run smoke:ui` | 30 assertions â€” every judge-facing surface renders without throwing |
 
 The backend suite also runs the **Official Rules compliance audit** â€” synthetic

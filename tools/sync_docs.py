@@ -188,6 +188,79 @@ def main() -> int:
                                 f"{mm.group(3)}{suites['backend']} assertions"),
                     "ARCHITECTURE module map backend count", changes)
 
+    # The module map must list every module, with its size. This walks the
+    # map generically: any entry whose file exists gets its LOC corrected,
+    # and any new module is inserted next to its siblings.
+    MAP_ENTRY = re.compile(
+        r"^(\s+)([A-Za-z0-9_./-]+\.(?:py|ts|tsx|json|css))(\s+)([\d,]+)( LOC)(.*)$",
+        re.M)
+    roots = [ROOT / "backend", ROOT / "frontend" / "src"]
+    known = {}
+    for r in roots:
+        for p in r.rglob("*"):
+            if p.is_file() and p.suffix in (".py", ".ts", ".tsx", ".json", ".css"):
+                known.setdefault(p.name, []).append(p)
+
+    def resolve(basename: str):
+        cands = known.get(basename) or []
+        return cands[0] if len(cands) == 1 else (cands[0] if cands else None)
+
+    def fix_map(text: str) -> str:
+        out_lines = []
+        for line in text.splitlines(keepends=True):
+            m = MAP_ENTRY.match(line)
+            if m:
+                indent, path, gap, stated, unit, rest = m.groups()
+                target = resolve(path.rsplit("/", 1)[-1])
+                if target is not None:
+                    actual = count_lines(target.relative_to(ROOT).as_posix())
+                    if int(stated.replace(",", "")) != actual:
+                        line = f"{indent}{path}{gap}{actual:,}{unit}{rest}\n"
+                        changes.append(f"ARCHITECTURE module map for {path}")
+            out_lines.append(line)
+        return "".join(out_lines)
+
+    arch = fix_map(arch)
+
+    # A new module must appear in the map at all. The map lists the backend
+    # modules and the frontend lib modules - not every component.
+    listed = {m.group(2).rsplit("/", 1)[-1] for m in MAP_ENTRY.finditer(arch)}
+    required = []
+    for p in sorted((ROOT / "backend").glob("*.py")):
+        required.append((p, "backend"))
+    for p in sorted((ROOT / "frontend" / "src" / "lib").glob("*")):
+        if p.is_file() and p.suffix in (".ts", ".tsx"):
+            required.append((p, "frontend/src"))
+    for p, base in required:
+        if p.name in listed:
+            continue
+        rel = p.relative_to(ROOT).as_posix()
+        short = rel.replace("frontend/src/", "").replace("backend/", "")
+        actual = count_lines(rel)
+        lines = arch.splitlines(keepends=True)
+        anchor = next((i for i, l in enumerate(lines)
+                       if re.match(r"\s*lib/runtimeConfig\.ts\s", l)), None)
+        if anchor is None:
+            continue
+        # The map right-aligns the LOC figure at column 32; match it.
+        num = f"{actual:,}"
+        pad = max(1, 32 - 2 - len(short) - len(num))
+        lines.insert(anchor + 1,
+                     f"  {short}{' ' * pad}{num} LOC  the {p.stem} module\n")
+        arch = "".join(lines)
+        changes.append(f"ARCHITECTURE module map: added {short}")
+
+    # The compliance audit prints how many source files it scans.
+    out = run([sys.executable, "backend/test_pipeline.py"])
+    m = re.search(r"(\d+) files scanned, (\d+) offenders", out)
+    if m:
+        scanned = int(m.group(1))
+        readme = sub_once(readme, r"\((\d+) files scanned\)", f"({scanned} files scanned)",
+                          "README compliance-scan file count", changes)
+        guide = sub_once(guide, r"scans (\d+) files with 0 offenders",
+                         f"scans {scanned} files with 0 offenders",
+                         "SUBMISSION_GUIDE compliance-scan file count", changes)
+
     if args.check:
         print("\nwould change:")
         for c in changes:

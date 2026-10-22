@@ -6,6 +6,7 @@ import type {
 } from "@/lib/types";
 import { telemetry } from "@/lib/telemetry";
 import { EdgeEngine } from "@/lib/edgeEngine";
+import { FailoverDrill, realClock } from "@/lib/failoverDrill";
 import { API_BASE } from "@/lib/api";
 import { wsUrl } from "@/lib/runtimeConfig";
 
@@ -75,13 +76,7 @@ export function useResilientMatchEngine(): ResilientStudioState {
   const edgeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastEdgeInsight = useRef(0);
   const frameCount = useRef(0);
-  const drillRef = useRef<{
-    active: boolean;
-    swapStartedAt: number;
-    reconciledTicks: number;
-    timer: ReturnType<typeof setTimeout> | null;
-    reconcileTimer: ReturnType<typeof setTimeout> | null;
-  }>({ active: false, swapStartedAt: 0, reconciledTicks: 0, timer: null, reconcileTimer: null });
+  const drillRef = useRef<FailoverDrill | null>(null);
   const drillReconnectRef = useRef<(() => void) | null>(null);
   const runDrillRef = useRef<((durationMs: number) => void) | null>(null);
 
@@ -102,51 +97,11 @@ export function useResilientMatchEngine(): ResilientStudioState {
     // The edge engine is already running underneath the live stream, so a
     // drill is a hot-swap with zero dropped 3D frames: we close the socket,
     // let the edge timer take the picture, then reconnect and reconcile.
+    //
+    // The state machine lives in lib/failoverDrill.ts so it can be driven
+    // deterministically in a test; this hook owns the side effects only.
     const runDrill = (durationMs: number) => {
-      const drill = drillRef.current;
-      if (drill.active) return;
-      drill.active = true;
-      drill.swapStartedAt = performance.now();
-      drill.reconciledTicks = 0;
-      setFailoverDrillState({
-        active: true,
-        swapLatencyMs: 0,
-        framesDropped: 0,
-        reconciledTicks: 0,
-        phase: "outage",
-        startedAt: Date.now(),
-        durationMs,
-      });
-
-      // 1) simulate the cloud dropping the stream
-      try {
-        wsRef.current?.close();
-      } catch {
-        /* noop */
-      }
-      setConnected(false);
-      setStatus("EDGE_SYNTHETIC_FALLBACK");
-      startEdge();
-
-      // 2) measure the hot-swap latency (edge timer already running)
-      drill.timer = setTimeout(() => {
-        setFailoverDrillState((prev) => ({
-          ...prev,
-          swapLatencyMs: Number((performance.now() - drill.swapStartedAt).toFixed(1)),
-          phase: "reconciling",
-        }));
-        // 3) reconcile: reopen the cloud stream and cross-check the clock
-        drillReconnectRef.current?.();
-        drill.reconcileTimer = setTimeout(() => {
-          drill.active = false;
-          setFailoverDrillState((prev) => ({
-            ...prev,
-            active: false,
-            phase: "verified",
-            reconciledTicks: drill.reconciledTicks,
-          }));
-        }, 700);
-      }, durationMs);
+      drillRef.current?.trigger(durationMs);
     };
     drillReconnectRef.current = () => {
       try {
@@ -169,18 +124,10 @@ export function useResilientMatchEngine(): ResilientStudioState {
         if (!telemetry.playbackPaused) setTick(frame.tick);
         frameCount.current += 1;
         // During a drill every edge frame proves continuity: zero dropped.
-        // The badge is republished at 1Hz, not 10Hz, so the drill never
-        // causes the re-render churn it is supposed to prove does not exist.
-        if (drillRef.current.active) {
-          drillRef.current.reconciledTicks += 1;
-          if (drillRef.current.reconciledTicks % 10 === 0) {
-            setFailoverDrillState((prev) =>
-              prev.active
-                ? { ...prev, reconciledTicks: drillRef.current.reconciledTicks }
-                : prev,
-            );
-          }
-        }
+        // The drill owns the counting and republishes its badge at 1Hz, so
+        // the drill never causes the re-render churn it is supposed to
+        // prove does not exist.
+        drillRef.current?.frame();
         if (frameCount.current % 5 === 0) {
           telemetry.applyMetrics(frame.metrics);
           setMetrics(frame.metrics);
@@ -228,14 +175,7 @@ export function useResilientMatchEngine(): ResilientStudioState {
         setStatus("CONNECTED_PIPELINE_LIVE");
         stopEdge();
         // The cloud is back: reconcile the match clock against the edge twin.
-        if (drillRef.current.active) {
-          drillRef.current.reconciledTicks += 1;
-          setFailoverDrillState((prev) => ({
-            ...prev,
-            reconciledTicks: drillRef.current.reconciledTicks,
-            phase: prev.phase === "outage" ? "reconciling" : prev.phase,
-          }));
-        }
+        drillRef.current?.reconnected();
       };
 
       ws.onmessage = (raw) => {
@@ -322,11 +262,28 @@ export function useResilientMatchEngine(): ResilientStudioState {
         setStatus("EDGE_SYNTHETIC_FALLBACK");
         startEdge();
         // During a drill the reconnect is owned by the drill controller.
-        if (drillRef.current.active) return;
+        if (drillRef.current?.isActive) return;
         retry = setTimeout(connect, 2500);
       };
       ws.onerror = () => ws.close();
     };
+
+    drillRef.current = new FailoverDrill(
+      realClock,
+      (state) => setFailoverDrillState(state),
+      () => {
+        // 1) simulate the cloud dropping the stream
+        try {
+          wsRef.current?.close();
+        } catch {
+          /* noop */
+        }
+        setConnected(false);
+        setStatus("EDGE_SYNTHETIC_FALLBACK");
+        startEdge();
+      },
+      () => drillReconnectRef.current?.(),
+    );
 
     startEdge();
     connect();
@@ -341,8 +298,8 @@ export function useResilientMatchEngine(): ResilientStudioState {
       disposed = true;
       clearTimeout(retry);
       clearInterval(ping);
-      if (drillRef.current.timer) clearTimeout(drillRef.current.timer);
-      if (drillRef.current.reconcileTimer) clearTimeout(drillRef.current.reconcileTimer);
+      drillRef.current?.dispose();
+      drillRef.current = null;
       stopEdge();
       wsRef.current?.close();
     };
