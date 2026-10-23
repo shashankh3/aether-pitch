@@ -11,7 +11,7 @@ import math
 import re
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Iterable, Optional
 
 NUMBER_RE = re.compile(r"-?\d+(?:\.\d+)?")
 

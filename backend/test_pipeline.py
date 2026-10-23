@@ -24,7 +24,7 @@ if hasattr(sys.stdout, "reconfigure"):
 from agent_trace import build_agent_trace, gate_snapshot, p95, verify_grounding
 from fastapi import HTTPException
 from content_safety import ContentSafetyClient, content_safety_status
-from rai_shield import check_club_neutrality, check_numeric_grounding, detect_prompt_risk
+from rai_shield import check_club_neutrality, check_numeric_grounding
 from stage_a_synthetic_engine import MATCH_METADATA, PitchForgeEngine
 from stage_b_math_engine import (
     PITCH_L, PITCH_W, TacticalMathEngine, XT_COLS, XT_MAX, XT_MIN, XT_ROWS,
@@ -940,7 +940,6 @@ def main() -> int:
 
     def fake_chat(deployment, messages, **kwargs):
         debate_calls.append({"deployment": deployment, "messages": messages, "kwargs": kwargs})
-        user = json.loads(messages[1]["content"])
         turn = len(debate_calls)
         if turn == 1:
             return json.dumps({"statement": "Invert the right fullback into the 78,12 space."})

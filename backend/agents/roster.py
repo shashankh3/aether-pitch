@@ -2,10 +2,6 @@ from __future__ import annotations
 
 from typing import Optional
 
-from rai_shield import (
-    build_safety_shield, detect_prompt_risk, shield_deflection,
-)
-
 #: The SpatialArbiterAgent's dedicated brief for a single interactive
 #: counterfactual scenario (the what-if sandbox), as opposed to the full
 #: three-turn debate in ``WAR_ROOM_AGENTS``.

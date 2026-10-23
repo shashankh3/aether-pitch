@@ -19,18 +19,15 @@ from __future__ import annotations
 
 import asyncio
 import copy
-import hashlib
 import json
 import logging
 import time
 from collections import deque
 from datetime import datetime, timezone
-from typing import Any, Dict, List, NamedTuple, Optional, Set, Tuple
+from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 
-from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
 from agent_trace import build_agent_trace, gate_snapshot, p95, verify_grounding
 from config import settings
 from content_safety import ContentSafetyClient, content_safety_status
@@ -38,13 +35,20 @@ from counterfactual import (
     CounterfactualDisplacement, CounterfactualEvaluation, CounterfactualRequest,
     CounterfactualRejected, DefensiveLineOverride, evaluate_counterfactual,
 )
-from rai_shield import build_safety_shield, detect_prompt_risk
-from stage_a_synthetic_engine import PITCH_L, PitchForgeEngine
+from rai_shield import build_safety_shield
+from stage_a_synthetic_engine import PitchForgeEngine
 from stage_b_math_engine import TacticalMathEngine
 from stage_c_foundry_agents import FoundryRouter
 from stage_d_e_personalizer import Personalizer
 
 from runtime import BodySizeLimitMiddleware, Hub, QUEUE_MAX, SEND_TIMEOUT_S
+
+# The test harness reads these schema/limit handles straight off `main`, so the
+# imports above are deliberate re-exports rather than dead weight.
+__all__ = [
+    "CounterfactualDisplacement", "DefensiveLineOverride",
+    "QUEUE_MAX", "SEND_TIMEOUT_S",
+]
 
 TICK_DT = 1.0 / settings.tick_rate_hz          # 0.1 s sim step per tick
 

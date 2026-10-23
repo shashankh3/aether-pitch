@@ -4,7 +4,7 @@ import asyncio
 import json
 import re
 import time
-from typing import Dict, List, Optional
+from typing import Dict
 
 from agents.roster import ARCHETYPES, pick_archetype
 

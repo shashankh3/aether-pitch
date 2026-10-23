@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import re
 import time
 from typing import Dict, List
 
@@ -332,7 +331,6 @@ class WarRoomMixin:
         lines = metrics.get("def_lines") or {}
         team_ppda = float(ppda.get(team) or 0.0)
         opp_ppda = float(ppda.get(opp) or 0.0)
-        line_team = float(lines.get(team) or 0.0)
         line_opp = float(lines.get(opp) or 0.0)
         territory = metrics.get("pitch_control_split") or {}
         nla_pct = float(territory.get("nla_territory_pct") or 50.0)

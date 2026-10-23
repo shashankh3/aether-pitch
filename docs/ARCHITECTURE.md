@@ -30,7 +30,7 @@ backend/
   stage_a_synthetic_engine.py 1,075 LOC  Stage A — the simulation
   stage_b_math_engine.py        870 LOC  Stage B — the mathematics
   stage_c_foundry_agents.py       36 LOC  stable re-export barrel
-  agents/                     1,841 LOC  Foundry router package (8 modules)
+  agents/                     1,832 LOC  Foundry router package (8 modules)
   stage_d_e_personalizer.py     555 LOC  Stage D/E — render + personalise
   agent_trace.py                231 LOC  grounded handoff trace
   rai_shield.py                 311 LOC  prompt shield + neutrality + grounding
@@ -38,10 +38,10 @@ backend/
   counterfactual.py             358 LOC  what-if contract + evaluation (no globals)
   parity_fixture.py             237 LOC  cross-engine parity fixture
   config.py                      98 LOC  environment + runtime configuration
-  main.py                     1,157 LOC  HTTP/WS surface + match loop
+  main.py                     1,161 LOC  HTTP/WS surface + match loop
   runtime.py                    169 LOC  WebSocket hub + request body guard
   circuit_breaker.py            147 LOC  transport retry + circuit breaker
-  test_pipeline.py            2,518 LOC  237 assertions
+  test_pipeline.py            2,517 LOC  237 assertions
   test_resilience.py            234 LOC  resilience + async transport tests
 
 frontend/src/

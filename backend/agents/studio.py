@@ -111,7 +111,6 @@ class StudioQueryMixin:
         gap_defender = sp.get("gap_defender") or {}
         sprinter = sp.get("fastest_sprinter") or {}
         ghost = sp.get("ghost") or {}
-        chaos = sp.get("chaos_index", 0.5)
         q = (ctx.get("query") or "").lower()
         if any(k in q for k in ("ghost", "what if", "counterfactual", "alternative", "instead")):
             specialist = "Ghost-Pass Counterfactual"
